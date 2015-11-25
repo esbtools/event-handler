@@ -1,17 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~  Copyright 2015 esbtools Contributors and/or its affiliates.
+  ~
+  ~  This file is part of esbtools.
+  ~
+  ~  This program is free software: you can redistribute it and/or modify
+  ~  it under the terms of the GNU General Public License as published by
+  ~  the Free Software Foundation, either version 3 of the License, or
+  ~  (at your option) any later version.
+  ~  This program is distributed in the hope that it will be useful,
+  ~  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~  GNU General Public License for more details.
+  ~
+  ~  You should have received a copy of the GNU General Public License
+  ~  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  -->
+
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.redhat.esb</groupId>
-    <artifactId>event-handler</artifactId>
+    <groupId>org.esbtools.eventhandler</groupId>
+    <artifactId>event-handler-parent</artifactId>
+    <packaging>pom</packaging>
     <version>0.1.0-SNAPSHOT</version>
+    <modules>
+        <module>lib</module>
+        <module>lightblue</module>
+    </modules>
 
     <properties>
-        <version.lightblue-client-http>2.0.0-SNAPSHOT</version.lightblue-client-http>
 
+        <version.camel>2.16.0</version.camel>
+        <version.activemq>5.11.0</version.activemq>
         <version.guava>18.0</version.guava>
+        <version.logback>1.1.3</version.logback>
         <version.jsr305>1.3.9</version.jsr305>
 
         <version.junit>4.12</version.junit>
@@ -19,15 +44,36 @@
         <version.truth>0.27</version.truth>
 
         <version.maven-compiler-plugin>3.3</version.maven-compiler-plugin>
+        <version.jdk>1.8</version.jdk>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- Lightblue implementation -->
+            <!-- Camel and friends -->
             <dependency>
-                <groupId>com.redhat.lightblue.client</groupId>
-                <artifactId>lightblue-client-http</artifactId>
-                <version>${version.lightblue-client-http}</version>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-core</artifactId>
+                <version>${version.camel}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-jms</artifactId>
+                <version>${version.camel}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.activemq</groupId>
+                <artifactId>activemq-camel</artifactId>
+                <version>${version.activemq}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.activemq</groupId>
+                <artifactId>activemq-pool</artifactId>
+                <version>${version.activemq}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-http4</artifactId>
+                <version>${version.camel}</version>
             </dependency>
 
             <!-- Libraries: not implementation specific -->
@@ -40,6 +86,13 @@
                 <groupId>com.google.code.findbugs</groupId>
                 <artifactId>jsr305</artifactId>
                 <version>${version.jsr305}</version>
+            </dependency>
+
+            <!-- Logging -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${version.logback}</version>
             </dependency>
 
             <!-- Testing -->
@@ -61,35 +114,14 @@
                 <version>${version.truth}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-test</artifactId>
+                <version>${version.camel}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <dependencies>
-        <dependency>
-            <groupId>com.redhat.lightblue.client</groupId>
-            <artifactId>lightblue-client-http</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.truth</groupId>
-            <artifactId>truth</artifactId>
-        </dependency>
-    </dependencies>
 
     <build>
         <plugins>
@@ -97,8 +129,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${version.maven-compiler-plugin}</version>
                 <configuration>
-                    <source>1.7</source>
-                    <target>1.7</target>
+                    <source>${version.jdk}</source>
+                    <target>${version.jdk}</target>
                 </configuration>
             </plugin>
         </plugins>
