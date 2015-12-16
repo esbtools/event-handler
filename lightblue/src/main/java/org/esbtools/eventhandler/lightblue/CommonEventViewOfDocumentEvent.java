@@ -18,8 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.lightblue.model.EventStatus;
-import org.esbtools.eventhandler.lightblue.model.IdentityValue;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import java.time.Instant;
@@ -36,7 +34,7 @@ public class CommonEventViewOfDocumentEvent implements CommonEventView {
 
     @Override
     public String entityName() {
-        return documentEventEntity.getEntityName();
+        return documentEventEntity.getCanonicalType();
     }
 
     @Override
@@ -45,12 +43,12 @@ public class CommonEventViewOfDocumentEvent implements CommonEventView {
     }
 
     @Override
-    public List<IdentityValue> entityIdentity() {
-        return documentEventEntity.getIdentity();
+    public List<DocumentEventEntity.KeyAndValue> entityIdentity() {
+        return documentEventEntity.getEntityIdentity();
     }
 
     @Override
-    public List<IdentityValue> normalizedEntityIdentity() {
+    public List<DocumentEventEntity.KeyAndValue> entityIncludedFields() {
         return Collections.emptyList();
     }
 
@@ -65,7 +63,7 @@ public class CommonEventViewOfDocumentEvent implements CommonEventView {
     }
 
     @Override
-    public EventStatus status() {
+    public DocumentEventEntity.Status status() {
         return documentEventEntity.getStatus();
     }
 

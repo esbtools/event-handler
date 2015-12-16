@@ -20,7 +20,7 @@ package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.eventhandler.lightblue.model.LightblueDocument;
+
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 

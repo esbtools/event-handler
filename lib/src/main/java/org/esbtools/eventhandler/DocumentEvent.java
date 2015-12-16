@@ -24,9 +24,6 @@ import java.util.Optional;
  * Models an event which corresponds to a publishable document message.
  */
 public interface DocumentEvent {
-    // TODO: Make generic?
-    Optional<Notification> source();
-
     /**
      * If the provided event's entity is looked up, will it include whatever change that this event
      * was intended to share?

@@ -18,8 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.lightblue.model.EventStatus;
-import org.esbtools.eventhandler.lightblue.model.IdentityValue;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import java.time.Instant;
@@ -41,17 +39,11 @@ public interface CommonEventView {
 
     String entityVersion();
 
-    List<IdentityValue> entityIdentity();
-
-    List<IdentityValue> normalizedEntityIdentity();
+    List<DocumentEventEntity.KeyAndValue> entityIdentity();
 
     Optional<Instant> occurrenceDate();
 
     Optional<Instant> publishDate();
-
-    EventStatus status();
-
-    Optional<LightblueNotification> notification();
 
     Optional<DocumentEventEntity> documentEvent();
 }

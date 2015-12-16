@@ -22,8 +22,7 @@ import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentRepository;
 import org.esbtools.eventhandler.LookupResult;
 import org.esbtools.eventhandler.SimpleLookupResult;
-import org.esbtools.eventhandler.lightblue.model.LightblueDocument;
-import org.esbtools.eventhandler.lightblue.model.LightblueErrorDocument;
+
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.model.DataError;
 import com.redhat.lightblue.client.model.Error;

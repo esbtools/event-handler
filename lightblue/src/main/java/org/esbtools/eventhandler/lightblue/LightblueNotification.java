@@ -19,7 +19,7 @@
 package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.Notification;
-import org.esbtools.eventhandler.lightblue.model.NotificationEntity;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 public interface LightblueNotification extends Notification {
     NotificationEntity wrappedNotificationEntity();

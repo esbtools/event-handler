@@ -32,7 +32,9 @@
 
     <properties>
         <version.event-handler-lib>0.1.0-SNAPSHOT</version.event-handler-lib>
-        <version.lightblue-client-http>2.1.0-SNAPSHOT</version.lightblue-client-http>
+        <version.lightblue-notification-hook-model>0.1.0-SNAPSHOT</version.lightblue-notification-hook-model>
+        <version.lightblue-java-generator-api>0.1.1-SNAPSHOT</version.lightblue-java-generator-api>
+        <version.lightblue-client-http>2.2.0-SNAPSHOT</version.lightblue-client-http>
     </properties>
 
     <dependencies>
@@ -44,9 +46,19 @@
 
         <!-- Lightblue implementation -->
         <dependency>
+            <groupId>org.esbtools.lightblue-notification-hook</groupId>
+            <artifactId>lightblue-notification-hook-model</artifactId>
+            <version>${version.lightblue-notification-hook-model}</version>
+        </dependency>
+        <dependency>
             <groupId>com.redhat.lightblue.client</groupId>
             <artifactId>lightblue-client-http</artifactId>
             <version>${version.lightblue-client-http}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.alechenninger.lightblue</groupId>
+            <artifactId>lightblue-java-generator-api</artifactId>
+            <version>${version.lightblue-java-generator-api}</version>
         </dependency>
 
         <!-- Camel and friends -->

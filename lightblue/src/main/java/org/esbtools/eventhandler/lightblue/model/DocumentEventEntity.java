@@ -18,27 +18,25 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import io.github.alechenninger.lightblue.Identity;
+import io.github.alechenninger.lightblue.Required;
+import io.github.alechenninger.lightblue.Transient;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
- *
- * <p>Ready as in, "ready to be published." Ready events are normalized and prioritized.
- *
- * TODO Merge semantics TBD...
- *  - does discarded event get publishDate? - No I think. Publish date only if published.
  */
 public class DocumentEventEntity {
     private String _id;
-    private String entityName;
-    private String entityVersion;
-    private List<IdentityValue> identity;
-    private JsonNode projection;
-    // TODO: Status vs status dates vs created/updated dates
-    private EventStatus status;
+    private String canonicalType;
+    private Map<String, String> parameterMap;
+    private Status status;
     private Instant creationDate;
     private Instant processedDate;
     private String survivedById;
@@ -47,81 +45,132 @@ public class DocumentEventEntity {
         return _id;
     }
 
-    public DocumentEventEntity set_id(String _id) {
+    @Identity
+    public void set_id(String _id) {
         this._id = _id;
-        return this;
     }
 
-    public String getEntityName() {
-        return entityName;
+    public String getCanonicalType() {
+        return canonicalType;
     }
 
-    public DocumentEventEntity setEntityName(String entityName) {
-        this.entityName = entityName;
-        return this;
+    @Required
+    public void setCanonicalType(String canonicalType) {
+        this.canonicalType = canonicalType;
     }
 
-    public String getEntityVersion() {
-        return entityVersion;
+    @Transient
+    public Optional<String> getParameterByKey(String key) {
+        return Optional.ofNullable(parameterMap.get(key));
     }
 
-    public DocumentEventEntity setEntityVersion(String entityVersion) {
-        this.entityVersion = entityVersion;
-        return this;
+    public void setParameters(List<KeyAndValue> parameters) {
+        parameterMap = new HashMap<>(parameters.size());
+        for (KeyAndValue keyAndValue : parameters) {
+            parameterMap.put(keyAndValue.getKey(), keyAndValue.getValue());
+        }
     }
 
-    public List<IdentityValue> getIdentity() {
-        return identity;
-    }
-
-    public DocumentEventEntity setIdentity(List<IdentityValue> identity) {
-        this.identity = identity;
-        return this;
-    }
-
-    public JsonNode getProjection() {
-        return projection;
-    }
-
-    public DocumentEventEntity setProjection(JsonNode projection) {
-        this.projection = projection;
-        return this;
-    }
-
-    public EventStatus getStatus() {
+    public Status getStatus() {
         return status;
     }
 
-    public DocumentEventEntity setStatus(EventStatus status) {
+    @Required
+    public void setStatus(Status status) {
         this.status = status;
-        return this;
     }
 
     public Instant getCreationDate() {
         return creationDate;
     }
 
-    public DocumentEventEntity setCreationDate(Instant creationDate) {
+    @Required
+    public void setCreationDate(Instant creationDate) {
         this.creationDate = creationDate;
-        return this;
     }
 
     public Instant getProcessedDate() {
         return processedDate;
     }
 
-    public DocumentEventEntity setProcessedDate(Instant processedDate) {
+    public void setProcessedDate(Instant processedDate) {
         this.processedDate = processedDate;
-        return this;
     }
 
     public String getSurvivedById() {
         return survivedById;
     }
 
-    public DocumentEventEntity setSurvivedById(String survivedById) {
+    public void setSurvivedById(String survivedById) {
         this.survivedById = survivedById;
-        return this;
     }
 
+    public enum Status {
+        /** New raw event */
+        NEW,
+
+        /** Being processed (transient state) */
+        PROCESSING,
+
+        /** Processed */
+        PROCESSED,
+
+        /** Superseded by a duplicate event */
+        SUPERSEDED,
+
+        /** Merged into another event */
+        MERGED,
+
+        FAILED;
+    }
+
+    public static class KeyAndValue {
+        private String key;
+        private String value;
+
+        public KeyAndValue(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public String getKey() {
+            return this.key;
+        }
+
+        @Required
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public String getValue() {
+            return this.value;
+        }
+
+        @Required
+        public void setValue(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            KeyAndValue identityValue = (KeyAndValue) o;
+            return Objects.equals(key, identityValue.key) &&
+                    Objects.equals(value, identityValue.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(key, value);
+        }
+
+        @Override
+        public String toString() {
+            return "KeyAndValue{" +
+                    "key='" + key + '\'' +
+                    ", value='" + value + '\'' +
+                    '}';
+        }
+    }
 }

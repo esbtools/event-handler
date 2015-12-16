@@ -24,11 +24,9 @@ import org.esbtools.eventhandler.EventRepository;
 import org.esbtools.eventhandler.LookupResult;
 import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
-import com.redhat.esb.lightblue.events.OperationalProductEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.eventhandler.lightblue.model.EventStatus;
-import org.esbtools.eventhandler.lightblue.model.NotificationEntity;
-import com.redhat.esb.lightblue.notifications.OperationalProductNotification;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
+
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
@@ -115,7 +113,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             List<DocumentEventEntity> entitiesToUpdate = new ArrayList<>();
 
             for (DocumentEventEntity newEventEntity : documentEventEntities) {
-                newEventEntity.setStatus(EventStatus.PROCESSING);
+                newEventEntity.setStatus(DocumentEventEntity.Status.PROCESSING);
 
                 entitiesToUpdate.add(newEventEntity);
 
@@ -131,20 +129,20 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
                     if (newEvent.isSupersededBy(previousEvent)) {
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
-                        newEventEntity.setStatus(EventStatus.SUPERSEDED);
+                        newEventEntity.setStatus(DocumentEventEntity.Status.SUPERSEDED);
                         newEventEntity.setSurvivedById(previousEntity.get_id());
                         newEvent = null;
                         break;
                     } else if (newEvent.couldMergeWith(previousEvent)) {
                         DocumentEvent merger = newEvent.merge(previousEvent);
                         DocumentEventEntity mergerEntity = toWrappedDocumentEventEntity(merger);
-                        mergerEntity.setStatus(EventStatus.PROCESSING);
+                        mergerEntity.setStatus(DocumentEventEntity.Status.PROCESSING);
 
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
-                        previousEntity.setStatus(EventStatus.MERGED);
+                        previousEntity.setStatus(DocumentEventEntity.Status.MERGED);
                         previousEntity.setSurvivedById(mergerEntity.get_id());
 
-                        newEventEntity.setStatus(EventStatus.MERGED);
+                        newEventEntity.setStatus(DocumentEventEntity.Status.MERGED);
                         newEventEntity.setSurvivedById(mergerEntity.get_id());
 
                         newEvent = merger;
@@ -206,8 +204,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
         CommonEventView eventView = new CommonEventViewOfDocumentEvent(documentEventEntity);
 
         switch (eventView.entityName()) {
-            case "operationalProduct":
-                return new OperationalProductEvent(eventView);
+            // TODO: Make this pluggable
             default:
                 throw new EventHandlerException("Unknown entity type: " + documentEventEntity);
         }
@@ -217,8 +214,14 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
         return Arrays.stream(notifications)
                 .map(notification -> {
                     switch (notification.getEntityName()) {
-                        case "operationalProduct":
-                            return new OperationalProductNotification(notification);
+                        case "":
+                            // TODO: make this pluggable
+                            return new Notification() {
+                                @Override
+                                public Collection<DocumentEvent> toDocumentEvents() {
+                                    return null;
+                                }
+                            };
                         default:
                             throw new EventHandlerException("Unknown entity type: " +
                                     notification.getEntityName());

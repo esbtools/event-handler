@@ -19,7 +19,8 @@
 package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.eventhandler.lightblue.model.NotificationEntity;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
+
 import com.redhat.lightblue.client.request.data.DataUpdateRequest;
 
 import java.util.Collection;

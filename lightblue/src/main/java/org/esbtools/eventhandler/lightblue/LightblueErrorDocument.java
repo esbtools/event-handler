@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue.model;
+package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.model.DataError;
 import com.redhat.lightblue.client.model.Error;
