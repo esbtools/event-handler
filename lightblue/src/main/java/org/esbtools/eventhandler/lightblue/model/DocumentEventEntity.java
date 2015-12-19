@@ -37,6 +37,7 @@ public class DocumentEventEntity {
     private String canonicalType;
     private List<KeyAndValue> parameters;
     private Status status;
+    private Integer priority;
     private Instant creationDate;
     private Instant processedDate;
     private String survivedById;
@@ -113,23 +114,42 @@ public class DocumentEventEntity {
         this.survivedById = survivedById;
     }
 
+    public Integer getPriority() {
+        return priority;
+    }
+
+    @Required
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+
     public enum Status {
         /** New raw event */
-        NEW,
+        NEW("new"),
 
         /** Being processed (transient state) */
-        PROCESSING,
+        PROCESSING("processing"),
 
         /** Processed */
-        PROCESSED,
+        PROCESSED("processed"),
 
         /** Superseded by a duplicate event */
-        SUPERSEDED,
+        SUPERSEDED("superseded"),
 
         /** Merged into another event */
-        MERGED,
+        MERGED("merged"),
 
-        FAILED;
+        FAILED("failed");
+
+        private final String toString;
+
+        Status(String toString) {
+            this.toString = toString;
+        }
+
+        public String toString() {
+            return toString;
+        }
     }
 
     public static class KeyAndValue {
