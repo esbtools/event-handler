@@ -31,11 +31,6 @@
     <version>0.1.0-SNAPSHOT</version>
 
     <dependencies>
-        <dependency>
-            <groupId>com.redhat.lightblue.client</groupId>
-            <artifactId>lightblue-client-http</artifactId>
-        </dependency>
-
         <!-- Camel and friends -->
         <dependency>
             <groupId>org.apache.camel</groupId>

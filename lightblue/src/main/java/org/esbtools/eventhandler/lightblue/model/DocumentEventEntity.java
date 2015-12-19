@@ -19,13 +19,13 @@
 package org.esbtools.eventhandler.lightblue.model;
 
 import io.github.alechenninger.lightblue.Identity;
+import io.github.alechenninger.lightblue.MinItems;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Transient;
 
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,7 +35,7 @@ import java.util.Optional;
 public class DocumentEventEntity {
     private String _id;
     private String canonicalType;
-    private Map<String, String> parameterMap;
+    private List<KeyAndValue> parameters;
     private Status status;
     private Instant creationDate;
     private Instant processedDate;
@@ -61,14 +61,22 @@ public class DocumentEventEntity {
 
     @Transient
     public Optional<String> getParameterByKey(String key) {
-        return Optional.ofNullable(parameterMap.get(key));
+        for (KeyAndValue keyAndValue : parameters) {
+            if (Objects.equals(key, keyAndValue.getKey())) {
+                return Optional.ofNullable(keyAndValue.getValue());
+            }
+        }
+        return Optional.empty();
     }
 
+    public List<KeyAndValue> getParameters() {
+        return parameters;
+    }
+
+    @Required
+    @MinItems(1)
     public void setParameters(List<KeyAndValue> parameters) {
-        parameterMap = new HashMap<>(parameters.size());
-        for (KeyAndValue keyAndValue : parameters) {
-            parameterMap.put(keyAndValue.getKey(), keyAndValue.getValue());
-        }
+        this.parameters = parameters;
     }
 
     public Status getStatus() {

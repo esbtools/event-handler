@@ -18,6 +18,11 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.Locking;
+import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.response.LightblueException;
+
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.EventRepository;
@@ -26,11 +31,6 @@ import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
-
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.Locking;
-import com.redhat.lightblue.client.request.DataBulkRequest;
-import com.redhat.lightblue.client.response.LightblueException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -201,9 +201,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     }
 
     private static DocumentEvent toEventObject(DocumentEventEntity documentEventEntity) {
-        CommonEventView eventView = new CommonEventViewOfDocumentEvent(documentEventEntity);
-
-        switch (eventView.entityName()) {
+        switch (documentEventEntity.getCanonicalType()) {
             // TODO: Make this pluggable
             default:
                 throw new EventHandlerException("Unknown entity type: " + documentEventEntity);
@@ -257,22 +255,6 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
         throw new EventHandlerException("Unknown event type. Only LightblueDocumentEvent are " +
                 "supported. Event type was: " + event.getClass());
-    }
-
-    private static Optional<NotificationEntity> tryUnwrapSourceNotificationEntity(
-            DocumentEvent documentEvent) {
-        Optional<Notification> maybeSource = documentEvent.source();
-
-        if (maybeSource.isPresent()) {
-            Notification source = maybeSource.get();
-            if (!(source instanceof LightblueNotification)) {
-                throw new IllegalArgumentException("Unsupported Notification type. Expected " +
-                        "LightblueNotification but got: " + source);
-            }
-            return Optional.of(((LightblueNotification) source).wrappedNotificationEntity());
-        }
-
-        return Optional.empty();
     }
 
     final static class SortedResults {
