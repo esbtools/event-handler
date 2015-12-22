@@ -54,5 +54,6 @@ public interface EventRepository {
     List<DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
 
     // TODO: Handle failed
-    void confirmProcessedDocumentEvents(Collection<DocumentEvent> events) throws Exception;
+    void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> events,
+            Collection<FailedDocumentEvent> failures) throws Exception;
 }

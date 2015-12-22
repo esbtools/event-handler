@@ -21,9 +21,11 @@ package org.esbtools.eventhandler.lightblue;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import com.redhat.lightblue.client.request.LightblueRequest;
 import com.redhat.lightblue.client.request.data.DataUpdateRequest;
 
 import java.util.Collection;
+import java.util.List;
 
 public abstract class Update {
     public static DataUpdateRequest notificationsAsProcessing(
@@ -48,6 +50,11 @@ public abstract class Update {
 
     public static DataUpdateRequest processingDocumentEventsAsFailed(
             Collection<DocumentEventEntity> failed) {
+        return null;
+    }
+
+    public static DataUpdateRequest processingNotificationsAsFailed(
+            List<NotificationEntity> failed) {
         return null;
     }
 }

@@ -22,29 +22,27 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 
-public final class SimpleResult<T> implements Result<T> {
-    private final T result;
+public final class FailedDocumentEvent {
+    private final DocumentEvent documentEvent;
     private final Collection<String> errors;
 
-    public SimpleResult(T result, Collection<String> errors) {
-        this.result = result;
-        this.errors = errors;
+    public FailedDocumentEvent(DocumentEvent documentEvent, Collection<String> errors) {
+        this.documentEvent = documentEvent;
+        this.errors = Collections.unmodifiableCollection(errors);
     }
 
-    @Override
-    public T get() {
-        return result;
+    public DocumentEvent documentEvent() {
+        return documentEvent;
     }
 
-    @Override
     public Collection<String> errors() {
-        return Collections.unmodifiableCollection(errors);
+        return errors;
     }
 
     @Override
     public String toString() {
-        return "SimpleResult{" +
-                "result=" + result +
+        return "FailedDocumentEvent{" +
+                "documentEvent=" + documentEvent +
                 ", errors=" + errors +
                 '}';
     }
@@ -53,13 +51,13 @@ public final class SimpleResult<T> implements Result<T> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        SimpleResult<?> that = (SimpleResult<?>) o;
-        return Objects.equals(result, that.result) &&
+        FailedDocumentEvent that = (FailedDocumentEvent) o;
+        return Objects.equals(documentEvent, that.documentEvent) &&
                 Objects.equals(errors, that.errors);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(result, errors);
+        return Objects.hash(documentEvent, errors);
     }
 }

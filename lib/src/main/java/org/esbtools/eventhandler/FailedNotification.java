@@ -22,29 +22,27 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 
-public final class SimpleResult<T> implements Result<T> {
-    private final T result;
+public final class FailedNotification {
+    private final Notification notification;
     private final Collection<String> errors;
 
-    public SimpleResult(T result, Collection<String> errors) {
-        this.result = result;
-        this.errors = errors;
+    public FailedNotification(Notification notification, Collection<String> errors) {
+        this.notification = notification;
+        this.errors = Collections.unmodifiableCollection(errors);
     }
 
-    @Override
-    public T get() {
-        return result;
+    public Notification notification() {
+        return notification;
     }
 
-    @Override
     public Collection<String> errors() {
-        return Collections.unmodifiableCollection(errors);
+        return errors;
     }
 
     @Override
     public String toString() {
-        return "SimpleResult{" +
-                "result=" + result +
+        return "FailedNotification{" +
+                "notification=" + notification +
                 ", errors=" + errors +
                 '}';
     }
@@ -53,13 +51,13 @@ public final class SimpleResult<T> implements Result<T> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        SimpleResult<?> that = (SimpleResult<?>) o;
-        return Objects.equals(result, that.result) &&
+        FailedNotification that = (FailedNotification) o;
+        return Objects.equals(notification, that.notification) &&
                 Objects.equals(errors, that.errors);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(result, errors);
+        return Objects.hash(notification, errors);
     }
 }

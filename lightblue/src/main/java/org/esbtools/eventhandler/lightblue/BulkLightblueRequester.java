@@ -19,6 +19,9 @@
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.http.LightblueHttpClientException;
+import com.redhat.lightblue.client.model.DataError;
+import com.redhat.lightblue.client.model.Error;
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
@@ -31,8 +34,13 @@ import org.esbtools.eventhandler.Responses;
 import org.esbtools.eventhandler.ResponsesHandler;
 import org.esbtools.eventhandler.Result;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -50,7 +58,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         return new BulkResponsePromise(requests);
     }
 
-    private void doQueuedRequestsAndPopulateResults() throws LightblueException {
+    private void doQueuedRequestsAndPopulateResults() {
         Map<LazyResult, AbstractLightblueDataRequest[]> batch;
 
         synchronized (queuedRequests) {
@@ -66,31 +74,61 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
         }
 
-        LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
+        try {
+            LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
 
-        for (Entry<LazyResult, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-            LazyResult lazyResult = lazyResultToRequests.getKey();
-            AbstractLightblueDataRequest[] requests = lazyResultToRequests.getValue();
-            Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
+            for (Entry<LazyResult, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
+                LazyResult lazyResult = lazyResultToRequests.getKey();
+                AbstractLightblueDataRequest[] requests = lazyResultToRequests.getValue();
+                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
+                List<String> errors = new ArrayList<>();
 
-            for (AbstractLightblueDataRequest request : requests) {
-                LightblueResponse response = bulkResponse.getResponse(request);
+                for (AbstractLightblueDataRequest request : requests) {
+                    LightblueResponse response = bulkResponse.getResponse(request);
 
-                if (response instanceof LightblueErrorResponse) {
-                    LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
-                    if (errorResponse.hasLightblueErrors() || errorResponse.hasDataErrors()) {
-                        // TODO: handle errors
-                        continue;
+                    if (response instanceof LightblueErrorResponse) {
+                        LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
+
+                        for (DataError dataError : errorResponse.getDataErrors()) {
+                            for (Error error : dataError.getErrors()) {
+                                errors.add(error.getMsg());
+                            }
+                        }
+
+                        for (Error error : errorResponse.getLightblueErrors()) {
+                            errors.add(error.getMsg());
+                        }
+                    }
+
+                    if (response instanceof LightblueDataResponse) {
+                        responseMap.put(request, (LightblueDataResponse) response);
                     }
                 }
 
-                if (response instanceof LightblueDataResponse) {
-                    responseMap.put(request, (LightblueDataResponse) response);
+                if (errors.isEmpty()) {
+                    lazyResult.complete(new BulkResponses(responseMap));
+                } else {
+                    lazyResult.completeWithErrors(errors);
                 }
             }
+        } catch (LightblueException e) {
+            Collection<String> errorMessages = makeErrorMessagesFromLightblueException(e);
 
-            lazyResult.handleResponses(new BulkResponses(responseMap));
+            for (Entry<LazyResult, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
+                LazyResult lazyResult = lazyResultToRequests.getKey();
+                lazyResult.completeWithErrors(errorMessages);
+            }
         }
+    }
+
+    private static Collection<String> makeErrorMessagesFromLightblueException(LightblueException e) {
+        if (e instanceof LightblueHttpClientException) {
+            LightblueHttpClientException httpException = (LightblueHttpClientException) e;
+
+            return Collections.singletonList(httpException.getHttpResponseBody());
+        }
+
+        return Collections.singleton(e.getMessage());
     }
 
     class BulkResponsePromise implements LightblueResponsePromise {
@@ -124,6 +162,8 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     class LazyResult<T> implements Result<T> {
         private final ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler;
+        private final List<String> errors = new ArrayList<>();
+
         private T result;
         private boolean handled;
 
@@ -131,28 +171,43 @@ public class BulkLightblueRequester implements LightblueRequester {
             this.responsesHandler = responsesHandler;
         }
 
-        void handleResponses(Responses<AbstractLightblueDataRequest, LightblueDataResponse> responses) {
+        void complete(Responses<AbstractLightblueDataRequest, LightblueDataResponse> responses) {
             if (handled) return; // Should never happen.
+
             handled = true;
-            // TODO: handle exception
-            // TODO: generics refactoring?
-            result = responsesHandler.apply(responses);
+
+            try {
+                result = responsesHandler.apply(responses);
+            } catch (Exception e) {
+                StringWriter stringWriter = new StringWriter();
+                PrintWriter writer = new PrintWriter(stringWriter);
+                e.printStackTrace(writer);
+                errors.add(stringWriter.toString());
+            }
+        }
+
+        void completeWithErrors(Collection<String> errors) {
+            handled = true;
+
+            this.errors.addAll(errors);
         }
 
         @Override
         public T get() {
-            if (handled) {
-                return result;
-            }
-
-            try {
+            if (!handled) {
                 doQueuedRequestsAndPopulateResults();
-            } catch (LightblueException e) {
-                // TODO: handle
-                e.printStackTrace();
             }
 
             return result;
+        }
+
+        @Override
+        public Collection<String> errors() {
+            if (!handled) {
+                doQueuedRequestsAndPopulateResults();
+            }
+
+            return Collections.unmodifiableCollection(errors);
         }
     }
 }

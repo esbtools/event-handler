@@ -26,6 +26,8 @@ import com.redhat.lightblue.client.response.LightblueException;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.EventRepository;
+import org.esbtools.eventhandler.FailedDocumentEvent;
+import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
@@ -86,12 +88,23 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     }
 
     @Override
-    public void confirmProcessedNotifications(Collection<Notification> notification) throws Exception {
+    public void markNotificationsProcessedOrFailed(Collection<Notification> notification,
+            Collection<FailedNotification> failures) throws Exception {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
                 .map(LightblueEventRepository::toWrappedNotificationEntity)
                 .collect(Collectors.toList());
 
-        lightblue.data(Update.processingNotificationsAsProcessed(processedNotificationEntities));
+        // TODO: Add field in NotificationEntity for failure messages?
+        List<NotificationEntity> failedNotificationEntities = failures.stream()
+                .map(FailedNotification::notification)
+                .map(LightblueEventRepository::toWrappedNotificationEntity)
+                .collect(Collectors.toList());
+
+        DataBulkRequest markNotifications = new DataBulkRequest();
+        markNotifications.add(Update.processingNotificationsAsProcessed(processedNotificationEntities));
+        markNotifications.add(Update.processingNotificationsAsFailed(failedNotificationEntities));
+
+        lightblue.bulkData(markNotifications);
     }
 
     @Override
@@ -184,13 +197,23 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     }
 
     @Override
-    public void confirmProcessedDocumentEvents(Collection<DocumentEvent> documentEvents)
-            throws Exception {
+    public void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> documentEvents,
+            Collection<FailedDocumentEvent> failures) throws Exception {
         List<DocumentEventEntity> processed = documentEvents.stream()
                 .map(LightblueEventRepository::toWrappedDocumentEventEntity)
                 .collect(Collectors.toList());
 
-        lightblue.data(Update.processingDocumentEventsAsProcessed(processed));
+        // TODO: Add field on document event entity to store error messages?
+        List<DocumentEventEntity> failed = failures.stream()
+                .map(FailedDocumentEvent::documentEvent)
+                .map(LightblueEventRepository::toWrappedDocumentEventEntity)
+                .collect(Collectors.toList());
+
+        DataBulkRequest markDocumentEvents = new DataBulkRequest();
+        markDocumentEvents.add(Update.processingDocumentEventsAsProcessed(processed));
+        markDocumentEvents.add(Update.processingDocumentEventsAsFailed(failed));
+
+        lightblue.data(markDocumentEvents);
     }
 
     private void blockUntilLockAcquired(String resourceId) throws LightblueException {

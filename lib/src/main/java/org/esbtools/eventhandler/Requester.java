@@ -20,7 +20,7 @@ package org.esbtools.eventhandler;
 
 /**
  * Abstracts making requests, presumably to some external system, where the remote calls can be
- * made lazily.
+ * made lazily or asynchronously.
  *
  * <p>This allows for queuing up requests and performing them all in one batch request which reduces
  * network traffic should your backend support bulk requests like this.

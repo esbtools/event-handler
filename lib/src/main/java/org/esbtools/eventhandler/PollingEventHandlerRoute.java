@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,7 +72,8 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                             .collect(Collectors.toList());
 
                     eventRepository.addNewDocumentEvents(documentEvents);
-                    notificationRepository.confirmProcessedNotifications(notifications);
+                    notificationRepository.markNotificationsProcessedOrFailed(notifications,
+                            Collections.emptyList());
                 });
 
         from("timer:readyEvents?delay=" + readyEventPollDelay.get(ChronoUnit.MILLIS))
@@ -89,7 +91,8 @@ public class PollingEventHandlerRoute extends RouteBuilder {
 
                     // TODO: discern which docs have failed results
                     // Or add source() API to result and pass result here
-                    eventRepository.confirmProcessedDocumentEvents(documentEvents);
+                    eventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
+                            Collections.emptyList());
 
                     exchange.getIn().setBody(docResults);
                 })

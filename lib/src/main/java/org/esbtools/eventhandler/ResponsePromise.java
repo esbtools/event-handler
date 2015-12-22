@@ -23,6 +23,7 @@ package org.esbtools.eventhandler;
  *
  * <p>Allows code to build a {@link Result} object which may populate lazily with results from the
  * {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
+ *
  * @param <T> The type of requests
  * @param <U> The type of responses
  */

@@ -18,7 +18,15 @@
 
 package org.esbtools.eventhandler;
 
+import java.util.Collection;
+
 public interface Result<T> {
+    /**
+     *
+     * @throws java.util.NoSuchElementException If errors prevent a result from being retrieved.
+     */
     T get();
-    // TODO: Collection<String> errors();
+
+    // TODO: Should errors be represented as Strings or more complex types?
+    Collection<String> errors();
 }
