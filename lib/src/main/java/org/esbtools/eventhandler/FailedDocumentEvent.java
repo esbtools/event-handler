@@ -18,32 +18,30 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
 public final class FailedDocumentEvent {
     private final DocumentEvent documentEvent;
-    private final Collection<String> errors;
+    private final Exception exception;
 
-    public FailedDocumentEvent(DocumentEvent documentEvent, Collection<String> errors) {
+    public FailedDocumentEvent(DocumentEvent documentEvent, Exception exception) {
         this.documentEvent = documentEvent;
-        this.errors = Collections.unmodifiableCollection(errors);
+        this.exception = exception;
     }
 
     public DocumentEvent documentEvent() {
         return documentEvent;
     }
 
-    public Collection<String> errors() {
-        return errors;
+    public Exception exception() {
+        return exception;
     }
 
     @Override
     public String toString() {
         return "FailedDocumentEvent{" +
                 "documentEvent=" + documentEvent +
-                ", errors=" + errors +
+                ", exception=" + exception +
                 '}';
     }
 
@@ -53,11 +51,11 @@ public final class FailedDocumentEvent {
         if (o == null || getClass() != o.getClass()) return false;
         FailedDocumentEvent that = (FailedDocumentEvent) o;
         return Objects.equals(documentEvent, that.documentEvent) &&
-                Objects.equals(errors, that.errors);
+                Objects.equals(exception, that.exception);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(documentEvent, errors);
+        return Objects.hash(documentEvent, exception);
     }
 }

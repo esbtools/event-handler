@@ -18,32 +18,30 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
 public final class FailedNotification {
     private final Notification notification;
-    private final Collection<String> errors;
+    private final Exception exception;
 
-    public FailedNotification(Notification notification, Collection<String> errors) {
+    public FailedNotification(Notification notification, Exception exception) {
         this.notification = notification;
-        this.errors = Collections.unmodifiableCollection(errors);
+        this.exception = exception;
     }
 
     public Notification notification() {
         return notification;
     }
 
-    public Collection<String> errors() {
-        return errors;
+    public Exception exception() {
+        return exception;
     }
 
     @Override
     public String toString() {
         return "FailedNotification{" +
-                "notification=" + notification +
-                ", errors=" + errors +
+                "Notification=" + notification +
+                ", exception=" + exception +
                 '}';
     }
 
@@ -53,11 +51,11 @@ public final class FailedNotification {
         if (o == null || getClass() != o.getClass()) return false;
         FailedNotification that = (FailedNotification) o;
         return Objects.equals(notification, that.notification) &&
-                Objects.equals(errors, that.errors);
+                Objects.equals(exception, that.exception);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(notification, errors);
+        return Objects.hash(notification, exception);
     }
 }

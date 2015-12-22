@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 // TODO: Split out to two routebuilders, one for notifications and one for document events
@@ -57,19 +59,25 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                 .process(exchange -> {
                     List<Notification> notifications = notificationRepository.
                             retrieveOldestNotificationsUpTo(notificationBatchSize);
-                    List<Result<Collection<DocumentEvent>>> documentEventResults =
+                    List<Future<Collection<DocumentEvent>>> allFutureDocEvents =
                             new ArrayList<>(notifications.size());
 
                     for (Notification notification : notifications) {
                         // TODO: Handle exceptions when getting results
-                        Result<Collection<DocumentEvent>> results = notification.toDocumentEvents();
-                        documentEventResults.add(results);
+                        Future<Collection<DocumentEvent>> results = notification.toDocumentEvents();
+                        allFutureDocEvents.add(results);
                     }
 
-                    // TODO: Handle failures here; fail associated notifications?
-                    List<DocumentEvent> documentEvents = documentEventResults.stream()
-                            .flatMap(result -> result.get().stream())
-                            .collect(Collectors.toList());
+                    List<DocumentEvent> documentEvents = new ArrayList<>();
+
+                    for (Future<Collection<DocumentEvent>> futureDocEvents : allFutureDocEvents) {
+                        try {
+                            documentEvents.addAll(futureDocEvents.get());
+                        } catch (ExecutionException | InterruptedException e) {
+                            // TODO: fail notification
+                            throw e;
+                        }
+                    }
 
                     eventRepository.addNewDocumentEvents(documentEvents);
                     notificationRepository.markNotificationsProcessedOrFailed(notifications,
@@ -85,7 +93,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
 
                     // TODO: If this fails to return results, should put events back in ready pool
                     // or fail them?
-                    List<Result<?>> docResults = documentEvents.stream()
+                    List<Future<?>> docResults = documentEvents.stream()
                             .map(DocumentEvent::lookupDocument)
                             .collect(Collectors.toList());
 

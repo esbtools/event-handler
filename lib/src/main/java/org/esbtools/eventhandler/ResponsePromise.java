@@ -18,10 +18,12 @@
 
 package org.esbtools.eventhandler;
 
+import java.util.concurrent.Future;
+
 /**
  * An asynchronous capture of potentially yet-to-come responses.
  *
- * <p>Allows code to build a {@link Result} object which may populate lazily with results from the
+ * <p>Allows code to build a {@link Future} object which may populate lazily with results from the
  * {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
  *
  * @param <T> The type of requests
@@ -37,5 +39,5 @@ public interface ResponsePromise<T, U> {
      *                        exception if a result cannot be computed.
      * @param <V> The type of result.
      */
-    <V> Result<V> then(ResponsesHandler<T, U, V> responseHandler);
+    <V> Future<V> then(ResponsesHandler<T, U, V> responseHandler);
 }

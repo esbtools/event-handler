@@ -19,7 +19,6 @@
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.http.LightblueHttpClientException;
 import com.redhat.lightblue.client.model.DataError;
 import com.redhat.lightblue.client.model.Error;
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
@@ -30,23 +29,23 @@ import com.redhat.lightblue.client.response.LightblueErrorResponse;
 import com.redhat.lightblue.client.response.LightblueException;
 import com.redhat.lightblue.client.response.LightblueResponse;
 
-import org.esbtools.eventhandler.Responses;
 import org.esbtools.eventhandler.ResponsesHandler;
-import org.esbtools.eventhandler.Result;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final Map<LazyResult, AbstractLightblueDataRequest[]> queuedRequests =
+    private final Map<LazyFuture, AbstractLightblueDataRequest[]> queuedRequests =
             Collections.synchronizedMap(new HashMap<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
@@ -59,7 +58,7 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     private void doQueuedRequestsAndPopulateResults() {
-        Map<LazyResult, AbstractLightblueDataRequest[]> batch;
+        Map<LazyFuture, AbstractLightblueDataRequest[]> batch;
 
         synchronized (queuedRequests) {
             batch = new HashMap<>(queuedRequests);
@@ -77,11 +76,11 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
 
-            for (Entry<LazyResult, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-                LazyResult lazyResult = lazyResultToRequests.getKey();
+            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
+                LazyFuture lazyResult = lazyResultToRequests.getKey();
                 AbstractLightblueDataRequest[] requests = lazyResultToRequests.getValue();
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
-                List<String> errors = new ArrayList<>();
+                List<Error> errors = new ArrayList<>();
 
                 for (AbstractLightblueDataRequest request : requests) {
                     LightblueResponse response = bulkResponse.getResponse(request);
@@ -90,14 +89,10 @@ public class BulkLightblueRequester implements LightblueRequester {
                         LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
 
                         for (DataError dataError : errorResponse.getDataErrors()) {
-                            for (Error error : dataError.getErrors()) {
-                                errors.add(error.getMsg());
-                            }
+                            errors.addAll(dataError.getErrors());
                         }
 
-                        for (Error error : errorResponse.getLightblueErrors()) {
-                            errors.add(error.getMsg());
-                        }
+                        Collections.addAll(errors, errorResponse.getLightblueErrors());
                     }
 
                     if (response instanceof LightblueDataResponse) {
@@ -108,27 +103,15 @@ public class BulkLightblueRequester implements LightblueRequester {
                 if (errors.isEmpty()) {
                     lazyResult.complete(new BulkResponses(responseMap));
                 } else {
-                    lazyResult.completeWithErrors(errors);
+                    lazyResult.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {
-            Collection<String> errorMessages = makeErrorMessagesFromLightblueException(e);
-
-            for (Entry<LazyResult, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-                LazyResult lazyResult = lazyResultToRequests.getKey();
-                lazyResult.completeWithErrors(errorMessages);
+            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
+                LazyFuture lazyResult = lazyResultToRequests.getKey();
+                lazyResult.completeExceptionally(e);
             }
         }
-    }
-
-    private static Collection<String> makeErrorMessagesFromLightblueException(LightblueException e) {
-        if (e instanceof LightblueHttpClientException) {
-            LightblueHttpClientException httpException = (LightblueHttpClientException) e;
-
-            return Collections.singletonList(httpException.getHttpResponseBody());
-        }
-
-        return Collections.singleton(e.getMessage());
     }
 
     class BulkResponsePromise implements LightblueResponsePromise {
@@ -139,9 +122,9 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
-        public <T> LazyResult<T> then(
+        public <T> Future<T> then(
                 ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responseHandler) {
-            LazyResult<T> futureResult = new LazyResult<>(responseHandler);
+            LazyFuture<T> futureResult = new LazyFuture<>(responseHandler);
             queuedRequests.put(futureResult, requests);
             return futureResult;
         }
@@ -160,54 +143,78 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    class LazyResult<T> implements Result<T> {
+    class LazyFuture<T> implements Future<T> {
         private final ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler;
-        private final List<String> errors = new ArrayList<>();
 
         private T result;
-        private boolean handled;
+        private Exception exception;
+        private boolean completed;
+        private boolean cancelled = false;
 
-        LazyResult(ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler) {
+        LazyFuture(ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler) {
             this.responsesHandler = responsesHandler;
         }
 
-        void complete(Responses<AbstractLightblueDataRequest, LightblueDataResponse> responses) {
-            if (handled) return; // Should never happen.
+        void complete(LightblueResponses responses) {
+            if (isDone()) return;
 
-            handled = true;
+            completed = true;
 
             try {
                 result = responsesHandler.apply(responses);
             } catch (Exception e) {
-                StringWriter stringWriter = new StringWriter();
-                PrintWriter writer = new PrintWriter(stringWriter);
-                e.printStackTrace(writer);
-                errors.add(stringWriter.toString());
+                exception = e;
             }
         }
 
-        void completeWithErrors(Collection<String> errors) {
-            handled = true;
-
-            this.errors.addAll(errors);
+        void completeExceptionally(Exception exception) {
+            if (isDone()) return;
+            completed = true;
+            this.exception = exception;
         }
 
         @Override
-        public T get() {
-            if (!handled) {
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (completed) return false;
+            cancelled = true;
+            return true;
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return cancelled;
+        }
+
+        @Override
+        public boolean isDone() {
+            return cancelled || completed;
+        }
+
+        @Override
+        public T get() throws InterruptedException, ExecutionException {
+            if (cancelled) {
+                throw new CancellationException();
+            }
+
+            if (completed) {
                 doQueuedRequestsAndPopulateResults();
+            }
+
+            if (exception != null) {
+                throw new ExecutionException(exception);
             }
 
             return result;
         }
 
+        /**
+         * This future is not completed asynchronously so there is no way to "time out" unless we
+         * introduce another thread for processing requests which I don't think is hugely necessary.
+         */
         @Override
-        public Collection<String> errors() {
-            if (!handled) {
-                doQueuedRequestsAndPopulateResults();
-            }
-
-            return Collections.unmodifiableCollection(errors);
+        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
+                TimeoutException {
+            return get();
         }
     }
 }

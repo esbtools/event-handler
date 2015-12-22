@@ -16,17 +16,17 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
 
+import com.redhat.lightblue.client.model.Error;
+
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.Collectors;
 
-public interface Result<T> {
-    /**
-     *
-     * @throws java.util.NoSuchElementException If errors prevent a result from being retrieved.
-     */
-    T get();
-
-    // TODO: Should errors be represented as Strings or more complex types?
-    Collection<String> errors();
+public class BulkLightblueResponseException extends RuntimeException {
+    public BulkLightblueResponseException(Collection<Error> errors) {
+        super(errors.stream()
+                .reduce("", (string, error) -> string + ", [" + error + "]", String::concat));
+    }
 }
