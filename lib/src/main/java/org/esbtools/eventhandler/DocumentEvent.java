@@ -24,6 +24,8 @@ import java.util.Optional;
  * Models an event which corresponds to a publishable document message.
  */
 public interface DocumentEvent {
+    Result<?> lookupDocument();
+
     /**
      * If the provided event's entity is looked up, will it include whatever change that this event
      * was intended to share?

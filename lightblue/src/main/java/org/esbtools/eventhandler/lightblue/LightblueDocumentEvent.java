@@ -19,6 +19,7 @@
 package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.Requester;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import com.redhat.lightblue.client.request.data.DataFindRequest;
@@ -35,8 +36,4 @@ public interface LightblueDocumentEvent extends DocumentEvent {
     Optional<DocumentEventEntity> wrappedDocumentEventEntity();
 
     DocumentEventEntity toNewDocumentEventEntity();
-
-    List<DataFindRequest> dataRequests();
-
-    LightblueDocument makeDocumentFromResponses(List<LightblueDataResponse> responses);
 }

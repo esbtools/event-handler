@@ -18,10 +18,13 @@
 
 package org.esbtools.eventhandler;
 
-public interface LookupResult {
-    Object getBody();
+import java.util.function.Function;
 
-    boolean hasErrors();
-
-    DocumentEvent getAssociatedEvent();
+/**
+ * A function applied to {@link Responses} which returns some result of type {@code V}.
+ * @param <T> The type of requests
+ * @param <U> The type of responses
+ * @param <V> The type of result
+ */
+public interface ResponsesHandler<T, U, V> extends Function<Responses<T, U>, V> {
 }

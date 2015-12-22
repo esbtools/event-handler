@@ -18,8 +18,7 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.Collection;
-
-public interface Notification {
-    Result<Collection<DocumentEvent>> toDocumentEvents();
+public interface Result<T> {
+    T get();
+    // TODO: Collection<String> errors();
 }

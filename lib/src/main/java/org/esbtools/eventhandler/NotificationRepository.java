@@ -33,5 +33,5 @@ public interface NotificationRepository {
     List<Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception;
 
     // TODO: What if failed to create document events (this is definitely a possibility)
-    void confirmProcessed(Collection<Notification> notification) throws Exception;
+    void confirmProcessedNotifications(Collection<Notification> notification) throws Exception;
 }

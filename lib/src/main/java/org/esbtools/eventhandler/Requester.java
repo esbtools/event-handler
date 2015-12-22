@@ -18,8 +18,16 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.Collection;
-
-public interface Notification {
-    Result<Collection<DocumentEvent>> toDocumentEvents();
+/**
+ * Abstracts making requests, presumably to some external system, where the remote calls can be
+ * made lazily.
+ *
+ * <p>This allows for queuing up requests and performing them all in one batch request which reduces
+ * network traffic should your backend support bulk requests like this.
+ *
+ * @param <T> The type of requests
+ * @param <U> The type of responses
+ */
+public interface Requester<T, U> {
+    ResponsePromise<T, U> queueRequests(T... requests);
 }

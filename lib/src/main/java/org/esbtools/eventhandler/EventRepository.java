@@ -53,6 +53,6 @@ public interface EventRepository {
      */
     List<DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
 
-    void confirmPublishedOrFailedFromLookupResults(Collection<LookupResult> lookupResults)
-            throws Exception;
+    // TODO: Handle failed
+    void confirmProcessedDocumentEvents(Collection<DocumentEvent> events) throws Exception;
 }

@@ -16,10 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
+import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 
-public interface Notification {
-    Result<Collection<DocumentEvent>> toDocumentEvents();
+import org.esbtools.eventhandler.Requester;
+
+public interface LightblueRequester extends
+        Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
 }

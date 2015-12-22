@@ -16,10 +16,11 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
+import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
-public interface Notification {
-    Result<Collection<DocumentEvent>> toDocumentEvents();
+public interface DocumentEventFactory {
+    DocumentEvent getDocumentEventForEntity(DocumentEventEntity entity, LightblueRequester requester);
 }

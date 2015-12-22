@@ -18,18 +18,15 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.Collection;
+public class SimpleResult<T> implements Result<T> {
+    private final T result;
 
-public interface DocumentRepository {
-    /**
-     * Retrieves documents containing <em>latest</em> state of data represented by the document
-     * events.
-     *
-     * <p>Subsequent lookups will include newly persisted changes to the data.
-     *
-     * <p>A document is a representation of some underlying data which is able to be shared. It is a
-     * function of the needs of the canonical data model for the given document type.
-     */
-    Collection<LookupResult> lookupDocumentsForEvents(Collection<DocumentEvent> documentEvents)
-            throws Exception;
+    public SimpleResult(T result) {
+        this.result = result;
+    }
+
+    @Override
+    public T get() {
+        return result;
+    }
 }
