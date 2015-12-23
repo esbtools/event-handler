@@ -135,7 +135,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             for (DocumentEventEntity newEventEntity : documentEventEntities) {
-                newEventEntity.setStatus(DocumentEventEntity.Status.PROCESSING);
+                newEventEntity.setStatus(DocumentEventEntity.Status.processing);
 
                 entitiesToUpdate.add(newEventEntity);
 
@@ -151,20 +151,20 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
                     if (newEvent.isSupersededBy(previousEvent)) {
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
-                        newEventEntity.setStatus(DocumentEventEntity.Status.SUPERSEDED);
+                        newEventEntity.setStatus(DocumentEventEntity.Status.superseded);
                         newEventEntity.setSurvivedById(previousEntity.get_id());
                         newEvent = null;
                         break;
                     } else if (newEvent.couldMergeWith(previousEvent)) {
                         DocumentEvent merger = newEvent.merge(previousEvent);
                         DocumentEventEntity mergerEntity = toWrappedDocumentEventEntity(merger);
-                        mergerEntity.setStatus(DocumentEventEntity.Status.PROCESSING);
+                        mergerEntity.setStatus(DocumentEventEntity.Status.processing);
 
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
-                        previousEntity.setStatus(DocumentEventEntity.Status.MERGED);
+                        previousEntity.setStatus(DocumentEventEntity.Status.merged);
                         previousEntity.setSurvivedById(mergerEntity.get_id());
 
-                        newEventEntity.setStatus(DocumentEventEntity.Status.MERGED);
+                        newEventEntity.setStatus(DocumentEventEntity.Status.merged);
                         newEventEntity.setSurvivedById(mergerEntity.get_id());
 
                         newEvent = merger;

@@ -18,10 +18,13 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.MinItems;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Transient;
+import io.github.alechenninger.lightblue.Version;
 
 import javax.annotation.Nullable;
 import java.time.Instant;
@@ -34,6 +37,8 @@ import java.util.Optional;
 /**
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
  */
+@EntityName("documentEvent")
+@Version(value = "0.1.0", changelog = "Initial prototype")
 public class DocumentEventEntity {
     private String _id;
     private String canonicalType;
@@ -127,32 +132,23 @@ public class DocumentEventEntity {
     }
 
     public enum Status {
-        /** New raw event */
-        NEW("new"),
+        /** Initial state */
+        unprocessed,
 
         /** Being processed (transient state) */
-        PROCESSING("processing"),
+        processing,
 
-        /** Processed */
-        PROCESSED("processed"),
+        /** Indicates this document event's associated document has successfully been published */
+        processed,
 
         /** Superseded by a duplicate event */
-        SUPERSEDED("superseded"),
+        superseded,
 
         /** Merged into another event */
-        MERGED("merged"),
+        merged,
 
-        FAILED("failed");
-
-        private final String toString;
-
-        Status(String toString) {
-            this.toString = toString;
-        }
-
-        public String toString() {
-            return toString;
-        }
+        /** Something went wrong trying to construct a document for this event */
+        failed;
     }
 
     public static class KeyAndValue {
@@ -177,7 +173,6 @@ public class DocumentEventEntity {
             return this.value;
         }
 
-        @Required
         public void setValue(String value) {
             this.value = value;
         }
