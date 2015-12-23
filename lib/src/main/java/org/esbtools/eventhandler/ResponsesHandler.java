@@ -21,7 +21,9 @@ package org.esbtools.eventhandler;
 import java.util.function.Function;
 
 /**
- * A function applied to {@link Responses} which returns some result of type {@code V}.
+ * A function applied to {@link Responses} which returns some result of type {@code V}, or throws an
+ * exception if unable to compute a result.
+ *
  * @param <T> The type of requests
  * @param <U> The type of responses
  * @param <V> The type of result

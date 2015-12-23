@@ -43,6 +43,25 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+/**
+ * A partially thread-safe requester which queues up requests until an associated {@link Future} is
+ * resolved, at which point all queued requests are performed in a single batch.
+ *
+ * <p>This class may be used across multiple threads safely, however the returned {@code Future}s
+ * are not threadsafe. That is, a given future instance should not be shared among multiple threads,
+ * which should not be a relevant limitation (if it is, however, it would not be hard to make them
+ * thread safe). Requests are queued up atomically, and performed and cleared atomically as well.
+ * That is, when one future is resolved, the current batch of requests is frozen, copied, cleared,
+ * and performed. A thread queueing a request while another thread resolves a future will
+ * <em>not</em> result in a loss of requests. It will either make it in for the batch, or be queued
+ * for the next.
+ *
+ * <p>While this class is thread safe, the logical "scope" of returned {@code Future}s is
+ * significant to consider. If you know you are going to batch up a bunch of requests, you don't
+ * want some other thread interrupting your batch performing your requests before you've finished
+ * queueing all of them up. So, you should create a new {@code BulkLightblueRequester} instance per
+ * logical "batch," and generally should avoid sharing an instance among multiple threads.
+ */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
     private final Map<LazyFuture, AbstractLightblueDataRequest[]> queuedRequests =
@@ -57,7 +76,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         return new BulkResponsePromise(requests);
     }
 
-    private void doQueuedRequestsAndPopulateResults() {
+    private void doQueuedRequestsAndCompleteFutures() {
         Map<LazyFuture, AbstractLightblueDataRequest[]> batch;
 
         synchronized (queuedRequests) {
@@ -69,6 +88,7 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         for (AbstractLightblueDataRequest[] allRequestBatches : batch.values()) {
             for (AbstractLightblueDataRequest requestInBatch : allRequestBatches) {
+                // TODO: Determine if any requests are equivalent / duplicated and filter out
                 bulkRequest.add(requestInBatch);
             }
         }
@@ -76,9 +96,9 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
 
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-                LazyFuture lazyFuture = lazyResultToRequests.getKey();
-                AbstractLightblueDataRequest[] requests = lazyResultToRequests.getValue();
+            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
+                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
+                AbstractLightblueDataRequest[] requests = lazyFutureToRequests.getValue();
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
 
@@ -107,9 +127,9 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
             }
         } catch (LightblueException e) {
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-                LazyFuture lazyResult = lazyResultToRequests.getKey();
-                lazyResult.completeExceptionally(e);
+            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
+                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
+                lazyFuture.completeExceptionally(e);
             }
         }
     }
@@ -124,9 +144,9 @@ public class BulkLightblueRequester implements LightblueRequester {
         @Override
         public <T> Future<T> then(
                 ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responseHandler) {
-            LazyFuture<T> futureResult = new LazyFuture<>(responseHandler);
-            queuedRequests.put(futureResult, requests);
-            return futureResult;
+            LazyFuture<T> lazyFuture = new LazyFuture<>(responseHandler);
+            queuedRequests.put(lazyFuture, requests);
+            return lazyFuture;
         }
     }
 
@@ -197,7 +217,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
 
             if (completed) {
-                doQueuedRequestsAndPopulateResults();
+                doQueuedRequestsAndCompleteFutures();
             }
 
             if (exception != null) {

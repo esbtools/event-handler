@@ -20,10 +20,11 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.model.Error;
 
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.stream.Collectors;
 
+/**
+ * Accumulates lightblue {@link Error errors} for a given batch of requests to a single exception.
+ */
 public class BulkLightblueResponseException extends RuntimeException {
     public BulkLightblueResponseException(Collection<Error> errors) {
         super(errors.stream()
