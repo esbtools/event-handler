@@ -23,8 +23,10 @@ import java.util.concurrent.Future;
 /**
  * An asynchronous capture of potentially yet-to-come responses.
  *
- * <p>Allows code to build a {@link Future} object which may populate lazily with results from the
- * {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
+ * <p>Allows code to build a {@link Future} object which will complete at some point in the future
+ * with results from the {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
+ *
+ * @see Requester
  *
  * @param <T> The type of requests
  * @param <U> The type of responses

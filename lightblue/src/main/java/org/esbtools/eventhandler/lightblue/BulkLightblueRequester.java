@@ -72,7 +72,7 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     @Override
-    public LightblueResponsePromise queueRequests(AbstractLightblueDataRequest... requests) {
+    public LightblueResponsePromise request(AbstractLightblueDataRequest... requests) {
         return new BulkResponsePromise(requests);
     }
 
