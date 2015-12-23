@@ -33,6 +33,8 @@ events, but pull document messages.
 
 ## Sure. So how do I use it?
 
+Current status: Prototype
+
 To consume this library, you will want to write (or reuse) an implementation of a standard set of
 interfaces to get at notifications and/or document events. Additionally, you will need to write
 implementations of notifications and/or document events which house your business logic.
