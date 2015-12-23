@@ -77,7 +77,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
 
             for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyResultToRequests : batch.entrySet()) {
-                LazyFuture lazyResult = lazyResultToRequests.getKey();
+                LazyFuture lazyFuture = lazyResultToRequests.getKey();
                 AbstractLightblueDataRequest[] requests = lazyResultToRequests.getValue();
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
@@ -101,9 +101,9 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    lazyResult.complete(new BulkResponses(responseMap));
+                    lazyFuture.complete(new BulkResponses(responseMap));
                 } else {
-                    lazyResult.completeExceptionally(new BulkLightblueResponseException(errors));
+                    lazyFuture.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {

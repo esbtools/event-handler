@@ -63,9 +63,8 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                             new ArrayList<>(notifications.size());
 
                     for (Notification notification : notifications) {
-                        // TODO: Handle exceptions when getting results
-                        Future<Collection<DocumentEvent>> results = notification.toDocumentEvents();
-                        allFutureDocEvents.add(results);
+                        Future<Collection<DocumentEvent>> futureDocEvents = notification.toDocumentEvents();
+                        allFutureDocEvents.add(futureDocEvents);
                     }
 
                     List<DocumentEvent> documentEvents = new ArrayList<>();
@@ -93,7 +92,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
 
                     // TODO: If this fails to return results, should put events back in ready pool
                     // or fail them?
-                    List<Future<?>> docResults = documentEvents.stream()
+                    List<Future<?>> futureDocs = documentEvents.stream()
                             .map(DocumentEvent::lookupDocument)
                             .collect(Collectors.toList());
 
@@ -102,7 +101,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                     eventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
                             Collections.emptyList());
 
-                    exchange.getIn().setBody(docResults);
+                    exchange.getIn().setBody(futureDocs);
                 })
                 .split(body())
                 // TODO: add back error handling when we have error info in results

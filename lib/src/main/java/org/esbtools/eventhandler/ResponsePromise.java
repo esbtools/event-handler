@@ -33,7 +33,7 @@ public interface ResponsePromise<T, U> {
     /**
      * Once responses are received from some requests, the provided {@code responseHandler} function
      * will be called with those responses. This handler returns a value that is used for the
-     * returned result.
+     * returned {@link Future}'s {@link Future#get() get} methods.
      *
      * @param responseHandler Function which accepts responses and returns a result or throws an
      *                        exception if a result cannot be computed.
