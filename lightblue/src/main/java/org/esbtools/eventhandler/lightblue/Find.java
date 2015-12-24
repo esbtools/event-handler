@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue;
 import com.redhat.lightblue.client.Literal;
 import com.redhat.lightblue.client.Projection;
 import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
@@ -39,6 +40,8 @@ public abstract class Find {
                 Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(entities)),
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed)));
         findEntities.select(Projection.includeFieldRecursively("*"));
+        findEntities.sort(Sort.desc("priority"));
+        findEntities.range(0, maxEvents - 1);
 
         return findEntities;
     }

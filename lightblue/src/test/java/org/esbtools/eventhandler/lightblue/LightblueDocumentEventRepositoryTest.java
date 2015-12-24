@@ -19,6 +19,7 @@
 package org.esbtools.eventhandler.lightblue;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -41,7 +42,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -50,6 +53,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepositoryTest {
 
@@ -81,8 +85,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldRetrieveDocumentEventsForSpecifiedEntities() throws LightblueException {
-        DocumentEventEntity stringEvent = new StringDocumentEvent("foo", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity stringEvent = newStringDocumentEventEntity("foo");
 
         DocumentEventEntity otherEvent = DocumentEventEntity.newlyCreated("Other", 50,
                 ZonedDateTime.now(fixedClock), new DocumentEventEntity.KeyAndValue("value", "foo"));
@@ -104,39 +107,34 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldMarkRetrievedDocumentEventsAsProcessing() throws LightblueException {
-        DocumentEventEntity stringEvent = new StringDocumentEvent("foo", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity stringEvent1 = newStringDocumentEventEntity("foo");
+        DocumentEventEntity stringEvent2 = newStringDocumentEventEntity("bar");
 
-        insertDocumentEventEntities(stringEvent);
+        insertDocumentEventEntities(stringEvent1, stringEvent2);
 
-        repository.retrievePriorityDocumentEventsUpTo(1);
+        repository.retrievePriorityDocumentEventsUpTo(2);
 
         DataFindRequest findDocEvent = new DataFindRequest(DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
         findDocEvent.select(Projection.includeFieldRecursively("*"));
         findDocEvent.where(Query.withValue("canonicalType", Query.BinOp.eq, "String"));
-        DocumentEventEntity found = client.data(findDocEvent).parseProcessed(DocumentEventEntity.class);
+        DocumentEventEntity[] found = client.data(findDocEvent).parseProcessed(DocumentEventEntity[].class);
 
-        assertEquals(DocumentEventEntity.Status.processing, found.getStatus());
+        assertEquals(DocumentEventEntity.Status.processing, found[0].getStatus());
+        assertEquals(DocumentEventEntity.Status.processing, found[1].getStatus());
     }
 
     @Test
     public void shouldOnlyRetrieveUnprocessedEvents() throws LightblueException {
-        DocumentEventEntity stringEvent = new StringDocumentEvent("right", fixedClock)
-                .toNewDocumentEventEntity();
-        DocumentEventEntity processingEvent = new StringDocumentEvent("wrong", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity stringEvent = newStringDocumentEventEntity("right");
+        DocumentEventEntity processingEvent = newStringDocumentEventEntity("wrong");
         processingEvent.setStatus(DocumentEventEntity.Status.processing);
-        DocumentEventEntity processedEvent = new StringDocumentEvent("wrong", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity processedEvent = newStringDocumentEventEntity("wrong");
         processedEvent.setStatus(DocumentEventEntity.Status.processed);
-        DocumentEventEntity failedEvent = new StringDocumentEvent("wrong", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity failedEvent = newStringDocumentEventEntity("wrong");
         failedEvent.setStatus(DocumentEventEntity.Status.failed);
-        DocumentEventEntity mergedEvent = new StringDocumentEvent("wrong", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity mergedEvent = newStringDocumentEventEntity("wrong");
         mergedEvent.setStatus(DocumentEventEntity.Status.merged);
-        DocumentEventEntity supersededEvent = new StringDocumentEvent("wrong", fixedClock)
-                .toNewDocumentEventEntity();
+        DocumentEventEntity supersededEvent = newStringDocumentEventEntity("wrong");
         supersededEvent.setStatus(DocumentEventEntity.Status.superseded);
 
         insertDocumentEventEntities(stringEvent, processingEvent, processedEvent, failedEvent,
@@ -207,20 +205,56 @@ public class LightblueDocumentEventRepositoryTest {
         }
     }
 
-    private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
-        DataInsertRequest insertEntities = new DataInsertRequest("documentEvent", DocumentEventEntity.VERSION);
-        insertEntities.create(entities);
-        client.data(insertEntities);
+    @Test
+    public void shouldRetrieveDocumentEventsInPriorityOrder() throws LightblueException {
+        insertDocumentEventEntities(
+                newStringDocumentEventEntityWithPriorityOverride("", 5),
+                newStringDocumentEventEntityWithPriorityOverride("", 100),
+                newStringDocumentEventEntityWithPriorityOverride("", 50),
+                newStringDocumentEventEntityWithPriorityOverride("", 25),
+                newStringDocumentEventEntityWithPriorityOverride("", 30),
+                newStringDocumentEventEntityWithPriorityOverride("", 25),
+                newStringDocumentEventEntityWithPriorityOverride("", 99),
+                newStringDocumentEventEntityWithPriorityOverride("", 55),
+                newStringDocumentEventEntityWithPriorityOverride("", 70),
+                newStringDocumentEventEntityWithPriorityOverride("", 2));
+
+        List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(10).stream()
+                .map(d -> (LightblueDocumentEvent) d)
+                .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
+                .map(Optional::get)
+                .map(DocumentEventEntity::getPriority)
+                .collect(Collectors.toList());
+
+        assertEquals(Arrays.asList(100, 99, 70, 55, 50, 30, 25, 25, 5, 2), priorities);
+    }
+
+    private DocumentEventEntity newStringDocumentEventEntity(String value) {
+        return new StringDocumentEvent(value, fixedClock).toNewDocumentEventEntity();
+    }
+
+    private DocumentEventEntity newStringDocumentEventEntityWithPriorityOverride(String value,
+            int priority) {
+        DocumentEventEntity entity = new StringDocumentEvent(value, fixedClock)
+                .toNewDocumentEventEntity();
+        entity.setPriority(priority);
+        return entity;
     }
 
     private DocumentEventEntity[] randomNewDocumentEventEntities(int amount) {
         DocumentEventEntity[] entities = new DocumentEventEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
-                    .toNewDocumentEventEntity();
+            entities[i] = newStringDocumentEventEntity(UUID.randomUUID().toString());
         }
 
         return entities;
+    }
+
+    private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
+        DataInsertRequest insertEntities = new DataInsertRequest(
+                DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+        insertEntities.create(entities);
+        client.data(insertEntities);
     }
 }
