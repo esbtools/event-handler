@@ -19,6 +19,7 @@
 package org.esbtools.eventhandler.lightblue;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueClientConfiguration;
@@ -41,6 +42,14 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class LightblueDocumentEventRepositoryTest {
 
@@ -142,9 +151,76 @@ public class LightblueDocumentEventRepositoryTest {
                 .getParameterByKey("value"));
     }
 
+    @Test
+    public void shouldReturnNonOverlappingSetsEvenAmongMultipleThreads() throws LightblueException,
+            InterruptedException, ExecutionException, TimeoutException {
+        SlowDataLightblueClient thread1Client = new SlowDataLightblueClient(client);
+        SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
+
+        LightblueEventRepository thread1Repository = new LightblueEventRepository(
+                thread1Client, new String[]{"String"}, 100,
+                "testLockingDomain", new EmptyNotificationFactory(),
+                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
+        LightblueEventRepository thread2Repository = new LightblueEventRepository(
+                thread2Client, new String[]{"String"}, 100,
+                "testLockingDomain", new EmptyNotificationFactory(),
+                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        insertDocumentEventEntities(randomNewDocumentEventEntities(100));
+
+        CountDownLatch bothThreadsStarted = new CountDownLatch(2);
+
+        thread1Client.pauseOnNextRequest();
+        thread2Client.pauseOnNextRequest();
+
+        Future<List<DocumentEvent>> futureThread1Events = executor.submit(() -> {
+            bothThreadsStarted.countDown();
+            return thread1Repository.retrievePriorityDocumentEventsUpTo(100);
+        });
+        Future<List<DocumentEvent>> futureThread2Events = executor.submit(() -> {
+            bothThreadsStarted.countDown();
+            return thread2Repository.retrievePriorityDocumentEventsUpTo(100);
+        });
+
+        bothThreadsStarted.await();
+
+        Thread.sleep(5000);
+
+        thread2Client.unpause();
+        thread1Client.unpause();
+
+        List<DocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
+        List<DocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
+
+        executor.shutdown();
+        assertTrue("Threads took too long", executor.awaitTermination(5, TimeUnit.SECONDS));
+
+        if (thread1Events.isEmpty()) {
+            assertEquals("Either both threads got events, or some events weren't retrieved.",
+                    100, thread2Events.size());
+        } else {
+            assertEquals("Either both threads got events, or some events weren't retrieved.",
+                    100, thread1Events.size());
+            assertEquals("Both threads got events!", 0, thread2Events.size());
+        }
+    }
+
     private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
         DataInsertRequest insertEntities = new DataInsertRequest("documentEvent", DocumentEventEntity.VERSION);
         insertEntities.create(entities);
         client.data(insertEntities);
+    }
+
+    private DocumentEventEntity[] randomNewDocumentEventEntities(int amount) {
+        DocumentEventEntity[] entities = new DocumentEventEntity[amount];
+
+        for (int i = 0; i < amount; i++) {
+            entities[i] = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
+                    .toNewDocumentEventEntity();
+        }
+
+        return entities;
     }
 }

@@ -188,7 +188,8 @@ public class DocumentEventEntity {
 
     @Override
     public int hashCode() {
-        return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate, processedDate, survivedById);
+        return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
+                processedDate, survivedById);
     }
 
     public enum Status {
@@ -215,8 +216,9 @@ public class DocumentEventEntity {
         private String key;
         private String value;
 
-        @JsonCreator
-        public KeyAndValue(@JsonProperty("key") String key, @JsonProperty("value") String value) {
+        public KeyAndValue() {}
+
+        public KeyAndValue(String key, String value) {
             this.key = key;
             this.value = value;
         }
