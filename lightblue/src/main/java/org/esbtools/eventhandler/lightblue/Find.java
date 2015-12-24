@@ -18,14 +18,28 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import com.redhat.lightblue.client.Literal;
+import com.redhat.lightblue.client.Projection;
+import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
+
+import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 public abstract class Find {
     public static DataFindRequest newNotificationsForEntitiesUpTo(String[] entities, int maxEvents) {
         return null;
     }
 
-    public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities, int maxEvents) {
-        return null;
+    public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,
+            int maxEvents) {
+        DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+
+        findEntities.where(Query.and(
+                Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(entities)),
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed)));
+        findEntities.select(Projection.includeFieldRecursively("*"));
+
+        return findEntities;
     }
 }

@@ -22,8 +22,12 @@ import static org.junit.Assert.assertEquals;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueClientConfiguration;
+import com.redhat.lightblue.client.Projection;
+import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.DocumentEvent;
@@ -32,6 +36,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -43,7 +48,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Rule
     public LightblueExternalResource lightblueExternalResource =
-            new LightblueExternalResource(TestMetadataJson.forEntity(DocumentEvent.class));
+            new LightblueExternalResource(TestMetadataJson.forEntity(DocumentEventEntity.class));
 
     private LightblueClient client;
 
@@ -62,6 +67,11 @@ public class LightblueDocumentEventRepositoryTest {
                 new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
     }
 
+    @Before
+    public void dropDocEventEntities() throws UnknownHostException {
+        lightblueExternalResource.cleanupMongoCollections(DocumentEventEntity.ENTITY_NAME);
+    }
+
     @Test
     public void shouldRetrieveDocumentEventsForSpecifiedEntities() throws LightblueException {
         DocumentEventEntity stringEvent = new StringDocumentEvent("foo", fixedClock)
@@ -75,6 +85,30 @@ public class LightblueDocumentEventRepositoryTest {
         List<DocumentEvent> docEvents = repository.retrievePriorityDocumentEventsUpTo(2);
 
         assertEquals(1, docEvents.size());
+
+        DocumentEventEntity entity = ((LightblueDocumentEvent) docEvents.get(0))
+                .wrappedDocumentEventEntity()
+                .get();
+
+        assertEquals(stringEvent.getCanonicalType(), entity.getCanonicalType());
+        assertEquals(stringEvent.getParameters(), entity.getParameters());
+        assertEquals(stringEvent.getCreationDate().toInstant(), entity.getCreationDate().toInstant());
+    }
+
+    @Test
+    public void shouldMarkRetrievedDocumentEventsAsProcessing() throws LightblueException {
+        DocumentEventEntity stringEvent = new StringDocumentEvent("foo", fixedClock)
+                .toNewDocumentEventEntity();
+        insertDocumentEventEntities(stringEvent);
+
+        repository.retrievePriorityDocumentEventsUpTo(1);
+
+        DataFindRequest findDocEvent = new DataFindRequest(DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+        findDocEvent.select(Projection.includeFieldRecursively("*"));
+        findDocEvent.where(Query.withValue("canonicalType", Query.BinOp.eq, "String"));
+        DocumentEventEntity found = client.data(findDocEvent).parseProcessed(DocumentEventEntity.class);
+
+        assertEquals(DocumentEventEntity.Status.processing, found.getStatus());
     }
 
     private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {

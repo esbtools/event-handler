@@ -185,10 +185,17 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             }
 
             DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
-            insertAndUpdateEvents.add(Insert.documentEvents(mergerEntities));
-            insertAndUpdateEvents.add(Update.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
+            if (!mergerEntities.isEmpty()) {
+                insertAndUpdateEvents.add(Insert.documentEvents(mergerEntities));
+            }
 
-            lightblue.data(insertAndUpdateEvents);
+            insertAndUpdateEvents.addAll(Update.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
+
+            if (insertAndUpdateEvents.getRequests().size() == 1) {
+                lightblue.data(insertAndUpdateEvents.getRequests().get(0));
+            } else {
+                lightblue.data(insertAndUpdateEvents);
+            }
 
             return optimized;
         } finally {

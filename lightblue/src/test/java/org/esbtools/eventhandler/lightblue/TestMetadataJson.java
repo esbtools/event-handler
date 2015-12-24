@@ -30,7 +30,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import io.github.alechenninger.lightblue.MetadataGenerator;
 import io.github.alechenninger.lightblue.javabeans.JavaBeansReflector;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 public abstract class TestMetadataJson {
     private static final Extensions<JsonNode> extensions = new Extensions<JsonNode>() {{
@@ -43,13 +42,13 @@ public abstract class TestMetadataJson {
     private static final MetadataGenerator metadataGenerator = new MetadataGenerator(new JavaBeansReflector());
 
     public static LightblueExternalResource.LightblueTestMethods forEntity(Class<?> entityClass) {
-        EntityMetadata documentEventMd = metadataGenerator.generateMetadata(DocumentEventEntity.class);
-        documentEventMd.setDataStore(new MongoDataStore("${mongo.database}", "${mongo.datasource}", "documentEvent"));
+        EntityMetadata entityMd = metadataGenerator.generateMetadata(entityClass);
+        entityMd.setDataStore(new MongoDataStore("${mongo.database}", "${mongo.datasource}", entityMd.getName()));
 
         return new LightblueExternalResource.LightblueTestMethods() {
             @Override
             public JsonNode[] getMetadataJsonNodes() throws Exception {
-                return new JsonNode[] {parser.convert(documentEventMd)};
+                return new JsonNode[] {parser.convert(entityMd)};
             }
         };
     }

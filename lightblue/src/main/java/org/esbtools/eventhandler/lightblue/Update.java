@@ -21,9 +21,12 @@ package org.esbtools.eventhandler.lightblue;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.Query.BinOp;
 import com.redhat.lightblue.client.request.LightblueRequest;
 import com.redhat.lightblue.client.request.data.DataUpdateRequest;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -38,9 +41,33 @@ public abstract class Update {
         return null;
     }
 
-    public static DataUpdateRequest newDocumentEventsStatusAndSurvivedBy(
+    public static Collection<DataUpdateRequest> newDocumentEventsStatusAndSurvivedBy(
             Collection<DocumentEventEntity> updatedEventEntities) {
-        return null;
+        List<DataUpdateRequest> requests = new ArrayList<>(updatedEventEntities.size());
+
+        for (DocumentEventEntity entity : updatedEventEntities) {
+            DataUpdateRequest request = new DataUpdateRequest(
+                    DocumentEventEntity.ENTITY_NAME,
+                    DocumentEventEntity.VERSION);
+
+            request.where(Query.withValue("_id", BinOp.eq, entity.get_id()));
+
+            List<com.redhat.lightblue.client.Update> updates = new ArrayList<>(2);
+            updates.add(com.redhat.lightblue.client.Update.set("status", entity.getStatus().toString()));
+
+            String survivedById = entity.getSurvivedById();
+
+            if (survivedById != null) {
+                updates.add(com.redhat.lightblue.client.Update.set("survivedById", survivedById));
+            }
+
+            // Work around client bug.
+            request.updates(updates.toArray(new com.redhat.lightblue.client.Update[updates.size()]));
+
+            requests.add(request);
+        }
+
+        return requests;
     }
 
     public static DataUpdateRequest processingDocumentEventsAsProcessed(

@@ -20,6 +20,7 @@ package org.esbtools.eventhandler.lightblue.model;
 
 import com.redhat.lightblue.client.util.ClientConstants;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.alechenninger.lightblue.EntityName;
@@ -156,6 +157,40 @@ public class DocumentEventEntity {
         this.priority = priority;
     }
 
+    @Override
+    public String toString() {
+        return "DocumentEventEntity{" +
+                "_id='" + _id + '\'' +
+                ", canonicalType='" + canonicalType + '\'' +
+                ", parameters=" + parameters +
+                ", status=" + status +
+                ", priority=" + priority +
+                ", creationDate=" + creationDate +
+                ", processedDate=" + processedDate +
+                ", survivedById='" + survivedById + '\'' +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DocumentEventEntity that = (DocumentEventEntity) o;
+        return Objects.equals(_id, that._id) &&
+                Objects.equals(canonicalType, that.canonicalType) &&
+                Objects.equals(parameters, that.parameters) &&
+                status == that.status &&
+                Objects.equals(priority, that.priority) &&
+                Objects.equals(creationDate, that.creationDate) &&
+                Objects.equals(processedDate, that.processedDate) &&
+                Objects.equals(survivedById, that.survivedById);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate, processedDate, survivedById);
+    }
+
     public enum Status {
         /** Initial state */
         unprocessed,
@@ -180,7 +215,8 @@ public class DocumentEventEntity {
         private String key;
         private String value;
 
-        public KeyAndValue(String key, String value) {
+        @JsonCreator
+        public KeyAndValue(@JsonProperty("key") String key, @JsonProperty("value") String value) {
             this.key = key;
             this.value = value;
         }

@@ -6,7 +6,7 @@
           "extensions" : {
               "locking" : [
                   {
-                      "domain":"test",
+                      "domain":"testLockingDomain",
                       "datasource":"${mongo.datasource}",
                       "collection":"locktest"
                   }
