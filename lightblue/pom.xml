@@ -36,7 +36,28 @@
         <version.lightblue-java-generator-api>0.1.1-SNAPSHOT</version.lightblue-java-generator-api>
         <version.lightblue-java-generator>0.1.0-SNAPSHOT</version.lightblue-java-generator>
         <version.lightblue-client>2.2.0-SNAPSHOT</version.lightblue-client>
+        <version.jackson>2.6.4</version.jackson>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${version.jackson}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${version.jackson}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${version.jackson}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -62,10 +83,9 @@
             <version>${version.lightblue-java-generator-api}</version>
         </dependency>
         <dependency>
-            <groupId>io.github.alechenninger.lightblue</groupId>
-            <artifactId>lightblue-java-generator</artifactId>
-            <version>${version.lightblue-java-generator}</version>
-            <scope>test</scope>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${version.jackson}</version>
         </dependency>
 
         <!-- Implementation specific testing -->
@@ -75,6 +95,13 @@
             <version>${version.lightblue-client}</version>
             <scope>test></scope>
         </dependency>
+        <dependency>
+            <groupId>io.github.alechenninger.lightblue</groupId>
+            <artifactId>lightblue-java-generator</artifactId>
+            <version>${version.lightblue-java-generator}</version>
+            <scope>test</scope>
+        </dependency>
+
 
         <!-- Camel and friends -->
         <dependency>

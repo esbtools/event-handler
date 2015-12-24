@@ -18,6 +18,9 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
+import com.redhat.lightblue.client.util.ClientConstants;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
@@ -25,9 +28,13 @@ import io.github.alechenninger.lightblue.MinItems;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Transient;
 import io.github.alechenninger.lightblue.Version;
+import org.esbtools.eventhandler.DocumentEvent;
 
 import javax.annotation.Nullable;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -37,17 +44,33 @@ import java.util.Optional;
 /**
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
  */
-@EntityName("documentEvent")
-@Version(value = "0.1.0", changelog = "Initial prototype")
+@EntityName(DocumentEventEntity.ENTITY_NAME)
+@Version(value = DocumentEventEntity.VERSION, changelog = "Initial prototype")
 public class DocumentEventEntity {
+    public static final String ENTITY_NAME = "documentEvent";
+    public static final String VERSION = "0.1.0";
+
     private String _id;
     private String canonicalType;
     private List<KeyAndValue> parameters;
     private Status status;
     private Integer priority;
-    private Instant creationDate;
-    private Instant processedDate;
+    private ZonedDateTime creationDate;
+    private ZonedDateTime processedDate;
     private String survivedById;
+
+    private static final String LIGHTBLUE_DATE_FORMAT = ClientConstants.LIGHTBLUE_DATE_FORMAT_STR;
+
+    public static DocumentEventEntity newlyCreated(String canonicalType, int priority,
+            ZonedDateTime creationDate, KeyAndValue... parameters) {
+        DocumentEventEntity entity = new DocumentEventEntity();
+        entity.setStatus(Status.unprocessed);
+        entity.setCreationDate(creationDate);
+        entity.setCanonicalType(canonicalType);
+        entity.setPriority(priority);
+        entity.setParameters(Arrays.asList(parameters));
+        return entity;
+    }
 
     public String get_id() {
         return _id;
@@ -97,20 +120,22 @@ public class DocumentEventEntity {
         this.status = status;
     }
 
-    public Instant getCreationDate() {
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)
+    public ZonedDateTime getCreationDate() {
         return creationDate;
     }
 
     @Required
-    public void setCreationDate(Instant creationDate) {
+    public void setCreationDate(ZonedDateTime creationDate) {
         this.creationDate = creationDate;
     }
 
-    public Instant getProcessedDate() {
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)
+    public ZonedDateTime getProcessedDate() {
         return processedDate;
     }
 
-    public void setProcessedDate(Instant processedDate) {
+    public void setProcessedDate(ZonedDateTime processedDate) {
         this.processedDate = processedDate;
     }
 
