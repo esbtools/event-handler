@@ -97,6 +97,7 @@ public class LightblueDocumentEventRepositoryTest {
     public void shouldMarkRetrievedDocumentEventsAsProcessing() throws LightblueException {
         DocumentEventEntity stringEvent = new StringDocumentEvent("foo", fixedClock)
                 .toNewDocumentEventEntity();
+
         insertDocumentEventEntities(stringEvent);
 
         repository.retrievePriorityDocumentEventsUpTo(1);
@@ -107,6 +108,38 @@ public class LightblueDocumentEventRepositoryTest {
         DocumentEventEntity found = client.data(findDocEvent).parseProcessed(DocumentEventEntity.class);
 
         assertEquals(DocumentEventEntity.Status.processing, found.getStatus());
+    }
+
+    @Test
+    public void shouldOnlyRetrieveUnprocessedEvents() throws LightblueException {
+        DocumentEventEntity stringEvent = new StringDocumentEvent("right", fixedClock)
+                .toNewDocumentEventEntity();
+        DocumentEventEntity processingEvent = new StringDocumentEvent("wrong", fixedClock)
+                .toNewDocumentEventEntity();
+        processingEvent.setStatus(DocumentEventEntity.Status.processing);
+        DocumentEventEntity processedEvent = new StringDocumentEvent("wrong", fixedClock)
+                .toNewDocumentEventEntity();
+        processedEvent.setStatus(DocumentEventEntity.Status.processed);
+        DocumentEventEntity failedEvent = new StringDocumentEvent("wrong", fixedClock)
+                .toNewDocumentEventEntity();
+        failedEvent.setStatus(DocumentEventEntity.Status.failed);
+        DocumentEventEntity mergedEvent = new StringDocumentEvent("wrong", fixedClock)
+                .toNewDocumentEventEntity();
+        mergedEvent.setStatus(DocumentEventEntity.Status.merged);
+        DocumentEventEntity supersededEvent = new StringDocumentEvent("wrong", fixedClock)
+                .toNewDocumentEventEntity();
+        supersededEvent.setStatus(DocumentEventEntity.Status.superseded);
+
+        insertDocumentEventEntities(stringEvent, processingEvent, processedEvent, failedEvent,
+                mergedEvent, supersededEvent);
+
+        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(6);
+
+        assertEquals(1, retrieved.size());
+        assertEquals("right", ((LightblueDocumentEvent) retrieved.get(0))
+                .wrappedDocumentEventEntity()
+                .get()
+                .getParameterByKey("value"));
     }
 
     private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {

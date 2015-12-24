@@ -194,7 +194,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             if (insertAndUpdateEvents.getRequests().size() == 1) {
                 lightblue.data(insertAndUpdateEvents.getRequests().get(0));
             } else {
-                lightblue.data(insertAndUpdateEvents);
+                // TODO: Verify these were all successful
+                lightblue.bulkData(insertAndUpdateEvents);
             }
 
             return optimized;
