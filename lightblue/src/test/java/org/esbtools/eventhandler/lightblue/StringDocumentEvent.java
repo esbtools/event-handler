@@ -98,7 +98,7 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
             }
         }
 
-        return false;
+        return true;
     }
 
     @Override

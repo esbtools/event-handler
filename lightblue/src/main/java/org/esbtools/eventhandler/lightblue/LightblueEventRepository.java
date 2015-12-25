@@ -33,6 +33,8 @@ import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import java.time.Clock;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -50,15 +52,18 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     private final Locking locking;
     private final NotificationFactory notificationFactory;
     private final DocumentEventFactory documentEventFactory;
+    private final Clock clock;
 
     public LightblueEventRepository(LightblueClient lightblue, String[] entities,
             int documentEventBatchSize, String lockingDomain,
-            NotificationFactory notificationFactory, DocumentEventFactory documentEventFactory) {
+            NotificationFactory notificationFactory, DocumentEventFactory documentEventFactory,
+            Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
         this.documentEventBatchSize = documentEventBatchSize;
         this.notificationFactory = notificationFactory;
         this.documentEventFactory = documentEventFactory;
+        this.clock = clock;
 
         locking = lightblue.getLocking(lockingDomain);
     }
@@ -77,7 +82,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                     .data(Find.newNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
-            lightblue.data(Update.notificationsAsProcessing(notificationEntities));
+            lightblue.data(UpdateRequest.notificationsAsProcessing(notificationEntities));
 
             return Arrays.stream(notificationEntities)
                     .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
@@ -101,8 +106,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 .collect(Collectors.toList());
 
         DataBulkRequest markNotifications = new DataBulkRequest();
-        markNotifications.add(Update.processingNotificationsAsProcessed(processedNotificationEntities));
-        markNotifications.add(Update.processingNotificationsAsFailed(failedNotificationEntities));
+        markNotifications.add(UpdateRequest.processingNotificationsAsProcessed(processedNotificationEntities));
+        markNotifications.add(UpdateRequest.processingNotificationsAsFailed(failedNotificationEntities));
 
         lightblue.bulkData(markNotifications);
     }
@@ -153,6 +158,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
                         newEventEntity.setStatus(DocumentEventEntity.Status.superseded);
                         newEventEntity.setSurvivedById(previousEntity.get_id());
+                        newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
                         newEvent = null;
                         break;
                     } else if (newEvent.couldMergeWith(previousEvent)) {
@@ -163,9 +169,11 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
                         previousEntity.setStatus(DocumentEventEntity.Status.merged);
                         previousEntity.setSurvivedById(mergerEntity.get_id());
+                        previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
                         newEventEntity.setStatus(DocumentEventEntity.Status.merged);
                         newEventEntity.setSurvivedById(mergerEntity.get_id());
+                        newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
 
                         newEvent = merger;
                         maybeMergerEntity = Optional.of(mergerEntity);
@@ -189,7 +197,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 insertAndUpdateEvents.add(Insert.documentEvents(mergerEntities));
             }
 
-            insertAndUpdateEvents.addAll(Update.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
+            insertAndUpdateEvents.addAll(UpdateRequest.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
 
             if (insertAndUpdateEvents.getRequests().size() == 1) {
                 lightblue.data(insertAndUpdateEvents.getRequests().get(0));
@@ -218,8 +226,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 .collect(Collectors.toList());
 
         DataBulkRequest markDocumentEvents = new DataBulkRequest();
-        markDocumentEvents.add(Update.processingDocumentEventsAsProcessed(processed));
-        markDocumentEvents.add(Update.processingDocumentEventsAsFailed(failed));
+        markDocumentEvents.add(UpdateRequest.processingDocumentEventsAsProcessed(processed));
+        markDocumentEvents.add(UpdateRequest.processingDocumentEventsAsFailed(failed));
 
         lightblue.data(markDocumentEvents);
     }

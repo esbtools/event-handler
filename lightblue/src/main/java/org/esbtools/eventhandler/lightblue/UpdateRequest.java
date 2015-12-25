@@ -23,14 +23,17 @@ import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.Query.BinOp;
+import com.redhat.lightblue.client.Update;
 import com.redhat.lightblue.client.request.LightblueRequest;
 import com.redhat.lightblue.client.request.data.DataUpdateRequest;
 
+import java.sql.Date;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public abstract class Update {
+public abstract class UpdateRequest {
     public static DataUpdateRequest notificationsAsProcessing(
             NotificationEntity[] notificationEntities) {
         return null;
@@ -52,17 +55,22 @@ public abstract class Update {
 
             request.where(Query.withValue("_id", BinOp.eq, entity.get_id()));
 
-            List<com.redhat.lightblue.client.Update> updates = new ArrayList<>(2);
-            updates.add(com.redhat.lightblue.client.Update.set("status", entity.getStatus().toString()));
+            List<Update> updates = new ArrayList<>(2);
+            updates.add(Update.set("status", entity.getStatus().toString()));
 
+            ZonedDateTime processedDate = entity.getProcessedDate();
             String survivedById = entity.getSurvivedById();
 
+            if (processedDate != null) {
+                updates.add(Update.set("processedDate", Date.from(processedDate.toInstant())));
+            }
+
             if (survivedById != null) {
-                updates.add(com.redhat.lightblue.client.Update.set("survivedById", survivedById));
+                updates.add(Update.set("survivedById", survivedById));
             }
 
             // Work around client bug.
-            request.updates(updates.toArray(new com.redhat.lightblue.client.Update[updates.size()]));
+            request.updates(updates.toArray(new Update[updates.size()]));
 
             requests.add(request);
         }

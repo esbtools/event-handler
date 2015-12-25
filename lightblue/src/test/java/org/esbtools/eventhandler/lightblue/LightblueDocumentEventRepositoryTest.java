@@ -19,8 +19,6 @@
 package org.esbtools.eventhandler.lightblue;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueClientConfiguration;
@@ -39,6 +37,7 @@ import org.junit.Test;
 
 import java.net.UnknownHostException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -75,7 +74,8 @@ public class LightblueDocumentEventRepositoryTest {
 
         repository = new LightblueEventRepository(client, new String[]{"String"}, 10,
                 "testLockingDomain", new EmptyNotificationFactory(),
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
+                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
+                fixedClock);
     }
 
     @Before
@@ -158,66 +158,72 @@ public class LightblueDocumentEventRepositoryTest {
         LightblueEventRepository thread1Repository = new LightblueEventRepository(
                 thread1Client, new String[]{"String"}, 100,
                 "testLockingDomain", new EmptyNotificationFactory(),
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
+                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
+                fixedClock);
         LightblueEventRepository thread2Repository = new LightblueEventRepository(
                 thread2Client, new String[]{"String"}, 100,
                 "testLockingDomain", new EmptyNotificationFactory(),
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new));
+                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
+                fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
-        insertDocumentEventEntities(randomNewDocumentEventEntities(100));
+        try {
+            insertDocumentEventEntities(randomNewDocumentEventEntities(100));
 
-        CountDownLatch bothThreadsStarted = new CountDownLatch(2);
+            CountDownLatch bothThreadsStarted = new CountDownLatch(2);
 
-        thread1Client.pauseOnNextRequest();
-        thread2Client.pauseOnNextRequest();
+            thread1Client.pauseOnNextRequest();
+            thread2Client.pauseOnNextRequest();
 
-        Future<List<DocumentEvent>> futureThread1Events = executor.submit(() -> {
-            bothThreadsStarted.countDown();
-            return thread1Repository.retrievePriorityDocumentEventsUpTo(100);
-        });
-        Future<List<DocumentEvent>> futureThread2Events = executor.submit(() -> {
-            bothThreadsStarted.countDown();
-            return thread2Repository.retrievePriorityDocumentEventsUpTo(100);
-        });
+            Future<List<DocumentEvent>> futureThread1Events = executor.submit(() -> {
+                bothThreadsStarted.countDown();
+                return thread1Repository.retrievePriorityDocumentEventsUpTo(100);
+            });
+            Future<List<DocumentEvent>> futureThread2Events = executor.submit(() -> {
+                bothThreadsStarted.countDown();
+                return thread2Repository.retrievePriorityDocumentEventsUpTo(100);
+            });
 
-        bothThreadsStarted.await();
+            bothThreadsStarted.await();
 
-        Thread.sleep(5000);
+            Thread.sleep(5000);
 
-        thread2Client.unpause();
-        thread1Client.unpause();
+            thread2Client.unpause();
+            thread1Client.unpause();
 
-        List<DocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
-        List<DocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
+            List<DocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
+            List<DocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
 
-        executor.shutdown();
-        assertTrue("Threads took too long", executor.awaitTermination(5, TimeUnit.SECONDS));
-
-        if (thread1Events.isEmpty()) {
-            assertEquals("Either both threads got events, or some events weren't retrieved.",
-                    100, thread2Events.size());
-        } else {
-            assertEquals("Either both threads got events, or some events weren't retrieved.",
-                    100, thread1Events.size());
-            assertEquals("Both threads got events!", 0, thread2Events.size());
+            if (thread1Events.isEmpty()) {
+                assertEquals("Either both threads got events, or some events weren't retrieved.",
+                        100, thread2Events.size());
+            } else {
+                assertEquals("Either both threads got events, or some events weren't retrieved.",
+                        100, thread1Events.size());
+                assertEquals("Both threads got events!", 0, thread2Events.size());
+            }
+        } finally {
+            executor.shutdown();
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
         }
     }
 
     @Test
     public void shouldRetrieveDocumentEventsInPriorityOrder() throws LightblueException {
         insertDocumentEventEntities(
-                newStringDocumentEventEntityWithPriorityOverride("", 5),
-                newStringDocumentEventEntityWithPriorityOverride("", 100),
-                newStringDocumentEventEntityWithPriorityOverride("", 50),
-                newStringDocumentEventEntityWithPriorityOverride("", 25),
-                newStringDocumentEventEntityWithPriorityOverride("", 30),
-                newStringDocumentEventEntityWithPriorityOverride("", 25),
-                newStringDocumentEventEntityWithPriorityOverride("", 99),
-                newStringDocumentEventEntityWithPriorityOverride("", 55),
-                newStringDocumentEventEntityWithPriorityOverride("", 70),
-                newStringDocumentEventEntityWithPriorityOverride("", 2));
+                newRandomStringDocumentEventEntityWithPriorityOverride(5),
+                newRandomStringDocumentEventEntityWithPriorityOverride(100),
+                newRandomStringDocumentEventEntityWithPriorityOverride(50),
+                newRandomStringDocumentEventEntityWithPriorityOverride(25),
+                newRandomStringDocumentEventEntityWithPriorityOverride(30),
+                newRandomStringDocumentEventEntityWithPriorityOverride(25),
+                newRandomStringDocumentEventEntityWithPriorityOverride(99),
+                newRandomStringDocumentEventEntityWithPriorityOverride(55),
+                newRandomStringDocumentEventEntityWithPriorityOverride(70),
+                newRandomStringDocumentEventEntityWithPriorityOverride(2));
 
         List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(10).stream()
                 .map(d -> (LightblueDocumentEvent) d)
@@ -229,13 +235,58 @@ public class LightblueDocumentEventRepositoryTest {
         assertEquals(Arrays.asList(100, 99, 70, 55, 50, 30, 25, 25, 5, 2), priorities);
     }
 
+    @Test
+    public void shouldIgnoreSupersededEventsAndMarkAsSuperseded() throws LightblueException {
+        Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
+
+        insertDocumentEventEntities(
+                newStringDocumentEventEntity("duplicate", creationTimeClock),
+                newStringDocumentEventEntity("duplicate", creationTimeClock),
+                newStringDocumentEventEntity("duplicate", creationTimeClock),
+                newStringDocumentEventEntity("duplicate", creationTimeClock),
+                newStringDocumentEventEntity("duplicate", creationTimeClock));
+
+        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+
+        assertEquals(1, retrieved.size());
+
+        String survivorId = ((LightblueDocumentEvent) retrieved.get(0)).wrappedDocumentEventEntity()
+                .get()
+                .get_id();
+
+        DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        findSuperseded.select(Projection.includeFieldRecursively("*"));
+        findSuperseded.where(Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
+
+        DocumentEventEntity[] found = client.data(findSuperseded, DocumentEventEntity[].class);
+
+        assertEquals(
+                Arrays.asList(survivorId, survivorId, survivorId, survivorId),
+                Arrays.stream(found)
+                        .map(DocumentEventEntity::getSurvivedById)
+                        .collect(Collectors.toList()));
+
+        Instant processedDate = ZonedDateTime.now(fixedClock).toInstant();
+
+        assertEquals(
+                Arrays.asList(processedDate, processedDate, processedDate, processedDate),
+                Arrays.stream(found)
+                        .map(DocumentEventEntity::getProcessedDate)
+                        .map(ZonedDateTime::toInstant)
+                        .collect(Collectors.toList()));
+    }
+
     private DocumentEventEntity newStringDocumentEventEntity(String value) {
         return new StringDocumentEvent(value, fixedClock).toNewDocumentEventEntity();
     }
 
-    private DocumentEventEntity newStringDocumentEventEntityWithPriorityOverride(String value,
-            int priority) {
-        DocumentEventEntity entity = new StringDocumentEvent(value, fixedClock)
+    private DocumentEventEntity newStringDocumentEventEntity(String value, Clock clock) {
+        return new StringDocumentEvent(value, clock).toNewDocumentEventEntity();
+    }
+
+    private DocumentEventEntity newRandomStringDocumentEventEntityWithPriorityOverride(int priority) {
+        DocumentEventEntity entity = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
                 .toNewDocumentEventEntity();
         entity.setPriority(priority);
         return entity;
