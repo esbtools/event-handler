@@ -26,7 +26,7 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
-public abstract class Find {
+public abstract class FindRequests {
     public static DataFindRequest newNotificationsForEntitiesUpTo(String[] entities, int maxEvents) {
         return null;
     }

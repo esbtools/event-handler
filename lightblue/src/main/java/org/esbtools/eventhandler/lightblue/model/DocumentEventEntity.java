@@ -35,12 +35,17 @@ import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
@@ -59,6 +64,7 @@ public class DocumentEventEntity {
     private ZonedDateTime creationDate;
     private ZonedDateTime processedDate;
     private String survivedById;
+    private Set<String> survivorOfIds;
 
     private static final String LIGHTBLUE_DATE_FORMAT = ClientConstants.LIGHTBLUE_DATE_FORMAT_STR;
 
@@ -155,6 +161,31 @@ public class DocumentEventEntity {
     @Required
     public void setPriority(Integer priority) {
         this.priority = priority;
+    }
+
+    public Set<String> getSurvivorOfIds() {
+        return survivorOfIds;
+    }
+
+    public void setSurvivorOfIds(Set<String> survivorOfIds) {
+        this.survivorOfIds = survivorOfIds;
+    }
+
+    public void addSurvivorOfIds(String... ids) {
+        if (survivorOfIds == null) {
+            survivorOfIds = new HashSet<>();
+        }
+        Collections.addAll(survivorOfIds, ids);
+    }
+
+    public void addSurvivorOfIds(Collection<String> ids) {
+        if (ids == null) return;
+
+        if (survivorOfIds == null) {
+            survivorOfIds = new HashSet<>();
+        }
+
+        survivorOfIds.addAll(ids);
     }
 
     @Override

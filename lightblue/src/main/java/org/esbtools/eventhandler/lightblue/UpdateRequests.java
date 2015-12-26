@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import com.redhat.lightblue.client.Literal;
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.Query.BinOp;
 import com.redhat.lightblue.client.Update;
@@ -32,8 +33,9 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
-public abstract class UpdateRequest {
+public abstract class UpdateRequests {
     public static DataUpdateRequest notificationsAsProcessing(
             NotificationEntity[] notificationEntities) {
         return null;
@@ -59,14 +61,9 @@ public abstract class UpdateRequest {
             updates.add(Update.set("status", entity.getStatus().toString()));
 
             ZonedDateTime processedDate = entity.getProcessedDate();
-            String survivedById = entity.getSurvivedById();
 
             if (processedDate != null) {
                 updates.add(Update.set("processedDate", Date.from(processedDate.toInstant())));
-            }
-
-            if (survivedById != null) {
-                updates.add(Update.set("survivedById", survivedById));
             }
 
             // Work around client bug.

@@ -79,10 +79,10 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(Find.newNotificationsForEntitiesUpTo(entities, maxEvents))
+                    .data(FindRequests.newNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
-            lightblue.data(UpdateRequest.notificationsAsProcessing(notificationEntities));
+            lightblue.data(UpdateRequests.notificationsAsProcessing(notificationEntities));
 
             return Arrays.stream(notificationEntities)
                     .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
@@ -106,8 +106,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 .collect(Collectors.toList());
 
         DataBulkRequest markNotifications = new DataBulkRequest();
-        markNotifications.add(UpdateRequest.processingNotificationsAsProcessed(processedNotificationEntities));
-        markNotifications.add(UpdateRequest.processingNotificationsAsFailed(failedNotificationEntities));
+        markNotifications.add(UpdateRequests.processingNotificationsAsProcessed(processedNotificationEntities));
+        markNotifications.add(UpdateRequests.processingNotificationsAsFailed(failedNotificationEntities));
 
         lightblue.bulkData(markNotifications);
     }
@@ -121,7 +121,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             documentEventEntities.add(toNewDocumentEventEntity(documentEvent));
         }
 
-        lightblue.data(Insert.documentEvents(documentEventEntities));
+        lightblue.data(InsertRequests.documentEvents(documentEventEntities));
     }
 
     @Override
@@ -131,7 +131,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             blockUntilLockAcquired(Locks.forDocumentEventsForEntities(entities));
 
             DocumentEventEntity[] documentEventEntities = lightblue
-                    .data(Find.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
+                    .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
 
             List<DocumentEvent> optimized = new ArrayList<>(maxEvents);
@@ -156,24 +156,28 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
                     if (newEvent.isSupersededBy(previousEvent)) {
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
+                        previousEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
+                        previousEntity.addSurvivorOfIds(newEventEntity.get_id());
+
                         newEventEntity.setStatus(DocumentEventEntity.Status.superseded);
-                        newEventEntity.setSurvivedById(previousEntity.get_id());
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
                         newEvent = null;
                         break;
                     } else if (newEvent.couldMergeWith(previousEvent)) {
-                        DocumentEvent merger = newEvent.merge(previousEvent);
-                        DocumentEventEntity mergerEntity = toWrappedDocumentEventEntity(merger);
-                        mergerEntity.setStatus(DocumentEventEntity.Status.processing);
-
                         DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
                         previousEntity.setStatus(DocumentEventEntity.Status.merged);
-                        previousEntity.setSurvivedById(mergerEntity.get_id());
                         previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
                         newEventEntity.setStatus(DocumentEventEntity.Status.merged);
-                        newEventEntity.setSurvivedById(mergerEntity.get_id());
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
+
+                        DocumentEvent merger = newEvent.merge(previousEvent);
+
+                        DocumentEventEntity mergerEntity = toNewDocumentEventEntity(merger);
+                        mergerEntity.setStatus(DocumentEventEntity.Status.processing);
+                        mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
+                        mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
+                        mergerEntity.addSurvivorOfIds(previousEntity.get_id(), newEventEntity.get_id());
 
                         newEvent = merger;
                         maybeMergerEntity = Optional.of(mergerEntity);
@@ -194,10 +198,10 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
             DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
             if (!mergerEntities.isEmpty()) {
-                insertAndUpdateEvents.add(Insert.documentEvents(mergerEntities));
+                insertAndUpdateEvents.add(InsertRequests.documentEvents(mergerEntities));
             }
 
-            insertAndUpdateEvents.addAll(UpdateRequest.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
+            insertAndUpdateEvents.addAll(UpdateRequests.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
 
             if (insertAndUpdateEvents.getRequests().size() == 1) {
                 lightblue.data(insertAndUpdateEvents.getRequests().get(0));
@@ -226,8 +230,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 .collect(Collectors.toList());
 
         DataBulkRequest markDocumentEvents = new DataBulkRequest();
-        markDocumentEvents.add(UpdateRequest.processingDocumentEventsAsProcessed(processed));
-        markDocumentEvents.add(UpdateRequest.processingDocumentEventsAsFailed(failed));
+        markDocumentEvents.add(UpdateRequests.processingDocumentEventsAsProcessed(processed));
+        markDocumentEvents.add(UpdateRequests.processingDocumentEventsAsFailed(failed));
 
         lightblue.data(markDocumentEvents);
     }

@@ -24,7 +24,7 @@ import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import java.util.Collection;
 
-public abstract class Insert {
+public abstract class InsertRequests {
     public static DataInsertRequest documentEvents(
             Collection<DocumentEventEntity> documentEventEntities) {
         return null;

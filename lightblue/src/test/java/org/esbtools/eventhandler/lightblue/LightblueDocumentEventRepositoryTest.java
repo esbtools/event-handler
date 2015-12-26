@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -42,6 +43,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -236,7 +238,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldIgnoreSupersededEventsAndMarkAsSuperseded() throws LightblueException {
+    public void shouldIgnoreSupersededEventsAndMarkAsSupersededAndTrackVictimIds() throws LightblueException {
         Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
 
         insertDocumentEventEntities(
@@ -250,22 +252,12 @@ public class LightblueDocumentEventRepositoryTest {
 
         assertEquals(1, retrieved.size());
 
-        String survivorId = ((LightblueDocumentEvent) retrieved.get(0)).wrappedDocumentEventEntity()
-                .get()
-                .get_id();
-
         DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
         findSuperseded.select(Projection.includeFieldRecursively("*"));
         findSuperseded.where(Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
 
         DocumentEventEntity[] found = client.data(findSuperseded, DocumentEventEntity[].class);
-
-        assertEquals(
-                Arrays.asList(survivorId, survivorId, survivorId, survivorId),
-                Arrays.stream(found)
-                        .map(DocumentEventEntity::getSurvivedById)
-                        .collect(Collectors.toList()));
 
         Instant processedDate = ZonedDateTime.now(fixedClock).toInstant();
 
@@ -275,6 +267,12 @@ public class LightblueDocumentEventRepositoryTest {
                         .map(DocumentEventEntity::getProcessedDate)
                         .map(ZonedDateTime::toInstant)
                         .collect(Collectors.toList()));
+
+        DocumentEventEntity survivorEntity = ((LightblueDocumentEvent) retrieved.get(0))
+                .wrappedDocumentEventEntity().get();
+
+        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
+                Arrays.stream(found).map(DocumentEventEntity::get_id).collect(Collectors.toList()));
     }
 
     private DocumentEventEntity newStringDocumentEventEntity(String value) {
