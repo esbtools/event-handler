@@ -27,6 +27,10 @@ import java.util.Collection;
 public abstract class InsertRequests {
     public static DataInsertRequest documentEvents(
             Collection<DocumentEventEntity> documentEventEntities) {
-        return null;
+        DataInsertRequest insert = new DataInsertRequest(
+                DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        insert.create(documentEventEntities);
+        return insert;
     }
 }

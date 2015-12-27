@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.Future;
 
 /**
@@ -42,7 +41,7 @@ import java.util.concurrent.Future;
 public class StringsDocumentEvent implements LightblueDocumentEvent {
     private final List<String> values;
     private final ZonedDateTime creationDate;
-    private final Optional<DocumentEventEntity> wrappedEntity;
+    private final DocumentEventEntity wrappedEntity;
     private final Clock clock;
 
     public StringsDocumentEvent(List<String> values, Clock clock) {
@@ -50,11 +49,11 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
         this.clock = clock;
 
         creationDate = ZonedDateTime.now(clock);
-        wrappedEntity = Optional.empty();
+        wrappedEntity = toNewDocumentEventEntity();
     }
 
     public StringsDocumentEvent(DocumentEventEntity wrappedEntity) {
-        this.wrappedEntity = Optional.of(wrappedEntity);
+        this.wrappedEntity = wrappedEntity;
         this.clock = Clock.systemDefaultZone();
 
         values = Arrays.asList(wrappedEntity.getParameterByKey("values").split("|"));
@@ -66,11 +65,10 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
     }
 
     @Override
-    public Optional<DocumentEventEntity> wrappedDocumentEventEntity() {
+    public DocumentEventEntity wrappedDocumentEventEntity() {
         return wrappedEntity;
     }
 
-    @Override
     public DocumentEventEntity toNewDocumentEventEntity() {
         DocumentEventEntity entity = new DocumentEventEntity();
         entity.setCanonicalType("Strings");
@@ -99,13 +97,11 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
             return false;
         }
 
-        if (other.wrappedDocumentEventEntity().isPresent()) {
-            DocumentEventEntity otherEntity = other.wrappedDocumentEventEntity().get();
+        DocumentEventEntity otherEntity = other.wrappedDocumentEventEntity();
 
-            if (otherEntity.getStatus().equals(DocumentEventEntity.Status.processed) &&
-                    otherEntity.getProcessedDate().isBefore(creationDate)) {
-                return false;
-            }
+        if (otherEntity.getStatus().equals(DocumentEventEntity.Status.processed) &&
+                otherEntity.getProcessedDate().isBefore(creationDate)) {
+            return false;
         }
 
         return true;
@@ -129,5 +125,29 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
         mergedValues.addAll(this.values);
 
         return new StringsDocumentEvent(mergedValues, clock);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        StringsDocumentEvent that = (StringsDocumentEvent) o;
+        return Objects.equals(values, that.values) &&
+                Objects.equals(creationDate, that.creationDate) &&
+                Objects.equals(wrappedEntity, that.wrappedEntity);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(values, creationDate, wrappedEntity);
+    }
+
+    @Override
+    public String toString() {
+        return "StringsDocumentEvent{" +
+                "values=" + values +
+                ", creationDate=" + creationDate +
+                ", wrappedEntity=" + wrappedEntity +
+                '}';
     }
 }

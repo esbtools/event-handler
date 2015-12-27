@@ -33,7 +33,5 @@ import java.util.Optional;
  */
 public interface LightblueDocumentEvent extends DocumentEvent {
 
-    Optional<DocumentEventEntity> wrappedDocumentEventEntity();
-
-    DocumentEventEntity toNewDocumentEventEntity();
+    DocumentEventEntity wrappedDocumentEventEntity();
 }

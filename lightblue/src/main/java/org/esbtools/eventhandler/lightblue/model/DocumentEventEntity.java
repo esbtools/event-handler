@@ -20,31 +20,23 @@ package org.esbtools.eventhandler.lightblue.model;
 
 import com.redhat.lightblue.client.util.ClientConstants;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.MinItems;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Transient;
 import io.github.alechenninger.lightblue.Version;
-import org.esbtools.eventhandler.DocumentEvent;
 
 import javax.annotation.Nullable;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -171,14 +163,16 @@ public class DocumentEventEntity {
         this.survivorOfIds = survivorOfIds;
     }
 
-    public void addSurvivorOfIds(String... ids) {
+    public void addSurvivorOfIds(@Nullable String... ids) {
+        if (ids == null) return;
+
         if (survivorOfIds == null) {
             survivorOfIds = new HashSet<>();
         }
         Collections.addAll(survivorOfIds, ids);
     }
 
-    public void addSurvivorOfIds(Collection<String> ids) {
+    public void addSurvivorOfIds(@Nullable  Collection<String> ids) {
         if (ids == null) return;
 
         if (survivorOfIds == null) {
@@ -199,6 +193,7 @@ public class DocumentEventEntity {
                 ", creationDate=" + creationDate +
                 ", processedDate=" + processedDate +
                 ", survivedById='" + survivedById + '\'' +
+                ", survivorOfIds=" + survivorOfIds +
                 '}';
     }
 
@@ -214,13 +209,14 @@ public class DocumentEventEntity {
                 Objects.equals(priority, that.priority) &&
                 Objects.equals(creationDate, that.creationDate) &&
                 Objects.equals(processedDate, that.processedDate) &&
-                Objects.equals(survivedById, that.survivedById);
+                Objects.equals(survivedById, that.survivedById) &&
+                Objects.equals(survivorOfIds, that.survivorOfIds);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
-                processedDate, survivedById);
+                processedDate, survivedById, survivorOfIds);
     }
 
     public enum Status {

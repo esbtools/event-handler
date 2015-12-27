@@ -45,7 +45,6 @@ import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -74,9 +73,11 @@ public class LightblueDocumentEventRepositoryTest {
                 .fromLightblueExternalResource(lightblueExternalResource);
         client = LightblueClients.withJavaTimeSerializationSupport(config);
 
-        repository = new LightblueEventRepository(client, new String[]{"String"}, 10,
+        repository = new LightblueEventRepository(client, new String[]{"String", "Strings"}, 10,
                 "testLockingDomain", new EmptyNotificationFactory(),
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
+                new ByTypeDocumentEventFactory()
+                        .addType("String", StringDocumentEvent::new)
+                        .addType("Strings", StringsDocumentEvent::new),
                 fixedClock);
     }
 
@@ -99,8 +100,7 @@ public class LightblueDocumentEventRepositoryTest {
         assertEquals(1, docEvents.size());
 
         DocumentEventEntity entity = ((LightblueDocumentEvent) docEvents.get(0))
-                .wrappedDocumentEventEntity()
-                .get();
+                .wrappedDocumentEventEntity();
 
         assertEquals(stringEvent.getCanonicalType(), entity.getCanonicalType());
         assertEquals(stringEvent.getParameters(), entity.getParameters());
@@ -147,7 +147,6 @@ public class LightblueDocumentEventRepositoryTest {
         assertEquals(1, retrieved.size());
         assertEquals("right", ((LightblueDocumentEvent) retrieved.get(0))
                 .wrappedDocumentEventEntity()
-                .get()
                 .getParameterByKey("value"));
     }
 
@@ -230,7 +229,6 @@ public class LightblueDocumentEventRepositoryTest {
         List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(10).stream()
                 .map(d -> (LightblueDocumentEvent) d)
                 .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
-                .map(Optional::get)
                 .map(DocumentEventEntity::getPriority)
                 .collect(Collectors.toList());
 
@@ -269,23 +267,58 @@ public class LightblueDocumentEventRepositoryTest {
                         .collect(Collectors.toList()));
 
         DocumentEventEntity survivorEntity = ((LightblueDocumentEvent) retrieved.get(0))
-                .wrappedDocumentEventEntity().get();
+                .wrappedDocumentEventEntity();
 
         assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
                 Arrays.stream(found).map(DocumentEventEntity::get_id).collect(Collectors.toList()));
     }
 
+    @Test
+    public void shouldMergeEventsInBatchAndMarkAsMergedAndTrackVictims() throws LightblueException {
+        insertDocumentEventEntities(
+                newStringsDocumentEventEntity("1"),
+                newStringsDocumentEventEntity("2"),
+                newStringsDocumentEventEntity("3"),
+                newStringsDocumentEventEntity("4"),
+                newStringsDocumentEventEntity("5"));
+
+        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+
+        assertThat(retrieved).hasSize(1);
+
+        List<DocumentEventEntity> mergedEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.merged));
+
+        DocumentEventEntity retrievedEntity = ((LightblueDocumentEvent) retrieved.get(0))
+                .wrappedDocumentEventEntity();
+    }
+
+    private List<DocumentEventEntity> findDocumentEventEntitiesWhere(Query query)
+            throws LightblueException {
+        DataFindRequest find = new DataFindRequest(
+                DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        find.where(query);
+        find.select(Projection.includeFieldRecursively("*"));
+        return Arrays.asList(client.data(find, DocumentEventEntity[].class));
+    }
+
+    private DocumentEventEntity newStringsDocumentEventEntity(String value) {
+        return new StringsDocumentEvent(Collections.singletonList(value), fixedClock)
+                .wrappedDocumentEventEntity();
+    }
+
     private DocumentEventEntity newStringDocumentEventEntity(String value) {
-        return new StringDocumentEvent(value, fixedClock).toNewDocumentEventEntity();
+        return new StringDocumentEvent(value, fixedClock).wrappedDocumentEventEntity();
     }
 
     private DocumentEventEntity newStringDocumentEventEntity(String value, Clock clock) {
-        return new StringDocumentEvent(value, clock).toNewDocumentEventEntity();
+        return new StringDocumentEvent(value, clock).wrappedDocumentEventEntity();
     }
 
     private DocumentEventEntity newRandomStringDocumentEventEntityWithPriorityOverride(int priority) {
         DocumentEventEntity entity = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
-                .toNewDocumentEventEntity();
+                .wrappedDocumentEventEntity();
         entity.setPriority(priority);
         return entity;
     }
