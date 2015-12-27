@@ -96,13 +96,13 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     public void markNotificationsProcessedOrFailed(Collection<Notification> notification,
             Collection<FailedNotification> failures) throws Exception {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
-                .map(LightblueEventRepository::toWrappedNotificationEntity)
+                .map(LightblueEventRepository::asEntity)
                 .collect(Collectors.toList());
 
         // TODO: Add field in NotificationEntity for failure messages?
         List<NotificationEntity> failedNotificationEntities = failures.stream()
                 .map(FailedNotification::notification)
-                .map(LightblueEventRepository::toWrappedNotificationEntity)
+                .map(LightblueEventRepository::asEntity)
                 .collect(Collectors.toList());
 
         DataBulkRequest markNotifications = new DataBulkRequest();
@@ -118,7 +118,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
         List<DocumentEventEntity> documentEventEntities = new ArrayList<>(documentEvents.size());
 
         for (DocumentEvent documentEvent : documentEvents) {
-            documentEventEntities.add(toWrappedDocumentEventEntity(documentEvent));
+            documentEventEntities.add(asEntity(documentEvent));
         }
 
         lightblue.data(InsertRequests.documentEventsReturningOnlyIds(documentEventEntities));
@@ -150,7 +150,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                     DocumentEvent previousEvent = previousEventIterator.next();
 
                     if (newEvent.isSupersededBy(previousEvent)) {
-                        DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
+                        DocumentEventEntity previousEntity = asEntity(previousEvent);
                         previousEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
                         previousEntity.addSurvivorOfIds(newEventEntity.get_id());
 
@@ -164,11 +164,11 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         newEventEntity.setStatus(DocumentEventEntity.Status.merged);
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
 
-                        DocumentEventEntity previousEntity = toWrappedDocumentEventEntity(previousEvent);
+                        DocumentEventEntity previousEntity = asEntity(previousEvent);
                         previousEntity.setStatus(DocumentEventEntity.Status.merged);
                         previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
-                        DocumentEventEntity mergerEntity = toWrappedDocumentEventEntity(merger);
+                        DocumentEventEntity mergerEntity = asEntity(merger);
                         mergerEntity.setStatus(DocumentEventEntity.Status.processing);
                         mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
                         mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
@@ -199,7 +199,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
             if (optimized.size() > 0) {
                 for (DocumentEvent event : optimized) {
-                    DocumentEventEntity entity = toWrappedDocumentEventEntity(event);
+                    DocumentEventEntity entity = asEntity(event);
                     if (entity.get_id() == null) {
                         newEvents.add(event);
                         insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
@@ -247,13 +247,13 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     public void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> documentEvents,
             Collection<FailedDocumentEvent> failures) throws Exception {
         List<DocumentEventEntity> processed = documentEvents.stream()
-                .map(LightblueEventRepository::toWrappedDocumentEventEntity)
+                .map(LightblueEventRepository::asEntity)
                 .collect(Collectors.toList());
 
         // TODO: Add field on document event entity to store error messages?
         List<DocumentEventEntity> failed = failures.stream()
                 .map(FailedDocumentEvent::documentEvent)
-                .map(LightblueEventRepository::toWrappedDocumentEventEntity)
+                .map(LightblueEventRepository::asEntity)
                 .collect(Collectors.toList());
 
         DataBulkRequest markDocumentEvents = new DataBulkRequest();
@@ -275,7 +275,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
         }
     }
 
-    private static NotificationEntity toWrappedNotificationEntity(Notification notification) {
+    private static NotificationEntity asEntity(Notification notification) {
         if (notification instanceof LightblueNotification) {
             return ((LightblueNotification) notification).wrappedNotificationEntity();
         }
@@ -284,7 +284,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 "are supported. Event type was: " + notification.getClass());
     }
 
-    private static DocumentEventEntity toWrappedDocumentEventEntity(DocumentEvent event) {
+    private static DocumentEventEntity asEntity(DocumentEvent event) {
         if (event instanceof LightblueDocumentEvent) {
             return ((LightblueDocumentEvent) event).wrappedDocumentEventEntity();
         }
