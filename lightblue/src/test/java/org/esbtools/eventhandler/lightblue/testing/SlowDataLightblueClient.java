@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.testing;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.Locking;

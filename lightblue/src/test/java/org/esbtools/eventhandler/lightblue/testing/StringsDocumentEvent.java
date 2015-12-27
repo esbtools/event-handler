@@ -16,11 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.testing;
 
 import com.google.common.base.Joiner;
 import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
+import org.esbtools.eventhandler.lightblue.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import java.time.Clock;

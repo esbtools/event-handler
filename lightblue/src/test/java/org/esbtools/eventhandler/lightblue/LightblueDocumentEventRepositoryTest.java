@@ -30,9 +30,14 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.response.LightblueException;
 
-import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.junit.Assert;
+import org.esbtools.eventhandler.lightblue.testing.EmptyNotificationFactory;
+import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
+import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
+import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
+import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
+import org.esbtools.eventhandler.lightblue.testing.StringsDocumentEvent;
+import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
