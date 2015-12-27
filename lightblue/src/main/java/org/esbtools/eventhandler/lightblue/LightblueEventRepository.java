@@ -207,7 +207,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 }
             }
 
-            insertAndUpdateEvents.addAll(UpdateRequests.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
+            insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
 
             // TODO: Verify these were all successful
             LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);

@@ -46,7 +46,7 @@ public abstract class UpdateRequests {
         return null;
     }
 
-    public static Collection<DataUpdateRequest> newDocumentEventsStatusAndSurvivedBy(
+    public static Collection<DataUpdateRequest> documentEventsStatusAndProcessedDate(
             Collection<DocumentEventEntity> updatedEventEntities) {
         List<DataUpdateRequest> requests = new ArrayList<>(updatedEventEntities.size());
 
