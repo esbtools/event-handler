@@ -32,6 +32,7 @@ import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -291,6 +292,35 @@ public class LightblueDocumentEventRepositoryTest {
 
         DocumentEventEntity retrievedEntity = ((LightblueDocumentEvent) retrieved.get(0))
                 .wrappedDocumentEventEntity();
+
+        assertThat(mergedEntities).named("merged entities").hasSize(5);
+        assertThat(retrievedEntity.getSurvivorOfIds())
+                .containsExactlyElementsIn(
+                mergedEntities.stream()
+                        .map(DocumentEventEntity::get_id)
+                        .collect(Collectors.toList()));
+    }
+
+    @Test
+    public void shouldPersistMergerEntitiesAsProcessingIfCreatedDuringRetrieval()
+            throws LightblueException {
+        insertDocumentEventEntities(
+                newStringsDocumentEventEntity("1"),
+                newStringsDocumentEventEntity("2"),
+                newStringsDocumentEventEntity("3"),
+                newStringsDocumentEventEntity("4"),
+                newStringsDocumentEventEntity("5"));
+
+        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+        DocumentEventEntity retrievedEntity = ((LightblueDocumentEvent) retrieved.get(0))
+                .wrappedDocumentEventEntity();
+
+        List<DocumentEventEntity> processingEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processing));
+
+        assertThat(processingEntities).named("persisted processing entities").hasSize(1);
+        assertThat(retrievedEntity.get_id()).named("retrieved event id")
+                .isEqualTo(processingEntities.get(0).get_id());
     }
 
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(Query query)

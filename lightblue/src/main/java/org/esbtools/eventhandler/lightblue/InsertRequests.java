@@ -20,17 +20,29 @@ package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
+import com.redhat.lightblue.client.Projection;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import java.util.Collection;
 
 public abstract class InsertRequests {
-    public static DataInsertRequest documentEvents(
+    public static DataInsertRequest documentEventsReturningOnlyIds(
+            DocumentEventEntity... documentEventEntities) {
+        DataInsertRequest insert = new DataInsertRequest(
+                DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        insert.create(documentEventEntities);
+        insert.returns(Projection.includeField("_id"));
+        return insert;
+    }
+
+    public static DataInsertRequest documentEventsReturningOnlyIds(
             Collection<DocumentEventEntity> documentEventEntities) {
         DataInsertRequest insert = new DataInsertRequest(
                 DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
         insert.create(documentEventEntities);
+        insert.returns(Projection.includeField("_id"));
         return insert;
     }
 }

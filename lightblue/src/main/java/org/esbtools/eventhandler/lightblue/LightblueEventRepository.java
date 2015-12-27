@@ -21,6 +21,8 @@ package org.esbtools.eventhandler.lightblue;
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.DocumentEvent;
@@ -40,8 +42,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 // TODO: Doesn't have to be same class for this
@@ -121,7 +121,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             documentEventEntities.add(toWrappedDocumentEventEntity(documentEvent));
         }
 
-        lightblue.data(InsertRequests.documentEvents(documentEventEntities));
+        lightblue.data(InsertRequests.documentEventsReturningOnlyIds(documentEventEntities));
     }
 
     @Override
@@ -144,10 +144,6 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 entitiesToUpdate.add(newEventEntity);
 
                 DocumentEvent newEvent = getDocumentEventForEntity(requester, newEventEntity);
-
-                // If there is a merge out of this event, it will need to be inserted later, since
-                // it is a net new event.
-                Optional<DocumentEventEntity> maybeMergerEntity = Optional.empty();
 
                 Iterator<DocumentEvent> previousEventIterator = optimized.iterator();
                 while (previousEventIterator.hasNext()) {
@@ -173,10 +169,15 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
                         DocumentEventEntity mergerEntity = toWrappedDocumentEventEntity(merger);
+                        mergerEntity.setStatus(DocumentEventEntity.Status.processing);
                         mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
-                        mergerEntity.addSurvivorOfIds(previousEntity.get_id());
                         mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
-                        mergerEntity.addSurvivorOfIds(newEventEntity.get_id());
+                        if (previousEntity.get_id() != null) {
+                            mergerEntity.addSurvivorOfIds(previousEntity.get_id());
+                        }
+                        if (newEventEntity.get_id() != null) {
+                            mergerEntity.addSurvivorOfIds(newEventEntity.get_id());
+                        }
 
                         newEvent = merger;
                         previousEventIterator.remove();
@@ -194,14 +195,33 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             }
 
             DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
+            List<DocumentEvent> newEvents = new ArrayList<>();
+
+            if (optimized.size() > 0) {
+                for (DocumentEvent event : optimized) {
+                    DocumentEventEntity entity = toWrappedDocumentEventEntity(event);
+                    if (entity.get_id() == null) {
+                        newEvents.add(event);
+                        insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
+                    }
+                }
+            }
 
             insertAndUpdateEvents.addAll(UpdateRequests.newDocumentEventsStatusAndSurvivedBy(entitiesToUpdate));
 
-            if (insertAndUpdateEvents.getRequests().size() == 1) {
-                lightblue.data(insertAndUpdateEvents.getRequests().get(0));
-            } else {
-                // TODO: Verify these were all successful
-                lightblue.bulkData(insertAndUpdateEvents);
+            // TODO: Verify these were all successful
+            LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);
+            List<LightblueDataResponse> responses = bulkResponse.getResponses();
+
+            for (int i = 0; i < newEvents.size(); i++) {
+                LightblueDataResponse response = responses.get(i);
+                DocumentEvent newEvent = newEvents.get(i);
+                // TODO: Make this not necessary
+                if (newEvent instanceof LightblueDocumentEvent) {
+                    LightblueDocumentEvent lightblueDocEvent = (LightblueDocumentEvent) newEvent;
+                    DocumentEventEntity newEntity = response.parseProcessed(DocumentEventEntity.class);
+                    lightblueDocEvent.wrappedDocumentEventEntity().set_id(newEntity.get_id());
+                }
             }
 
             return optimized;
