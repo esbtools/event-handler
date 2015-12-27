@@ -194,15 +194,13 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             }
 
             DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
-            List<DocumentEvent> newEvents = new ArrayList<>();
+            List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 
-            if (optimized.size() > 0) {
-                for (LightblueDocumentEvent event : optimized) {
-                    DocumentEventEntity entity = event.wrappedDocumentEventEntity();
-                    if (entity.get_id() == null) {
-                        newEvents.add(event);
-                        insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
-                    }
+            for (LightblueDocumentEvent event : optimized) {
+                DocumentEventEntity entity = event.wrappedDocumentEventEntity();
+                if (entity.get_id() == null) {
+                    newEvents.add(event);
+                    insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
                 }
             }
 
@@ -214,13 +212,9 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
             for (int i = 0; i < newEvents.size(); i++) {
                 LightblueDataResponse response = responses.get(i);
-                DocumentEvent newEvent = newEvents.get(i);
-                // TODO: Make this not necessary
-                if (newEvent instanceof LightblueDocumentEvent) {
-                    LightblueDocumentEvent lightblueDocEvent = (LightblueDocumentEvent) newEvent;
-                    DocumentEventEntity newEntity = response.parseProcessed(DocumentEventEntity.class);
-                    lightblueDocEvent.wrappedDocumentEventEntity().set_id(newEntity.get_id());
-                }
+                LightblueDocumentEvent newEvent = newEvents.get(i);
+                DocumentEventEntity newEntity = response.parseProcessed(DocumentEventEntity.class);
+                newEvent.wrappedDocumentEventEntity().set_id(newEntity.get_id());
             }
 
             return optimized;
