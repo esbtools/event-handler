@@ -55,7 +55,6 @@ public class DocumentEventEntity {
     private Integer priority;
     private ZonedDateTime creationDate;
     private ZonedDateTime processedDate;
-    private String survivedById;
     private Set<String> survivorOfIds;
 
     private static final String LIGHTBLUE_DATE_FORMAT = ClientConstants.LIGHTBLUE_DATE_FORMAT_STR;
@@ -138,14 +137,6 @@ public class DocumentEventEntity {
         this.processedDate = processedDate;
     }
 
-    public String getSurvivedById() {
-        return survivedById;
-    }
-
-    public void setSurvivedById(String survivedById) {
-        this.survivedById = survivedById;
-    }
-
     public Integer getPriority() {
         return priority;
     }
@@ -192,7 +183,6 @@ public class DocumentEventEntity {
                 ", priority=" + priority +
                 ", creationDate=" + creationDate +
                 ", processedDate=" + processedDate +
-                ", survivedById='" + survivedById + '\'' +
                 ", survivorOfIds=" + survivorOfIds +
                 '}';
     }
@@ -209,14 +199,13 @@ public class DocumentEventEntity {
                 Objects.equals(priority, that.priority) &&
                 Objects.equals(creationDate, that.creationDate) &&
                 Objects.equals(processedDate, that.processedDate) &&
-                Objects.equals(survivedById, that.survivedById) &&
                 Objects.equals(survivorOfIds, that.survivorOfIds);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
-                processedDate, survivedById, survivorOfIds);
+                processedDate, survivorOfIds);
     }
 
     public enum Status {
