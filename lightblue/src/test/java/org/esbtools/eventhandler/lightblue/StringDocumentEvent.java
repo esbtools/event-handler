@@ -101,7 +101,7 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
     }
 
     @Override
-    public DocumentEvent merge(DocumentEvent event) {
+    public LightblueDocumentEvent merge(DocumentEvent event) {
         throw new UnsupportedOperationException("Can't do that");
     }
 

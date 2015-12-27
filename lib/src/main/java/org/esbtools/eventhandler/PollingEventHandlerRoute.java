@@ -87,7 +87,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                 .routeId("ready-events")
                 .process(exchange -> {
                     // TODO: Should event repository just lookup the entities in this design?
-                    List<DocumentEvent> documentEvents = eventRepository.
+                    List<? extends DocumentEvent> documentEvents = eventRepository.
                             retrievePriorityDocumentEventsUpTo(readyEventBatchSize);
 
                     // TODO: If this fails to return results, should put events back in ready pool

@@ -113,7 +113,7 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
     }
 
     @Override
-    public DocumentEvent merge(DocumentEvent event) {
+    public LightblueDocumentEvent merge(DocumentEvent event) {
         if (!couldMergeWith(event)) {
             throw new IllegalArgumentException(event.toString());
         }

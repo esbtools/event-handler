@@ -38,7 +38,7 @@ public interface EventRepository {
      *
      * <p>The document events are retrievable from {@link #retrievePriorityDocumentEventsUpTo(int)}.
      */
-    void addNewDocumentEvents(Collection<DocumentEvent> documentEvents) throws Exception;
+    void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents) throws Exception;
 
     /**
      * Retrieve the top {@code maxEvents} document events in priority order. Document events are
@@ -51,9 +51,9 @@ public interface EventRepository {
      *
      * <p>Subsequent calls should always return a unique set, even among multiple threads.
      */
-    List<DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
+    List<? extends DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
 
     // TODO: Handle failed
-    void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> events,
+    void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception;
 }

@@ -18,7 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import java.util.HashMap;
@@ -29,7 +28,8 @@ public class ByTypeDocumentEventFactory implements DocumentEventFactory {
     private final Map<String, DocumentEventFactory> factories = new HashMap<>();
 
     @Override
-    public DocumentEvent getDocumentEventForEntity(DocumentEventEntity entity, LightblueRequester requester) {
+    public LightblueDocumentEvent getDocumentEventForEntity(DocumentEventEntity entity,
+            LightblueRequester requester) {
         String type = entity.getCanonicalType();
 
         if (!factories.containsKey(type)) {

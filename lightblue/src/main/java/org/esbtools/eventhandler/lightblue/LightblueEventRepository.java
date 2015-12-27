@@ -113,19 +113,17 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     }
 
     @Override
-    public void addNewDocumentEvents(Collection<DocumentEvent> documentEvents)
+    public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents)
             throws LightblueException {
-        List<DocumentEventEntity> documentEventEntities = new ArrayList<>(documentEvents.size());
-
-        for (DocumentEvent documentEvent : documentEvents) {
-            documentEventEntities.add(asEntity(documentEvent));
-        }
+        List<DocumentEventEntity> documentEventEntities = documentEvents.stream()
+                .map(LightblueEventRepository::asEntity)
+                .collect(Collectors.toList());
 
         lightblue.data(InsertRequests.documentEventsReturningOnlyIds(documentEventEntities));
     }
 
     @Override
-    public List<DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
+    public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws LightblueException {
         try {
             blockUntilLockAcquired(Locks.forDocumentEventsForEntities(entities));
@@ -134,7 +132,7 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                     .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
 
-            List<DocumentEvent> optimized = new ArrayList<>(maxEvents);
+            List<LightblueDocumentEvent> optimized = new ArrayList<>(maxEvents);
             List<DocumentEventEntity> entitiesToUpdate = new ArrayList<>();
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
@@ -143,14 +141,15 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
                 entitiesToUpdate.add(newEventEntity);
 
-                DocumentEvent newEvent = getDocumentEventForEntity(requester, newEventEntity);
+                LightblueDocumentEvent newEvent = documentEventFactory
+                        .getDocumentEventForEntity(newEventEntity, requester);
 
-                Iterator<DocumentEvent> previousEventIterator = optimized.iterator();
+                Iterator<LightblueDocumentEvent> previousEventIterator = optimized.iterator();
                 while (previousEventIterator.hasNext()) {
-                    DocumentEvent previousEvent = previousEventIterator.next();
+                    LightblueDocumentEvent previousEvent = previousEventIterator.next();
 
                     if (newEvent.isSupersededBy(previousEvent)) {
-                        DocumentEventEntity previousEntity = asEntity(previousEvent);
+                        DocumentEventEntity previousEntity = previousEvent.wrappedDocumentEventEntity();
                         previousEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
                         previousEntity.addSurvivorOfIds(newEventEntity.get_id());
 
@@ -159,16 +158,16 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         newEvent = null;
                         break;
                     } else if (newEvent.couldMergeWith(previousEvent)) {
-                        DocumentEvent merger = newEvent.merge(previousEvent);
+                        LightblueDocumentEvent merger = newEvent.merge(previousEvent);
 
                         newEventEntity.setStatus(DocumentEventEntity.Status.merged);
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
 
-                        DocumentEventEntity previousEntity = asEntity(previousEvent);
+                        DocumentEventEntity previousEntity = previousEvent.wrappedDocumentEventEntity();
                         previousEntity.setStatus(DocumentEventEntity.Status.merged);
                         previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
-                        DocumentEventEntity mergerEntity = asEntity(merger);
+                        DocumentEventEntity mergerEntity = merger.wrappedDocumentEventEntity();
                         mergerEntity.setStatus(DocumentEventEntity.Status.processing);
                         mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
                         mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
@@ -198,8 +197,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             List<DocumentEvent> newEvents = new ArrayList<>();
 
             if (optimized.size() > 0) {
-                for (DocumentEvent event : optimized) {
-                    DocumentEventEntity entity = asEntity(event);
+                for (LightblueDocumentEvent event : optimized) {
+                    DocumentEventEntity entity = event.wrappedDocumentEventEntity();
                     if (entity.get_id() == null) {
                         newEvents.add(event);
                         insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
@@ -230,21 +229,8 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
         }
     }
 
-    private LightblueDocumentEvent getDocumentEventForEntity(BulkLightblueRequester requester,
-            DocumentEventEntity newEventEntity) {
-        DocumentEvent event = documentEventFactory.getDocumentEventForEntity(newEventEntity, requester);
-
-        // TODO: Maybe refactor so this runtime check is not necessary
-        if (event instanceof LightblueDocumentEvent) {
-            return (LightblueDocumentEvent) event;
-        }
-
-        throw new IllegalArgumentException("Expected DocumentEvent for entity to be a " +
-                "LightblueDocumentEvent but was: " + event);
-    }
-
     @Override
-    public void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> documentEvents,
+    public void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> documentEvents,
             Collection<FailedDocumentEvent> failures) throws Exception {
         List<DocumentEventEntity> processed = documentEvents.stream()
                 .map(LightblueEventRepository::asEntity)

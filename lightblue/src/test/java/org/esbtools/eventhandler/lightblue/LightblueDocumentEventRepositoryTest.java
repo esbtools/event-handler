@@ -96,12 +96,11 @@ public class LightblueDocumentEventRepositoryTest {
 
         insertDocumentEventEntities(stringEvent, otherEvent);
 
-        List<DocumentEvent> docEvents = repository.retrievePriorityDocumentEventsUpTo(2);
+        List<LightblueDocumentEvent> docEvents = repository.retrievePriorityDocumentEventsUpTo(2);
 
         assertEquals(1, docEvents.size());
 
-        DocumentEventEntity entity = ((LightblueDocumentEvent) docEvents.get(0))
-                .wrappedDocumentEventEntity();
+        DocumentEventEntity entity = docEvents.get(0).wrappedDocumentEventEntity();
 
         assertEquals(stringEvent.getCanonicalType(), entity.getCanonicalType());
         assertEquals(stringEvent.getParameters(), entity.getParameters());
@@ -143,12 +142,10 @@ public class LightblueDocumentEventRepositoryTest {
         insertDocumentEventEntities(stringEvent, processingEvent, processedEvent, failedEvent,
                 mergedEvent, supersededEvent);
 
-        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(6);
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(6);
 
         assertEquals(1, retrieved.size());
-        assertEquals("right", ((LightblueDocumentEvent) retrieved.get(0))
-                .wrappedDocumentEventEntity()
-                .getParameterByKey("value"));
+        assertEquals("right", retrieved.get(0).wrappedDocumentEventEntity().getParameterByKey("value"));
     }
 
     @Test
@@ -178,11 +175,11 @@ public class LightblueDocumentEventRepositoryTest {
             thread1Client.pauseOnNextRequest();
             thread2Client.pauseOnNextRequest();
 
-            Future<List<DocumentEvent>> futureThread1Events = executor.submit(() -> {
+            Future<List<LightblueDocumentEvent>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
                 return thread1Repository.retrievePriorityDocumentEventsUpTo(100);
             });
-            Future<List<DocumentEvent>> futureThread2Events = executor.submit(() -> {
+            Future<List<LightblueDocumentEvent>> futureThread2Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
                 return thread2Repository.retrievePriorityDocumentEventsUpTo(100);
             });
@@ -194,8 +191,8 @@ public class LightblueDocumentEventRepositoryTest {
             thread2Client.unpause();
             thread1Client.unpause();
 
-            List<DocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
-            List<DocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
+            List<LightblueDocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
+            List<LightblueDocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
 
             if (thread1Events.isEmpty()) {
                 assertEquals("Either both threads got events, or some events weren't retrieved.",
@@ -228,7 +225,6 @@ public class LightblueDocumentEventRepositoryTest {
                 newRandomStringDocumentEventEntityWithPriorityOverride(2));
 
         List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(10).stream()
-                .map(d -> (LightblueDocumentEvent) d)
                 .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
                 .map(DocumentEventEntity::getPriority)
                 .collect(Collectors.toList());
@@ -247,7 +243,7 @@ public class LightblueDocumentEventRepositoryTest {
                 newStringDocumentEventEntity("duplicate", creationTimeClock),
                 newStringDocumentEventEntity("duplicate", creationTimeClock));
 
-        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
 
         assertEquals(1, retrieved.size());
 
@@ -267,8 +263,7 @@ public class LightblueDocumentEventRepositoryTest {
                         .map(ZonedDateTime::toInstant)
                         .collect(Collectors.toList()));
 
-        DocumentEventEntity survivorEntity = ((LightblueDocumentEvent) retrieved.get(0))
-                .wrappedDocumentEventEntity();
+        DocumentEventEntity survivorEntity = retrieved.get(0).wrappedDocumentEventEntity();
 
         assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
                 Arrays.stream(found).map(DocumentEventEntity::get_id).collect(Collectors.toList()));
@@ -283,15 +278,14 @@ public class LightblueDocumentEventRepositoryTest {
                 newStringsDocumentEventEntity("4"),
                 newStringsDocumentEventEntity("5"));
 
-        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
 
         assertThat(retrieved).hasSize(1);
 
         List<DocumentEventEntity> mergedEntities = findDocumentEventEntitiesWhere(
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.merged));
 
-        DocumentEventEntity retrievedEntity = ((LightblueDocumentEvent) retrieved.get(0))
-                .wrappedDocumentEventEntity();
+        DocumentEventEntity retrievedEntity = retrieved.get(0).wrappedDocumentEventEntity();
 
         assertThat(mergedEntities).named("merged entities").hasSize(5);
         assertThat(retrievedEntity.getSurvivorOfIds())
@@ -311,9 +305,8 @@ public class LightblueDocumentEventRepositoryTest {
                 newStringsDocumentEventEntity("4"),
                 newStringsDocumentEventEntity("5"));
 
-        List<DocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
-        DocumentEventEntity retrievedEntity = ((LightblueDocumentEvent) retrieved.get(0))
-                .wrappedDocumentEventEntity();
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+        DocumentEventEntity retrievedEntity = retrieved.get(0).wrappedDocumentEventEntity();
 
         List<DocumentEventEntity> processingEntities = findDocumentEventEntitiesWhere(
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processing));
