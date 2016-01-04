@@ -54,6 +54,10 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
         wrappedEntity = entity;
     }
 
+    public String value() {
+        return value;
+    }
+
     public StringDocumentEvent(DocumentEventEntity wrappedEntity) {
         this.wrappedEntity = wrappedEntity;
 

@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 // TODO: Doesn't have to be same class for this
@@ -137,38 +138,37 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             for (DocumentEventEntity newEventEntity : documentEventEntities) {
-                newEventEntity.setStatus(DocumentEventEntity.Status.processing);
-
-                entitiesToUpdate.add(newEventEntity);
-
                 LightblueDocumentEvent newEvent = documentEventFactory
                         .getDocumentEventForEntity(newEventEntity, requester);
 
-                Iterator<LightblueDocumentEvent> previousEventIterator = optimized.iterator();
-                while (previousEventIterator.hasNext()) {
-                    LightblueDocumentEvent previousEvent = previousEventIterator.next();
+                Iterator<LightblueDocumentEvent> optimizedIterator = optimized.iterator();
 
-                    if (newEvent.isSupersededBy(previousEvent)) {
-                        DocumentEventEntity previousEntity = previousEvent.wrappedDocumentEventEntity();
+                while (optimizedIterator.hasNext()) {
+                    LightblueDocumentEvent previouslyOptimizedEvent = optimizedIterator.next();
+
+                    if (newEvent.isSupersededBy(previouslyOptimizedEvent)) {
+                        DocumentEventEntity previousEntity = previouslyOptimizedEvent.wrappedDocumentEventEntity();
                         previousEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
                         previousEntity.addSurvivorOfIds(newEventEntity.get_id());
 
                         newEventEntity.setStatus(DocumentEventEntity.Status.superseded);
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
+                        entitiesToUpdate.add(newEventEntity);
+
                         newEvent = null;
                         break;
-                    } else if (newEvent.couldMergeWith(previousEvent)) {
-                        LightblueDocumentEvent merger = newEvent.merge(previousEvent);
+                    } else if (newEvent.couldMergeWith(previouslyOptimizedEvent)) {
+                        LightblueDocumentEvent merger = newEvent.merge(previouslyOptimizedEvent);
 
                         newEventEntity.setStatus(DocumentEventEntity.Status.merged);
                         newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
+                        entitiesToUpdate.add(newEventEntity);
 
-                        DocumentEventEntity previousEntity = previousEvent.wrappedDocumentEventEntity();
+                        DocumentEventEntity previousEntity = previouslyOptimizedEvent.wrappedDocumentEventEntity();
                         previousEntity.setStatus(DocumentEventEntity.Status.merged);
                         previousEntity.setProcessedDate(ZonedDateTime.now(clock));
 
                         DocumentEventEntity mergerEntity = merger.wrappedDocumentEventEntity();
-                        mergerEntity.setStatus(DocumentEventEntity.Status.processing);
                         mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
                         mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
                         if (previousEntity.get_id() != null) {
@@ -179,17 +179,15 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                         }
 
                         newEvent = merger;
-                        previousEventIterator.remove();
+                        newEventEntity = mergerEntity;
+                        optimizedIterator.remove();
                     }
                 }
 
-                if (newEvent != null) {
+                if (newEvent != null && optimized.size() < maxEvents) {
+                    newEventEntity.setStatus(DocumentEventEntity.Status.processing);
+                    entitiesToUpdate.add(newEventEntity);
                     optimized.add(newEvent);
-                }
-
-                // TODO: This could be optimized a little better but will improve this soon after tests
-                if (optimized.size() >= maxEvents) {
-                    break;
                 }
             }
 

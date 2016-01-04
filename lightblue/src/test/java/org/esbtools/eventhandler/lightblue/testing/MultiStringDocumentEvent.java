@@ -40,13 +40,13 @@ import java.util.concurrent.Future;
  * <p>This is useful for testing document event merges. Every Strings event is merge-able: the
  * merged event includes both victims' values.
  */
-public class StringsDocumentEvent implements LightblueDocumentEvent {
+public class MultiStringDocumentEvent implements LightblueDocumentEvent {
     private final List<String> values;
     private final ZonedDateTime creationDate;
     private final DocumentEventEntity wrappedEntity;
     private final Clock clock;
 
-    public StringsDocumentEvent(List<String> values, Clock clock) {
+    public MultiStringDocumentEvent(List<String> values, Clock clock) {
         this.values = values;
         this.clock = clock;
 
@@ -54,15 +54,19 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
         wrappedEntity = toNewDocumentEventEntity();
     }
 
-    public StringsDocumentEvent(DocumentEventEntity wrappedEntity) {
+    public List<String> values() {
+        return values;
+    }
+
+    public MultiStringDocumentEvent(DocumentEventEntity wrappedEntity) {
         this.wrappedEntity = wrappedEntity;
         this.clock = Clock.systemDefaultZone();
 
-        values = Arrays.asList(wrappedEntity.getParameterByKey("values").split("|"));
+        values = Arrays.asList(wrappedEntity.getParameterByKey("values").split("\\|"));
         creationDate = wrappedEntity.getCreationDate();
     }
 
-    public StringsDocumentEvent(DocumentEventEntity wrappedEntity, LightblueRequester requester) {
+    public MultiStringDocumentEvent(DocumentEventEntity wrappedEntity, LightblueRequester requester) {
         this(wrappedEntity);
     }
 
@@ -89,11 +93,11 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
 
     @Override
     public boolean isSupersededBy(DocumentEvent event) {
-        if (!(event instanceof StringsDocumentEvent)) {
+        if (!(event instanceof MultiStringDocumentEvent)) {
             return false;
         }
 
-        StringsDocumentEvent other = (StringsDocumentEvent) event;
+        MultiStringDocumentEvent other = (MultiStringDocumentEvent) event;
 
         if (!Objects.equals(other.values, values)) {
             return false;
@@ -111,7 +115,7 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
 
     @Override
     public boolean couldMergeWith(DocumentEvent event) {
-        return event instanceof StringsDocumentEvent;
+        return event instanceof MultiStringDocumentEvent;
     }
 
     @Override
@@ -120,20 +124,20 @@ public class StringsDocumentEvent implements LightblueDocumentEvent {
             throw new IllegalArgumentException(event.toString());
         }
 
-        StringsDocumentEvent other = (StringsDocumentEvent) event;
+        MultiStringDocumentEvent other = (MultiStringDocumentEvent) event;
 
         List<String> mergedValues = new ArrayList<>();
         mergedValues.addAll(other.values);
         mergedValues.addAll(this.values);
 
-        return new StringsDocumentEvent(mergedValues, clock);
+        return new MultiStringDocumentEvent(mergedValues, clock);
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        StringsDocumentEvent that = (StringsDocumentEvent) o;
+        MultiStringDocumentEvent that = (MultiStringDocumentEvent) o;
         return Objects.equals(values, that.values) &&
                 Objects.equals(creationDate, that.creationDate) &&
                 Objects.equals(wrappedEntity, that.wrappedEntity);

@@ -36,7 +36,7 @@ import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
-import org.esbtools.eventhandler.lightblue.testing.StringsDocumentEvent;
+import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -62,7 +62,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepositoryTest {
-
     @ClassRule
     public static LightblueExternalResource lightblueExternalResource =
             new LightblueExternalResource(TestMetadataJson.forEntity(DocumentEventEntity.class));
@@ -73,17 +72,19 @@ public class LightblueDocumentEventRepositoryTest {
 
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
+    private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
+
     @Before
     public void initializeLightblueClientAndRepository() {
         LightblueClientConfiguration config = LightblueClientConfigurations
                 .fromLightblueExternalResource(lightblueExternalResource);
         client = LightblueClients.withJavaTimeSerializationSupport(config);
 
-        repository = new LightblueEventRepository(client, new String[]{"String", "Strings"}, 10,
-                "testLockingDomain", new EmptyNotificationFactory(),
+        repository = new LightblueEventRepository(client, new String[]{"String", "Strings"},
+                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain", new EmptyNotificationFactory(),
                 new ByTypeDocumentEventFactory()
                         .addType("String", StringDocumentEvent::new)
-                        .addType("Strings", StringsDocumentEvent::new),
+                        .addType("Strings", MultiStringDocumentEvent::new),
                 fixedClock);
     }
 
@@ -277,11 +278,11 @@ public class LightblueDocumentEventRepositoryTest {
     @Test
     public void shouldMergeEventsInBatchAndMarkAsMergedAndTrackVictims() throws LightblueException {
         insertDocumentEventEntities(
-                newStringsDocumentEventEntity("1"),
-                newStringsDocumentEventEntity("2"),
-                newStringsDocumentEventEntity("3"),
-                newStringsDocumentEventEntity("4"),
-                newStringsDocumentEventEntity("5"));
+                newMultiStringDocumentEventEntity("1"),
+                newMultiStringDocumentEventEntity("2"),
+                newMultiStringDocumentEventEntity("3"),
+                newMultiStringDocumentEventEntity("4"),
+                newMultiStringDocumentEventEntity("5"));
 
         List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
 
@@ -304,11 +305,11 @@ public class LightblueDocumentEventRepositoryTest {
     public void shouldPersistMergerEntitiesAsProcessingIfCreatedDuringRetrieval()
             throws LightblueException {
         insertDocumentEventEntities(
-                newStringsDocumentEventEntity("1"),
-                newStringsDocumentEventEntity("2"),
-                newStringsDocumentEventEntity("3"),
-                newStringsDocumentEventEntity("4"),
-                newStringsDocumentEventEntity("5"));
+                newMultiStringDocumentEventEntity("1"),
+                newMultiStringDocumentEventEntity("2"),
+                newMultiStringDocumentEventEntity("3"),
+                newMultiStringDocumentEventEntity("4"),
+                newMultiStringDocumentEventEntity("5"));
 
         List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
         DocumentEventEntity retrievedEntity = retrieved.get(0).wrappedDocumentEventEntity();
@@ -321,6 +322,95 @@ public class LightblueDocumentEventRepositoryTest {
                 .isEqualTo(processingEntities.get(0).get_id());
     }
 
+    @Test
+    public void shouldReturnNoMoreThanMaxEventsDespiteBatchSizeAndLeaveRemainingEventsUnprocessed() throws LightblueException {
+        insertDocumentEventEntities(randomNewDocumentEventEntities(5));
+
+        List<LightblueDocumentEvent> returnedEvents = repository.retrievePriorityDocumentEventsUpTo(2);
+
+        List<DocumentEventEntity> unprocessedEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed));
+
+        assertThat(returnedEvents).hasSize(2);
+        assertThat(unprocessedEntities).hasSize(3);
+        assertThat(returnedEvents.stream()
+                .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
+                .map(DocumentEventEntity::get_id)
+                .collect(Collectors.toList()))
+                .containsNoneIn(unprocessedEntities.stream()
+                        .map(DocumentEventEntity::get_id)
+                        .collect(Collectors.toList()));
+    }
+
+    @Test
+    public void shouldSearchThroughNoMoreThanBatchSize() throws LightblueException {
+        insertDocumentEventEntities(randomNewDocumentEventEntities(DOCUMENT_EVENT_BATCH_SIZE + 1));
+
+        List<LightblueDocumentEvent> returnedEvents =
+                repository.retrievePriorityDocumentEventsUpTo(DOCUMENT_EVENT_BATCH_SIZE + 1);
+
+        List<DocumentEventEntity> unprocessedEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed));
+
+        assertThat(returnedEvents).hasSize(DOCUMENT_EVENT_BATCH_SIZE);
+        assertThat(unprocessedEntities).hasSize(1);
+        assertThat(returnedEvents.stream()
+                .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
+                .map(DocumentEventEntity::get_id)
+                .collect(Collectors.toList()))
+                .containsNoneIn(unprocessedEntities.stream()
+                        .map(DocumentEventEntity::get_id)
+                        .collect(Collectors.toList()));
+    }
+
+    @Test
+    public void shouldOnlyReturnUpToMaxEventsAskedForButShouldOptimizeAmongUpToBatchSizeEvents()
+            throws LightblueException {
+        StringDocumentEvent event1 = new StringDocumentEvent("1", fixedClock);
+        StringDocumentEvent event2 = new StringDocumentEvent("2", fixedClock);
+        StringDocumentEvent event3 = new StringDocumentEvent("3", fixedClock);
+        StringDocumentEvent event4 = new StringDocumentEvent("4", fixedClock);
+
+        // 4 which are not able to be merged, and 7 which can be.
+        // Batch size should be 10, so one of these will remain unprocessed.
+        insertDocumentEventEntities(
+                event1.wrappedDocumentEventEntity(),
+                event2.wrappedDocumentEventEntity(),
+                event3.wrappedDocumentEventEntity(),
+                event4.wrappedDocumentEventEntity(),
+                newMultiStringDocumentEventEntity("should merge 1"),
+                newMultiStringDocumentEventEntity("should merge 2"),
+                newMultiStringDocumentEventEntity("should merge 3"),
+                newMultiStringDocumentEventEntity("should merge 4"),
+                newMultiStringDocumentEventEntity("should merge 5"),
+                newMultiStringDocumentEventEntity("should merge 6"),
+                newMultiStringDocumentEventEntity("should merge 7"));
+
+        MultiStringDocumentEvent expectedMergedEvent = new MultiStringDocumentEvent(
+                Arrays.asList("should merge 1", "should merge 2", "should merge 3", "should merge 4",
+                        "should merge 5", "should merge 6", "should merge 7"),
+                fixedClock);
+
+        List<LightblueDocumentEvent> returnedEvents = repository.retrievePriorityDocumentEventsUpTo(5);
+
+        List<StringDocumentEvent> returnedStringEvents = returnedEvents.stream()
+                .filter(e -> e instanceof StringDocumentEvent)
+                .map(e -> (StringDocumentEvent) e)
+                .collect(Collectors.toList());
+
+        List<MultiStringDocumentEvent> returnedMultiStringEvents = returnedEvents.stream()
+                .filter(e -> e instanceof MultiStringDocumentEvent)
+                .map(e -> (MultiStringDocumentEvent) e)
+                .collect(Collectors.toList());
+
+        assertThat(returnedEvents).hasSize(5);
+        assertThat(returnedStringEvents).hasSize(4);
+        assertThat(returnedMultiStringEvents).hasSize(1);
+        assertThat(returnedMultiStringEvents.get(0).values()).isEqualTo(Arrays.asList(
+                "should merge 1", "should merge 2", "should merge 3", "should merge 4",
+                "should merge 5", "should merge 6"));
+    }
+
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(Query query)
             throws LightblueException {
         DataFindRequest find = new DataFindRequest(
@@ -331,8 +421,8 @@ public class LightblueDocumentEventRepositoryTest {
         return Arrays.asList(client.data(find, DocumentEventEntity[].class));
     }
 
-    private DocumentEventEntity newStringsDocumentEventEntity(String value) {
-        return new StringsDocumentEvent(Collections.singletonList(value), fixedClock)
+    private DocumentEventEntity newMultiStringDocumentEventEntity(String value) {
+        return new MultiStringDocumentEvent(Collections.singletonList(value), fixedClock)
                 .wrappedDocumentEventEntity();
     }
 
