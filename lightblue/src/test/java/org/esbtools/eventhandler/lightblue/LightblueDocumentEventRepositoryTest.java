@@ -386,11 +386,6 @@ public class LightblueDocumentEventRepositoryTest {
                 newMultiStringDocumentEventEntity("should merge 6"),
                 newMultiStringDocumentEventEntity("should merge 7"));
 
-        MultiStringDocumentEvent expectedMergedEvent = new MultiStringDocumentEvent(
-                Arrays.asList("should merge 1", "should merge 2", "should merge 3", "should merge 4",
-                        "should merge 5", "should merge 6", "should merge 7"),
-                fixedClock);
-
         List<LightblueDocumentEvent> returnedEvents = repository.retrievePriorityDocumentEventsUpTo(5);
 
         List<StringDocumentEvent> returnedStringEvents = returnedEvents.stream()

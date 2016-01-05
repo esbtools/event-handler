@@ -25,8 +25,16 @@ import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
  * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
  */
 public interface LightblueDocumentEvent extends DocumentEvent {
+    /**
+     * {@inheritDoc}
+     */
     @Override
     LightblueDocumentEvent merge(DocumentEvent event);
 
+    /**
+     * @return Entity backing this document event. Every document event should be backed by an
+     * entity instance. This should refer to that one, mutable instance and should not create a new
+     * one.
+     */
     DocumentEventEntity wrappedDocumentEventEntity();
 }
