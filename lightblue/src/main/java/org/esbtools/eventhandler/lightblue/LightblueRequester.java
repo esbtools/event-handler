@@ -16,12 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
 
-public interface LookupResultConverter {
-    Object evaluate(LookupResult lookupResult);
+import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 
-    static LookupResultConverter identity() {
-        return result -> result;
-    }
+import org.esbtools.eventhandler.Requester;
+
+public interface LightblueRequester extends
+        Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
 }

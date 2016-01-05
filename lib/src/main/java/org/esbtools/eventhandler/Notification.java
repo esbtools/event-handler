@@ -19,7 +19,8 @@
 package org.esbtools.eventhandler;
 
 import java.util.Collection;
+import java.util.concurrent.Future;
 
 public interface Notification {
-    Collection<DocumentEvent> toDocumentEvents();
+    Future<Collection<DocumentEvent>> toDocumentEvents();
 }

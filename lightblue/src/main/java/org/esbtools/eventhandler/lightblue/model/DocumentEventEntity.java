@@ -23,9 +23,11 @@ import io.github.alechenninger.lightblue.MinItems;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Transient;
 
+import javax.annotation.Nullable;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -61,13 +63,14 @@ public class DocumentEventEntity {
     }
 
     @Transient
-    public Optional<String> getParameterByKey(String key) {
+    @Nullable
+    public String getParameterByKey(String key) {
         for (KeyAndValue keyAndValue : parameters) {
             if (Objects.equals(key, keyAndValue.getKey())) {
-                return Optional.ofNullable(keyAndValue.getValue());
+                return keyAndValue.getValue();
             }
         }
-        return Optional.empty();
+        throw new NoSuchElementException(key);
     }
 
     public List<KeyAndValue> getParameters() {

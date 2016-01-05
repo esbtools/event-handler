@@ -16,46 +16,46 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler;
 
 import java.util.Objects;
 
-public final class LightblueDocument {
-    private final String canonicalEntity;
-    private final String document;
+public final class FailedNotification {
+    private final Notification notification;
+    private final Exception exception;
 
-    public LightblueDocument(String canonicalEntity, String document) {
-        this.canonicalEntity = canonicalEntity;
-        this.document = document;
+    public FailedNotification(Notification notification, Exception exception) {
+        this.notification = notification;
+        this.exception = exception;
     }
 
-    public String getCanonicalEntity() {
-        return canonicalEntity;
+    public Notification notification() {
+        return notification;
     }
 
-    public String getDocument() {
-        return document;
+    public Exception exception() {
+        return exception;
+    }
+
+    @Override
+    public String toString() {
+        return "FailedNotification{" +
+                "Notification=" + notification +
+                ", exception=" + exception +
+                '}';
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        LightblueDocument that = (LightblueDocument) o;
-        return Objects.equals(canonicalEntity, that.canonicalEntity) &&
-                Objects.equals(document, that.document);
+        FailedNotification that = (FailedNotification) o;
+        return Objects.equals(notification, that.notification) &&
+                Objects.equals(exception, that.exception);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(canonicalEntity, document);
-    }
-
-    @Override
-    public String toString() {
-        return "LightblueMessage{" +
-                "canonicalEntity='" + canonicalEntity + '\'' +
-                ", document='" + document + '\'' +
-                '}';
+        return Objects.hash(notification, exception);
     }
 }

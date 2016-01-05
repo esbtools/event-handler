@@ -16,20 +16,18 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
+
+import com.redhat.lightblue.client.model.Error;
 
 import java.util.Collection;
 
-public interface DocumentRepository {
-    /**
-     * Retrieves documents containing <em>latest</em> state of data represented by the document
-     * events.
-     *
-     * <p>Subsequent lookups will include newly persisted changes to the data.
-     *
-     * <p>A document is a representation of some underlying data which is able to be shared. It is a
-     * function of the needs of the canonical data model for the given document type.
-     */
-    Collection<LookupResult> lookupDocumentsForEvents(Collection<DocumentEvent> documentEvents)
-            throws Exception;
+/**
+ * Accumulates lightblue {@link Error errors} for a given batch of requests to a single exception.
+ */
+public class BulkLightblueResponseException extends RuntimeException {
+    public BulkLightblueResponseException(Collection<Error> errors) {
+        super(errors.stream()
+                .reduce("", (string, error) -> string + ", [" + error + "]", String::concat));
+    }
 }

@@ -26,7 +26,8 @@ import com.redhat.lightblue.client.response.LightblueException;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.EventRepository;
-import org.esbtools.eventhandler.LookupResult;
+import org.esbtools.eventhandler.FailedDocumentEvent;
+import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
@@ -47,12 +48,17 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     private final String[] entities;
     private final int documentEventBatchSize;
     private final Locking locking;
+    private final NotificationFactory notificationFactory;
+    private final DocumentEventFactory documentEventFactory;
 
     public LightblueEventRepository(LightblueClient lightblue, String[] entities,
-            int documentEventBatchSize, String lockingDomain) {
+            int documentEventBatchSize, String lockingDomain,
+            NotificationFactory notificationFactory, DocumentEventFactory documentEventFactory) {
         this.lightblue = lightblue;
         this.entities = entities;
         this.documentEventBatchSize = documentEventBatchSize;
+        this.notificationFactory = notificationFactory;
+        this.documentEventFactory = documentEventFactory;
 
         locking = lightblue.getLocking(lockingDomain);
     }
@@ -65,25 +71,40 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             // TODO: What happens if app dies before lock release? Do we need TTL and ping?
             blockUntilLockAcquired(Locks.forNotificationsForEntities(entities));
 
+            BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
+
             NotificationEntity[] notificationEntities = lightblue
                     .data(Find.newNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
             lightblue.data(Update.notificationsAsProcessing(notificationEntities));
 
-            return toNotifications(notificationEntities);
+            return Arrays.stream(notificationEntities)
+                    .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
+                    .collect(Collectors.toList());
         } finally {
             locking.release(Locks.forNotificationsForEntities(entities));
         }
     }
 
     @Override
-    public void confirmProcessed(Collection<Notification> notification) throws Exception {
+    public void markNotificationsProcessedOrFailed(Collection<Notification> notification,
+            Collection<FailedNotification> failures) throws Exception {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
                 .map(LightblueEventRepository::toWrappedNotificationEntity)
                 .collect(Collectors.toList());
 
-        lightblue.data(Update.processingNotificationsAsProcessed(processedNotificationEntities));
+        // TODO: Add field in NotificationEntity for failure messages?
+        List<NotificationEntity> failedNotificationEntities = failures.stream()
+                .map(FailedNotification::notification)
+                .map(LightblueEventRepository::toWrappedNotificationEntity)
+                .collect(Collectors.toList());
+
+        DataBulkRequest markNotifications = new DataBulkRequest();
+        markNotifications.add(Update.processingNotificationsAsProcessed(processedNotificationEntities));
+        markNotifications.add(Update.processingNotificationsAsFailed(failedNotificationEntities));
+
+        lightblue.bulkData(markNotifications);
     }
 
     @Override
@@ -111,13 +132,14 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
             List<DocumentEvent> optimized = new ArrayList<>(maxEvents);
             List<DocumentEventEntity> mergerEntities = new ArrayList<>();
             List<DocumentEventEntity> entitiesToUpdate = new ArrayList<>();
+            BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             for (DocumentEventEntity newEventEntity : documentEventEntities) {
                 newEventEntity.setStatus(DocumentEventEntity.Status.PROCESSING);
 
                 entitiesToUpdate.add(newEventEntity);
 
-                DocumentEvent newEvent = toEventObject(newEventEntity);
+                DocumentEvent newEvent = documentEventFactory.getDocumentEventForEntity(newEventEntity, requester);
 
                 // If there is a merge out of this event, it will need to be inserted later, since
                 // it is a net new event.
@@ -175,17 +197,23 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
     }
 
     @Override
-    public void confirmPublishedOrFailedFromLookupResults(Collection<LookupResult> lookupResults)
-            throws Exception {
-        SortedResults sorted = lookupResults.stream()
-                .collect(SortedResults::new, SortedResults::add, SortedResults::addAll);
+    public void markDocumentEventsProcessedOrFailed(Collection<DocumentEvent> documentEvents,
+            Collection<FailedDocumentEvent> failures) throws Exception {
+        List<DocumentEventEntity> processed = documentEvents.stream()
+                .map(LightblueEventRepository::toWrappedDocumentEventEntity)
+                .collect(Collectors.toList());
 
-        // TODO: This would probably make more sense as just one save call / one raw events list
-        DataBulkRequest updatePublishingEvents = new DataBulkRequest();
-        updatePublishingEvents.add(Update.processingDocumentEventsAsProcessed(sorted.published));
-        updatePublishingEvents.add(Update.processingDocumentEventsAsFailed(sorted.failed));
+        // TODO: Add field on document event entity to store error messages?
+        List<DocumentEventEntity> failed = failures.stream()
+                .map(FailedDocumentEvent::documentEvent)
+                .map(LightblueEventRepository::toWrappedDocumentEventEntity)
+                .collect(Collectors.toList());
 
-        lightblue.data(updatePublishingEvents);
+        DataBulkRequest markDocumentEvents = new DataBulkRequest();
+        markDocumentEvents.add(Update.processingDocumentEventsAsProcessed(processed));
+        markDocumentEvents.add(Update.processingDocumentEventsAsFailed(failed));
+
+        lightblue.data(markDocumentEvents);
     }
 
     private void blockUntilLockAcquired(String resourceId) throws LightblueException {
@@ -198,34 +226,6 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
                 // Just try again...
             }
         }
-    }
-
-    private static DocumentEvent toEventObject(DocumentEventEntity documentEventEntity) {
-        switch (documentEventEntity.getCanonicalType()) {
-            // TODO: Make this pluggable
-            default:
-                throw new EventHandlerException("Unknown entity type: " + documentEventEntity);
-        }
-    }
-
-    private static List<Notification> toNotifications(NotificationEntity[] notifications) {
-        return Arrays.stream(notifications)
-                .map(notification -> {
-                    switch (notification.getEntityName()) {
-                        case "":
-                            // TODO: make this pluggable
-                            return new Notification() {
-                                @Override
-                                public Collection<DocumentEvent> toDocumentEvents() {
-                                    return null;
-                                }
-                            };
-                        default:
-                            throw new EventHandlerException("Unknown entity type: " +
-                                    notification.getEntityName());
-                    }
-                })
-                .collect(Collectors.toList());
     }
 
     private static NotificationEntity toWrappedNotificationEntity(Notification notification) {
@@ -255,23 +255,5 @@ public class LightblueEventRepository implements EventRepository, NotificationRe
 
         throw new EventHandlerException("Unknown event type. Only LightblueDocumentEvent are " +
                 "supported. Event type was: " + event.getClass());
-    }
-
-    final static class SortedResults {
-        final List<DocumentEventEntity> published = new ArrayList<>();
-        final List<DocumentEventEntity> failed = new ArrayList<>();
-
-        void add(LookupResult result) {
-            if (result.hasErrors()) {
-                failed.add(toWrappedDocumentEventEntity(result.getAssociatedEvent()));
-            } else {
-                published.add(toWrappedDocumentEventEntity(result.getAssociatedEvent()));
-            }
-        }
-
-        void addAll(SortedResults sortedResults) {
-            published.addAll(sortedResults.published);
-            failed.addAll(sortedResults.failed);
-        }
     }
 }

@@ -16,24 +16,16 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
-
-import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.Requester;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
-import java.util.List;
-import java.util.Optional;
+package org.esbtools.eventhandler;
 
 /**
- * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
+ * Maps responses to requests. In the case where you make multiple requests, you will likely want
+ * to parse each response differently based on the original request. You can get a response for a
+ * given request by calling {@link #forRequest(T)}.
+ *
+ * @param <T> The type of request
+ * @param <U> The type of response
  */
-public interface LightblueDocumentEvent extends DocumentEvent {
-
-    Optional<DocumentEventEntity> wrappedDocumentEventEntity();
-
-    DocumentEventEntity toNewDocumentEventEntity();
+public interface Responses<T, U> {
+    U forRequest(T request);
 }

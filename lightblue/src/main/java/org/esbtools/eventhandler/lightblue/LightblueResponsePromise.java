@@ -16,12 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue;
 
-public interface LookupResult {
-    Object getBody();
+import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 
-    boolean hasErrors();
+import org.esbtools.eventhandler.ResponsePromise;
 
-    DocumentEvent getAssociatedEvent();
+public interface LightblueResponsePromise extends
+        ResponsePromise<AbstractLightblueDataRequest, LightblueDataResponse> {
 }

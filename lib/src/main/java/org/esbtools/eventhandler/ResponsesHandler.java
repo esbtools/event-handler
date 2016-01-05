@@ -16,24 +16,17 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler;
 
-import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.Requester;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
-import java.util.List;
-import java.util.Optional;
+import java.util.function.Function;
 
 /**
- * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
+ * A function applied to {@link Responses} which returns some result of type {@code V}, or throws an
+ * exception if unable to compute a result.
+ *
+ * @param <T> The type of requests
+ * @param <U> The type of responses
+ * @param <V> The type of result
  */
-public interface LightblueDocumentEvent extends DocumentEvent {
-
-    Optional<DocumentEventEntity> wrappedDocumentEventEntity();
-
-    DocumentEventEntity toNewDocumentEventEntity();
+public interface ResponsesHandler<T, U, V> extends Function<Responses<T, U>, V> {
 }

@@ -18,22 +18,9 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.Requester;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.Notification;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
-import java.util.List;
-import java.util.Optional;
-
-/**
- * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
- */
-public interface LightblueDocumentEvent extends DocumentEvent {
-
-    Optional<DocumentEventEntity> wrappedDocumentEventEntity();
-
-    DocumentEventEntity toNewDocumentEventEntity();
+public interface NotificationFactory {
+    Notification getNotificationForEntity(NotificationEntity entity, LightblueRequester requester);
 }
