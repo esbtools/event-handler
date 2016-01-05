@@ -22,7 +22,7 @@ import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 /**
- * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
+ * Connects event implementations to the underlying {@link LightblueDocumentEventRepository} data model.
  */
 public interface LightblueDocumentEvent extends DocumentEvent {
     /**

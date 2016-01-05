@@ -31,7 +31,7 @@ import java.util.List;
  * {@link DocumentEvent#isSupersededBy(DocumentEvent) redundancies} and
  * {@link DocumentEvent#merge(DocumentEvent) merging} any events that can be merged.
  */
-public interface EventRepository {
+public interface DocumentEventRepository {
 
     /**
      * Persists new document events, updating originating notifications if applicable.

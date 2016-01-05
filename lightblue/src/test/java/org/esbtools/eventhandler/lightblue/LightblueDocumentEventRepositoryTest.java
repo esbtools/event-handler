@@ -31,7 +31,6 @@ import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.eventhandler.lightblue.testing.EmptyNotificationFactory;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
@@ -68,7 +67,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     private LightblueClient client;
 
-    private LightblueEventRepository repository;
+    private LightblueDocumentEventRepository repository;
 
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
 
@@ -80,8 +79,8 @@ public class LightblueDocumentEventRepositoryTest {
                 .fromLightblueExternalResource(lightblueExternalResource);
         client = LightblueClients.withJavaTimeSerializationSupport(config);
 
-        repository = new LightblueEventRepository(client, new String[]{"String", "Strings"},
-                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain", new EmptyNotificationFactory(),
+        repository = new LightblueDocumentEventRepository(client, new String[]{"String", "Strings"},
+                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain",
                 new ByTypeDocumentEventFactory()
                         .addType("String", StringDocumentEvent::new)
                         .addType("Strings", MultiStringDocumentEvent::new),
@@ -160,14 +159,14 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread1Client = new SlowDataLightblueClient(client);
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
-        LightblueEventRepository thread1Repository = new LightblueEventRepository(
+        LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
                 thread1Client, new String[]{"String"}, 100,
-                "testLockingDomain", new EmptyNotificationFactory(),
+                "testLockingDomain",
                 new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
                 fixedClock);
-        LightblueEventRepository thread2Repository = new LightblueEventRepository(
+        LightblueDocumentEventRepository thread2Repository = new LightblueDocumentEventRepository(
                 thread2Client, new String[]{"String"}, 100,
-                "testLockingDomain", new EmptyNotificationFactory(),
+                "testLockingDomain",
                 new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
                 fixedClock);
 
