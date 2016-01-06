@@ -30,23 +30,26 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.response.LightblueException;
 
+import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
+import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
-import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import javax.annotation.Nullable;
 import java.net.UnknownHostException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -69,7 +72,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     private LightblueDocumentEventRepository repository;
 
-    private Clock fixedClock = Clock.fixed(Instant.now(), ZoneOffset.UTC);
+    private Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
 
@@ -79,11 +82,14 @@ public class LightblueDocumentEventRepositoryTest {
                 .fromLightblueExternalResource(lightblueExternalResource);
         client = LightblueClients.withJavaTimeSerializationSupport(config);
 
-        repository = new LightblueDocumentEventRepository(client, new String[]{"String", "Strings"},
+        // TODO: Try and reduce places canonical types are specified
+        // We have 3 here: type list to process, types to factories, and inside the doc event impls
+        // themselves.
+        repository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
                 DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain",
                 new ByTypeDocumentEventFactory()
                         .addType("String", StringDocumentEvent::new)
-                        .addType("Strings", MultiStringDocumentEvent::new),
+                        .addType("MultiString", MultiStringDocumentEvent::new),
                 fixedClock);
     }
 
@@ -408,7 +414,79 @@ public class LightblueDocumentEventRepositoryTest {
                 "should merge 5", "should merge 6"));
     }
 
-    private List<DocumentEventEntity> findDocumentEventEntitiesWhere(Query query)
+    @Test
+    public void shouldAddNewDocumentEventsEntitiesAsUnprocessedAndShouldNotUpdateExistingEventsWithIds()
+            throws LightblueException {
+        StringDocumentEvent event1 = new StringDocumentEvent("1", fixedClock);
+        MultiStringDocumentEvent event2 = new MultiStringDocumentEvent(Arrays.asList("2"), fixedClock);
+
+        List<LightblueDocumentEvent> events = new ArrayList<>();
+        events.add(event1);
+        events.add(event2);
+
+        repository.addNewDocumentEvents(events);
+
+        List<DocumentEventEntity> stringEventEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("canonicalType", Query.BinOp.eq, "String"));
+        List<DocumentEventEntity> multiStringEventEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("canonicalType", Query.BinOp.eq, "MultiString"));
+
+        assertThat(stringEventEntities).hasSize(1);
+        assertThat(multiStringEventEntities).hasSize(1);
+
+        DocumentEventEntity entity1 = stringEventEntities.get(0);
+        DocumentEventEntity entity2 = multiStringEventEntities.get(0);
+        // Original entities shouldn't get ids.
+        // The only reason for this is current complexity that that would require, in addition to
+        // it not being strictly necessary. That is, if it were easy to do, it would probably be a
+        // good idea to update the entities with the persisted ids actually. But it's not that easy
+        // right now, so not worrying about it.
+        // See: https://github.com/lightblue-platform/lightblue-core/issues/556
+        entity1.set_id(null);
+        entity2.set_id(null);
+
+        assertEquals(event1.wrappedDocumentEventEntity(), entity1);
+        assertEquals(event2.wrappedDocumentEventEntity(), entity2);
+    }
+
+    @Test
+    public void shouldUpdateProcessedEntitiesWithStatusAndDatePostPublishing() throws LightblueException {
+        Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
+
+        StringDocumentEvent event1 = new StringDocumentEvent("1", creationTimeClock);
+        StringDocumentEvent event2 = new StringDocumentEvent("2", creationTimeClock);
+        DocumentEventEntity entity1 = event1.wrappedDocumentEventEntity();
+        DocumentEventEntity entity2 = event2.wrappedDocumentEventEntity();
+        entity1.set_id("1");
+        entity2.set_id("2");
+        entity1.setStatus(DocumentEventEntity.Status.processing);
+        entity2.setStatus(DocumentEventEntity.Status.processing);
+
+        DataInsertRequest insertProcessingEntities = new DataInsertRequest(
+                DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+        insertProcessingEntities.create(entity1, entity2);
+        client.data(insertProcessingEntities);
+
+        List<LightblueDocumentEvent> successes = Arrays.asList(event1);
+        List<FailedDocumentEvent> failures = Arrays.asList(new FailedDocumentEvent(event2, new RuntimeException("fake")));
+
+        repository.markDocumentEventsProcessedOrFailed(successes, failures);
+
+        DocumentEventEntity publishedEntity = findDocumentEventEntityWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processed));
+        DocumentEventEntity failedEntity = findDocumentEventEntityWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.failed));
+
+        entity1.setStatus(DocumentEventEntity.Status.processed);
+        entity2.setStatus(DocumentEventEntity.Status.failed);
+        entity1.setProcessedDate(ZonedDateTime.now(fixedClock));
+        entity2.setProcessedDate(ZonedDateTime.now(fixedClock));
+
+        assertEquals(entity1, publishedEntity);
+        assertEquals(entity2, failedEntity);
+    }
+
+    private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest find = new DataFindRequest(
                 DocumentEventEntity.ENTITY_NAME,
@@ -416,6 +494,21 @@ public class LightblueDocumentEventRepositoryTest {
         find.where(query);
         find.select(Projection.includeFieldRecursively("*"));
         return Arrays.asList(client.data(find, DocumentEventEntity[].class));
+    }
+
+    private DocumentEventEntity findDocumentEventEntityWhere(@Nullable Query query)
+            throws LightblueException {
+        DataFindRequest find = new DataFindRequest(
+                DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        find.where(query);
+        find.select(Projection.includeFieldRecursively("*"));
+
+        DocumentEventEntity[] found = client.data(find, DocumentEventEntity[].class);
+
+        assertThat(found).hasLength(1);
+
+        return found[0];
     }
 
     private DocumentEventEntity newMultiStringDocumentEventEntity(String value) {

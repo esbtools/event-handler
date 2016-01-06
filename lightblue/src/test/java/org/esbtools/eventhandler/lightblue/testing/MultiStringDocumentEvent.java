@@ -77,7 +77,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
 
     public DocumentEventEntity toNewDocumentEventEntity() {
         DocumentEventEntity entity = new DocumentEventEntity();
-        entity.setCanonicalType("Strings");
+        entity.setCanonicalType("MultiString");
         entity.setParameters(Arrays.asList(
                 new DocumentEventEntity.KeyAndValue("values", Joiner.on('|').join(values))));
         entity.setStatus(DocumentEventEntity.Status.unprocessed);

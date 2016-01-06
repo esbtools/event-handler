@@ -108,22 +108,31 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
     @Override
     public void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> documentEvents,
-            Collection<FailedDocumentEvent> failures) throws Exception {
+            Collection<FailedDocumentEvent> failures) throws LightblueException {
         List<DocumentEventEntity> processed = documentEvents.stream()
                 .map(LightblueDocumentEventRepository::asEntity)
+                .peek((e) -> {
+                    e.setProcessedDate(ZonedDateTime.now(clock));
+                    e.setStatus(DocumentEventEntity.Status.processed);
+                })
                 .collect(Collectors.toList());
 
-        // TODO: Add field on document event entity to store error messages?
         List<DocumentEventEntity> failed = failures.stream()
                 .map(FailedDocumentEvent::documentEvent)
                 .map(LightblueDocumentEventRepository::asEntity)
+                .peek((e) -> {
+                    e.setProcessedDate(ZonedDateTime.now(clock));
+                    e.setStatus(DocumentEventEntity.Status.failed);
+                })
                 .collect(Collectors.toList());
 
         DataBulkRequest markDocumentEvents = new DataBulkRequest();
-        markDocumentEvents.add(UpdateRequests.processingDocumentEventsAsProcessed(processed));
-        markDocumentEvents.add(UpdateRequests.processingDocumentEventsAsFailed(failed));
+        markDocumentEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(processed));
+        markDocumentEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(failed));
 
-        lightblue.data(markDocumentEvents);
+        // TODO: What if some of these fail?
+        // Documents are published, so not world ending, but important.
+        lightblue.bulkData(markDocumentEvents);
     }
 
     private void blockUntilLockAcquired(String resourceId) throws LightblueException {

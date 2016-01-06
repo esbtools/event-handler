@@ -20,6 +20,8 @@ package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.redhat.lightblue.client.Literal;
 import com.redhat.lightblue.client.Query;
@@ -36,6 +38,8 @@ import java.util.List;
 import java.util.Set;
 
 public abstract class UpdateRequests {
+    private static Logger logger = LoggerFactory.getLogger(UpdateRequests.class);
+
     public static DataUpdateRequest notificationsAsProcessing(
             NotificationEntity[] notificationEntities) {
         return null;
@@ -43,6 +47,11 @@ public abstract class UpdateRequests {
 
     public static DataUpdateRequest processingNotificationsAsProcessed(
             Collection<NotificationEntity> notificationEntities) {
+        return null;
+    }
+
+    public static DataUpdateRequest processingNotificationsAsFailed(
+            List<NotificationEntity> failed) {
         return null;
     }
 
@@ -54,6 +63,12 @@ public abstract class UpdateRequests {
             DataUpdateRequest request = new DataUpdateRequest(
                     DocumentEventEntity.ENTITY_NAME,
                     DocumentEventEntity.VERSION);
+
+            if (entity.get_id() == null) {
+                logger.warn("Tried to update an entity's status and processed date, but entity " +
+                        "has no id. Entity was: " + entity);
+                continue;
+            }
 
             request.where(Query.withValue("_id", BinOp.eq, entity.get_id()));
 
@@ -73,20 +88,5 @@ public abstract class UpdateRequests {
         }
 
         return requests;
-    }
-
-    public static DataUpdateRequest processingDocumentEventsAsProcessed(
-            Collection<DocumentEventEntity> published) {
-        return null;
-    }
-
-    public static DataUpdateRequest processingDocumentEventsAsFailed(
-            Collection<DocumentEventEntity> failed) {
-        return null;
-    }
-
-    public static DataUpdateRequest processingNotificationsAsFailed(
-            List<NotificationEntity> failed) {
-        return null;
     }
 }
