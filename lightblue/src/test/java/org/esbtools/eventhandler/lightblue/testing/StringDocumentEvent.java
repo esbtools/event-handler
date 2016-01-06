@@ -93,7 +93,7 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
 
         DocumentEventEntity otherEntity = other.wrappedDocumentEventEntity();
 
-        if (Objects.equals(otherEntity.getStatus(), DocumentEventEntity.Status.processed) &&
+        if (Objects.equals(otherEntity.getStatus(), DocumentEventEntity.Status.published) &&
                 otherEntity.getProcessedDate().isBefore(creationDate)) {
             return false;
         }

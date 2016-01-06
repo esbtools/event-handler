@@ -142,7 +142,7 @@ public class LightblueDocumentEventRepositoryTest {
         DocumentEventEntity processingEvent = newStringDocumentEventEntity("wrong");
         processingEvent.setStatus(DocumentEventEntity.Status.processing);
         DocumentEventEntity processedEvent = newStringDocumentEventEntity("wrong");
-        processedEvent.setStatus(DocumentEventEntity.Status.processed);
+        processedEvent.setStatus(DocumentEventEntity.Status.published);
         DocumentEventEntity failedEvent = newStringDocumentEventEntity("wrong");
         failedEvent.setStatus(DocumentEventEntity.Status.failed);
         DocumentEventEntity mergedEvent = newStringDocumentEventEntity("wrong");
@@ -473,11 +473,11 @@ public class LightblueDocumentEventRepositoryTest {
         repository.markDocumentEventsProcessedOrFailed(successes, failures);
 
         DocumentEventEntity publishedEntity = findDocumentEventEntityWhere(
-                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processed));
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.published));
         DocumentEventEntity failedEntity = findDocumentEventEntityWhere(
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.failed));
 
-        entity1.setStatus(DocumentEventEntity.Status.processed);
+        entity1.setStatus(DocumentEventEntity.Status.published);
         entity2.setStatus(DocumentEventEntity.Status.failed);
         entity1.setProcessedDate(ZonedDateTime.now(fixedClock));
         entity2.setProcessedDate(ZonedDateTime.now(fixedClock));

@@ -113,7 +113,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 .map(LightblueDocumentEventRepository::asEntity)
                 .peek((e) -> {
                     e.setProcessedDate(ZonedDateTime.now(clock));
-                    e.setStatus(DocumentEventEntity.Status.processed);
+                    e.setStatus(DocumentEventEntity.Status.published);
                 })
                 .collect(Collectors.toList());
 

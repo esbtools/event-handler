@@ -216,7 +216,7 @@ public class DocumentEventEntity {
         processing,
 
         /** Indicates this document event's associated document has successfully been published */
-        processed,
+        published,
 
         /** Superseded by a duplicate event */
         superseded,

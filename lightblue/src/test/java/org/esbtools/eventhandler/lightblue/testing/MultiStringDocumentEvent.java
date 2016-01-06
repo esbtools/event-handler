@@ -105,7 +105,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
 
         DocumentEventEntity otherEntity = other.wrappedDocumentEventEntity();
 
-        if (otherEntity.getStatus().equals(DocumentEventEntity.Status.processed) &&
+        if (otherEntity.getStatus().equals(DocumentEventEntity.Status.published) &&
                 otherEntity.getProcessedDate().isBefore(creationDate)) {
             return false;
         }
