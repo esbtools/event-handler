@@ -39,7 +39,7 @@ public class ByEntityNameNotificationFactory implements NotificationFactory {
      * @param factory A {@code NotificationFactory} which creates {@link LightblueNotification}s for
      *                the specific entity identified by its name.
      *
-     * @see NotificationEntity#getEntityName() 
+     * @see NotificationEntity#getEntityName()
      */
     public ByEntityNameNotificationFactory addByEntityName(String name, NotificationFactory factory) {
         factories.put(name, factory);

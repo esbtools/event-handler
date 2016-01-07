@@ -71,17 +71,7 @@ public abstract class UpdateRequests {
 
         return requests;
     }
-
-    public static DataUpdateRequest processingNotificationsAsProcessed(
-            Collection<NotificationEntity> notificationEntities) {
-        return null;
-    }
-
-    public static DataUpdateRequest processingNotificationsAsFailed(
-            List<NotificationEntity> failed) {
-        return null;
-    }
-
+    
     public static Collection<DataUpdateRequest> documentEventsStatusAndProcessedDate(
             Collection<DocumentEventEntity> updatedEventEntities) {
         List<DataUpdateRequest> requests = new ArrayList<>(updatedEventEntities.size());
