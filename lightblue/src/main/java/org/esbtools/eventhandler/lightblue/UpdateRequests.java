@@ -38,8 +38,8 @@ public abstract class UpdateRequests {
     private static Logger logger = LoggerFactory.getLogger(UpdateRequests.class);
 
     public static Collection<DataUpdateRequest> notificationsStatusAndProcessedDate(
-            NotificationEntity[] updatedNotificationEntities) {
-        List<DataUpdateRequest> requests = new ArrayList<>(updatedNotificationEntities.length);
+            Collection<NotificationEntity> updatedNotificationEntities) {
+        List<DataUpdateRequest> requests = new ArrayList<>(updatedNotificationEntities.size());
 
         for (NotificationEntity entity : updatedNotificationEntities) {
             DataUpdateRequest request = new DataUpdateRequest(

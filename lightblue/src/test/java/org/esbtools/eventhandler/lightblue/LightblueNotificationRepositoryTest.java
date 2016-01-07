@@ -30,6 +30,8 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.response.LightblueException;
 
+import org.esbtools.eventhandler.FailedNotification;
+import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
@@ -106,7 +108,7 @@ public class LightblueNotificationRepositoryTest {
         notIncludedEntity.setOperation(NotificationEntity.Operation.INSERT);
         notIncludedEntity.setTriggeredByUser("tester");
 
-        NotificationEntity entity1 = notificationForStringInsert("1", fixedClock.instant());
+        NotificationEntity entity1 = notificationEntityForStringInsert("1", fixedClock.instant());
         entity1.set_id("thisShouldBeTheOnlyId");
 
         insertNotificationEntities(notIncludedEntity, entity1);
@@ -120,12 +122,12 @@ public class LightblueNotificationRepositoryTest {
 
     @Test
     public void shouldOnlyRetrieveUnprocessedNotifications() throws LightblueException {
-        NotificationEntity unprocessedEntity = notificationForStringInsert("right");
-        NotificationEntity processingEntity = notificationForStringInsert("wrong");
+        NotificationEntity unprocessedEntity = notificationEntityForStringInsert("right");
+        NotificationEntity processingEntity = notificationEntityForStringInsert("wrong");
         processingEntity.setStatus(NotificationEntity.Status.processing);
-        NotificationEntity processedEntity = notificationForStringInsert("wrong");
+        NotificationEntity processedEntity = notificationEntityForStringInsert("wrong");
         processedEntity.setStatus(NotificationEntity.Status.processed);
-        NotificationEntity failedEntity = notificationForStringInsert("wrong");
+        NotificationEntity failedEntity = notificationEntityForStringInsert("wrong");
         failedEntity.setStatus(NotificationEntity.Status.failed);
 
         insertNotificationEntities(unprocessedEntity, processedEntity, processedEntity, failedEntity);
@@ -139,10 +141,10 @@ public class LightblueNotificationRepositoryTest {
 
     @Test
     public void shouldRetrieveNotificationsOldestFirstUpToRequestedMax() throws LightblueException {
-        NotificationEntity entity1 = notificationForStringInsert("1", fixedClock.instant());
-        NotificationEntity entity2 = notificationForStringInsert("2", fixedClock.instant().plus(1, ChronoUnit.MINUTES));
-        NotificationEntity entity3 = notificationForStringInsert("3", fixedClock.instant().plus(2, ChronoUnit.MINUTES));
-        NotificationEntity entity4 = notificationForStringInsert("4", fixedClock.instant().plus(3, ChronoUnit.MINUTES));
+        NotificationEntity entity1 = notificationEntityForStringInsert("1", fixedClock.instant());
+        NotificationEntity entity2 = notificationEntityForStringInsert("2", fixedClock.instant().plus(1, ChronoUnit.MINUTES));
+        NotificationEntity entity3 = notificationEntityForStringInsert("3", fixedClock.instant().plus(2, ChronoUnit.MINUTES));
+        NotificationEntity entity4 = notificationEntityForStringInsert("4", fixedClock.instant().plus(3, ChronoUnit.MINUTES));
 
         insertNotificationEntities(entity3, entity1, entity4, entity2);
 
@@ -248,6 +250,41 @@ public class LightblueNotificationRepositoryTest {
         assertThat(unprocessedIds).hasSize(5);
     }
 
+    @Test
+    public void shouldMarkNotificationsAsProcessedOrFailed() throws LightblueException {
+        LightblueNotification expectedProcessed = notificationForStringInsert("should succeed");
+        LightblueNotification expectedFailed = notificationForStringInsert("should fail");
+
+        NotificationEntity expectedProcessedEntity = expectedProcessed.wrappedNotificationEntity();
+        NotificationEntity expectedFailedEntity = expectedFailed.wrappedNotificationEntity();
+
+        expectedProcessedEntity.set_id("1");
+        expectedFailedEntity.set_id("2");
+
+        expectedProcessedEntity.setStatus(NotificationEntity.Status.processing);
+        expectedFailedEntity.setStatus(NotificationEntity.Status.processing);
+
+        insertNotificationEntities(
+                expectedProcessedEntity,
+                expectedFailedEntity);
+
+        List<LightblueNotification> succeeded = Arrays.asList(expectedProcessed);
+        List<FailedNotification> failed = Arrays.asList(
+                new FailedNotification(expectedFailed, new RuntimeException("fake")));
+
+        repository.markNotificationsProcessedOrFailed(succeeded, failed);
+
+        List<NotificationEntity> foundProcessed = findNotificationEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, "processed"));
+        List<NotificationEntity> foundFailed = findNotificationEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, "failed"));
+
+        assertThat(foundProcessed).named("found processed entities").hasSize(1);
+        assertThat(foundFailed).named("found failed entities").hasSize(1);
+        assertThat(foundProcessed.get(0).getEntityDataForField("value")).isEqualTo("should succeed");
+        assertThat(foundFailed.get(0).getEntityDataForField("value")).isEqualTo("should fail");
+    }
+
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest request = new DataFindRequest(
@@ -267,12 +304,17 @@ public class LightblueNotificationRepositoryTest {
         client.data(insertEntities);
     }
 
-    private static NotificationEntity notificationForStringInsert(String value) {
-        return new StringNotification(value, NotificationEntity.Operation.INSERT, "tester",
-                fixedClock).wrappedNotificationEntity();
+    private static LightblueNotification notificationForStringInsert(String value) {
+        return new StringNotification(
+                value, NotificationEntity.Operation.INSERT, "tester", fixedClock);
     }
 
-    private static NotificationEntity notificationForStringInsert(String value, Instant occurrenceDate) {
+    private static NotificationEntity notificationEntityForStringInsert(String value) {
+        return notificationForStringInsert(value).wrappedNotificationEntity();
+    }
+
+    private static NotificationEntity notificationEntityForStringInsert(String value,
+            Instant occurrenceDate) {
         return new StringNotification(value, NotificationEntity.Operation.INSERT, "tester",
                 Clock.fixed(occurrenceDate, ZoneOffset.UTC)).wrappedNotificationEntity();
     }
@@ -281,7 +323,7 @@ public class LightblueNotificationRepositoryTest {
         NotificationEntity[] entities = new NotificationEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = notificationForStringInsert(UUID.randomUUID().toString());
+            entities[i] = notificationEntityForStringInsert(UUID.randomUUID().toString());
         }
 
         return entities;

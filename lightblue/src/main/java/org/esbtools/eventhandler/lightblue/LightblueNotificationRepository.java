@@ -29,6 +29,7 @@ import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import java.sql.Date;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collection;
@@ -69,7 +70,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
             }
 
             DataBulkRequest updateEntities = new DataBulkRequest();
-            updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(notificationEntities));
+            updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
+                    Arrays.asList(notificationEntities)));
             lightblue.bulkData(updateEntities);
 
             return Arrays.stream(notificationEntities)
@@ -82,19 +84,29 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
     @Override
     public void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
-            Collection<FailedNotification> failures) throws Exception {
+            Collection<FailedNotification> failures) throws LightblueException {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
                 .map(LightblueNotificationRepository::asEntity)
+                .peek(entity -> {
+                    entity.setStatus(NotificationEntity.Status.processed);
+                    entity.setProcessedDate(Date.from(clock.instant()));
+                })
                 .collect(Collectors.toList());
 
         List<NotificationEntity> failedNotificationEntities = failures.stream()
                 .map(FailedNotification::notification)
                 .map(LightblueNotificationRepository::asEntity)
+                .peek(entity -> {
+                    entity.setStatus(NotificationEntity.Status.failed);
+                    entity.setProcessedDate(Date.from(clock.instant()));
+                })
                 .collect(Collectors.toList());
 
         DataBulkRequest markNotifications = new DataBulkRequest();
-        markNotifications.add(UpdateRequests.processingNotificationsAsProcessed(processedNotificationEntities));
-        markNotifications.add(UpdateRequests.processingNotificationsAsFailed(failedNotificationEntities));
+        markNotifications.addAll(
+                UpdateRequests.notificationsStatusAndProcessedDate(processedNotificationEntities));
+        markNotifications.addAll(
+                UpdateRequests.notificationsStatusAndProcessedDate(failedNotificationEntities));
 
         // TODO: Deal with failures
         lightblue.bulkData(markNotifications);
