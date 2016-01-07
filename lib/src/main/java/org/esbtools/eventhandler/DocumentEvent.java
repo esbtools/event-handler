@@ -22,8 +22,23 @@ import java.util.concurrent.Future;
 
 /**
  * Models an event which corresponds to a publishable document message.
+ *
+ * <p>Document events capture knowledge of how to construct a message for a particular document, as
+ * well as how this event compares to other document events such that other document events may be
+ * redundant (and can therefore be ignored), or if the events can be merged together such that one
+ * document can be looked up which satisfies a number of events. Checking for these conditions is a
+ * part of optimizing the amount of messages which are produced as a result of event processing.
  */
 public interface DocumentEvent {
+    /**
+     * Immediately returns with a {@link Future} representing the document this event should
+     * publish.
+     *
+     * <p>The document format itself is deliberately implementation specific.
+     *
+     * <p>This method is expected to never throw an exception. Failures should be captured in the
+     * returned {@code Future}.
+     */
     Future<?> lookupDocument();
 
     /**
