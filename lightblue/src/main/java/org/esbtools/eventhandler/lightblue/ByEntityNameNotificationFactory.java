@@ -24,9 +24,23 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+/**
+ * Supports creating many types of {@link LightblueNotification}s based on the entity name in the
+ * provided {@link NotificationEntity}.
+ */
 public class ByEntityNameNotificationFactory implements NotificationFactory {
     private final Map<String, NotificationFactory> factories = new HashMap<>();
 
+    /**
+     * Add a factory for a specific type of notification, to be used when the notification is for
+     * the provided entity name.
+     *
+     * @param name The entity name the {@link NotificationFactory} should be used for.
+     * @param factory A {@code NotificationFactory} which creates {@link LightblueNotification}s for
+     *                the specific entity identified by its name.
+     *
+     * @see NotificationEntity#getEntityName() 
+     */
     public ByEntityNameNotificationFactory addByEntityName(String name, NotificationFactory factory) {
         factories.put(name, factory);
         return this;
