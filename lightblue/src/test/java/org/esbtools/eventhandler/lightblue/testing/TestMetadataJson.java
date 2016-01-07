@@ -19,12 +19,12 @@
 package org.esbtools.eventhandler.lightblue.testing;
 
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
-import com.redhat.lightblue.common.mongo.MongoDataStore;
 import com.redhat.lightblue.metadata.EntityMetadata;
-import com.redhat.lightblue.metadata.mongo.MongoDataStoreParser;
 import com.redhat.lightblue.metadata.parser.Extensions;
 import com.redhat.lightblue.metadata.parser.JSONMetadataParser;
 import com.redhat.lightblue.metadata.types.DefaultTypes;
+import com.redhat.lightblue.mongo.common.MongoDataStore;
+import com.redhat.lightblue.mongo.metadata.MongoDataStoreParser;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;

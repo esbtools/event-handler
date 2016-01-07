@@ -56,6 +56,11 @@
                 <artifactId>jackson-annotations</artifactId>
                 <version>${version.jackson}</version>
             </dependency>
+            <dependency>
+                <groupId>com.redhat.lightblue</groupId>
+                <artifactId>lightblue-core-util</artifactId>
+                <version>1.10.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

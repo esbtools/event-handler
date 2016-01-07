@@ -409,9 +409,9 @@ public class LightblueDocumentEventRepositoryTest {
                 .collect(Collectors.toList()))
                 .containsExactly("1", "2", "3", "4");
         assertThat(returnedMultiStringEvents).hasSize(1);
-        assertThat(returnedMultiStringEvents.get(0).values()).isEqualTo(Arrays.asList(
+        assertThat(returnedMultiStringEvents.get(0).values()).containsExactly(
                 "should merge 1", "should merge 2", "should merge 3", "should merge 4",
-                "should merge 5", "should merge 6"));
+                "should merge 5", "should merge 6");
     }
 
     @Test
