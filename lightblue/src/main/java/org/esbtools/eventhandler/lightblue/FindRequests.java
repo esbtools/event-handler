@@ -50,6 +50,12 @@ public abstract class FindRequests {
         return findEntities;
     }
 
+    /**
+     * You generally don't want to retrieve document events which have already started being
+     * processed or have been processed, so this limits the request to
+     * {@link org.esbtools.eventhandler.lightblue.model.DocumentEventEntity.Status#unprocessed}
+     * document events.
+     */
     public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,
             int maxEvents) {
         DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
