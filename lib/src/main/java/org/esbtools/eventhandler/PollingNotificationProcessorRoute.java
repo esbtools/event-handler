@@ -30,13 +30,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-public class PollingNotificationHandlerRoute extends RouteBuilder {
+public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
     private final int batchSize;
 
-    public PollingNotificationHandlerRoute(NotificationRepository notificationRepository,
+    public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval, int batchSize) {
         this.notificationRepository = notificationRepository;
         this.documentEventRepository = documentEventRepository;
@@ -47,7 +47,7 @@ public class PollingNotificationHandlerRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from("timer:pollForNotifications?period=" + pollingInterval.get(ChronoUnit.MILLIS))
-        .routeId("notificationHandler")
+        .routeId("notificationProcessor")
         .process(exchange -> {
             List<? extends Notification> notifications =
                     notificationRepository.retrieveOldestNotificationsUpTo(batchSize);

@@ -22,45 +22,40 @@ import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
-public class PollingDocumentEventHandlerRoute extends RouteBuilder {
+public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final DocumentEventRepository documentEventRepository;
-    private final Duration readyEventPollDelay;
-    private final int readyEventBatchSize;
-    private final String toEsbEndpoint;
+    private final Duration pollingInterval;
+    private final int batchSize;
+    private final String documentEndpoint;
+    private final String failureEndpoint;
 
-    public PollingDocumentEventHandlerRoute(DocumentEventRepository documentEventRepository,
-            Duration readyEventPollDelay, int readyEventBatchSize, String toEsbEndpoint) {
+    public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
+            Duration pollingInterval, int batchSize, String documentEndpoint,
+            String failureEndpoint) {
         this.documentEventRepository = documentEventRepository;
-        this.readyEventPollDelay = readyEventPollDelay;
-        this.readyEventBatchSize = readyEventBatchSize;
-        this.toEsbEndpoint = toEsbEndpoint;
+        this.pollingInterval = pollingInterval;
+        this.batchSize = batchSize;
+        this.documentEndpoint = documentEndpoint;
+        this.failureEndpoint = failureEndpoint;
     }
 
     @Override
     public void configure() throws Exception {
-        from("timer:readyEvents?delay=" + readyEventPollDelay.get(ChronoUnit.MILLIS))
-        .routeId("ready-events")
+        from("timer:pollForDocumentEvents?period=" + pollingInterval.get(ChronoUnit.MILLIS))
+        .routeId("documentEventsProcessor")
         .process(exchange -> {
-            // TODO: Should event repository just lookup the entities in this design?
-            List<? extends DocumentEvent> documentEvents = documentEventRepository.
-                    retrievePriorityDocumentEventsUpTo(readyEventBatchSize);
+            List<? extends DocumentEvent> documentEvents = documentEventRepository
+                    .retrievePriorityDocumentEventsUpTo(batchSize);
 
-            // TODO: If this fails to return results, should put events back in ready pool
-            // or fail them?
             List<Future<?>> futureDocs = documentEvents.stream()
                     .map(DocumentEvent::lookupDocument)
                     .collect(Collectors.toList());
 
-            // TODO: discern which docs have failed results
-            // Or add source() API to result and pass result here
             documentEventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
                     Collections.emptyList());
 
@@ -68,6 +63,6 @@ public class PollingDocumentEventHandlerRoute extends RouteBuilder {
         })
         .split(body())
         // TODO: add back error handling when we have error info in results
-        .to(toEsbEndpoint);
+        .to(documentEndpoint);
     }
 }
