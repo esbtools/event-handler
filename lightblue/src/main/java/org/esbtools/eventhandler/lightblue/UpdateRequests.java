@@ -71,7 +71,7 @@ public abstract class UpdateRequests {
 
         return requests;
     }
-    
+
     public static Collection<DataUpdateRequest> documentEventsStatusAndProcessedDate(
             Collection<DocumentEventEntity> updatedEventEntities) {
         List<DataUpdateRequest> requests = new ArrayList<>(updatedEventEntities.size());

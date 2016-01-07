@@ -28,7 +28,13 @@ import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 public abstract class FindRequests {
-    public static DataFindRequest oldestNewNotificationsForEntitiesUpTo(String[] entities,
+    /**
+     * You generally don't want to retrieve notifications which have already started being processed
+     * or have been processed, so this limits the request to
+     * {@link org.esbtools.lightbluenotificationhook.NotificationEntity.Status#unprocessed}
+     * notifications.
+     */
+    public static DataFindRequest oldestNotificationsForEntitiesUpTo(String[] entities,
             int maxEvents) {
         DataFindRequest findEntities = new DataFindRequest(
                 NotificationEntity.ENTITY_NAME,

@@ -62,7 +62,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.oldestNewNotificationsForEntitiesUpTo(entities, maxEvents))
+                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
             for (NotificationEntity entity : notificationEntities) {
