@@ -24,8 +24,32 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+/**
+ * Supports creating many types of {@link LightblueDocumentEvent}s based on the canonical message
+ * type in the provided {@link DocumentEventEntity}.
+ */
 public class ByTypeDocumentEventFactory implements DocumentEventFactory {
     private final Map<String, DocumentEventFactory> factories = new HashMap<>();
+
+    /**
+     * Add a factory for document events of a specific canonical type. When
+     * {@link #getDocumentEventForEntity(DocumentEventEntity, LightblueRequester)} is passed a
+     * {@link DocumentEventEntity} with this canonical type, this factory will be used to create a
+     * {@link LightblueDocumentEvent} for it.
+     *
+     * <p>Only one factory per type is used, and subsequent calls with the same type will overwrite
+     * the previously assigned factory.
+     *
+     * @param type The canonical type to use this factory for.
+     * @param factory A {@code DocumentEventFactory} which creates {@link LightblueDocumentEvent}s
+     *                for the specific canonical type.
+     *
+     * @see DocumentEventEntity#getCanonicalType()
+     */
+    public ByTypeDocumentEventFactory addType(String type, DocumentEventFactory factory) {
+        factories.put(type, factory);
+        return this;
+    }
 
     @Override
     public LightblueDocumentEvent getDocumentEventForEntity(DocumentEventEntity entity,
@@ -38,10 +62,5 @@ public class ByTypeDocumentEventFactory implements DocumentEventFactory {
         }
 
         return factories.get(type).getDocumentEventForEntity(entity, requester);
-    }
-
-    public ByTypeDocumentEventFactory addType(String type, DocumentEventFactory factory) {
-        factories.put(type, factory);
-        return this;
     }
 }
