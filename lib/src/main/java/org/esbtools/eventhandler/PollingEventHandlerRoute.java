@@ -57,7 +57,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
         from("timer:newEvents?delay=" + newEventPollDelay.get(ChronoUnit.MILLIS))
                 .routeId("new-events")
                 .process(exchange -> {
-                    List<Notification> notifications = notificationRepository.
+                    List<? extends Notification> notifications = notificationRepository.
                             retrieveOldestNotificationsUpTo(notificationBatchSize);
                     List<Future<Collection<DocumentEvent>>> allFutureDocEvents =
                             new ArrayList<>(notifications.size());

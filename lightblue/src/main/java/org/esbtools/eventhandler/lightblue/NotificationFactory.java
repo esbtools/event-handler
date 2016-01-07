@@ -18,9 +18,8 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.Notification;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 public interface NotificationFactory {
-    Notification getNotificationForEntity(NotificationEntity entity, LightblueRequester requester);
+    LightblueNotification getNotificationForEntity(NotificationEntity entity, LightblueRequester requester);
 }

@@ -30,8 +30,8 @@ public interface NotificationRepository {
      * threads looking up notifications at the same time should all et a unique non-overlapping sample
      * of the oldest notifications. Subsequent calls should always return a unique set.
      */
-    List<Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception;
+    List<? extends Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception;
 
-    void markNotificationsProcessedOrFailed(Collection<Notification> notification,
+    void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception;
 }

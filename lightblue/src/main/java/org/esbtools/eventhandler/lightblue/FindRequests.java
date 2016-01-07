@@ -25,10 +25,23 @@ import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 public abstract class FindRequests {
-    public static DataFindRequest newNotificationsForEntitiesUpTo(String[] entities, int maxEvents) {
-        return null;
+    public static DataFindRequest oldestNewNotificationsForEntitiesUpTo(String[] entities,
+            int maxEvents) {
+        DataFindRequest findEntities = new DataFindRequest(
+                NotificationEntity.ENTITY_NAME,
+                NotificationEntity.ENTITY_VERSION);
+
+        findEntities.where(Query.and(
+                Query.withValues("entityName", Query.NaryOp.in, Literal.values(entities)),
+                Query.withValue("status", Query.BinOp.eq, NotificationEntity.Status.unprocessed)));
+        findEntities.select(Projection.includeFieldRecursively("*"));
+        findEntities.sort(Sort.asc("occurrenceDate"));
+        findEntities.range(0, maxEvents - 1);
+
+        return findEntities;
     }
 
     public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,

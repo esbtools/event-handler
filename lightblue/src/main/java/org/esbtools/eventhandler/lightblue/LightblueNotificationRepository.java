@@ -53,20 +53,24 @@ public class LightblueNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public List<Notification> retrieveOldestNotificationsUpTo(int maxEvents)
+    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
             throws LightblueException {
         try {
-            // TODO: Either block until lock acquired or throw exception and let caller poll
-            // TODO: What happens if app dies before lock release? Do we need TTL and ping?
             blockUntilLockAcquired(Locks.forNotificationsForEntities(entities));
 
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.newNotificationsForEntitiesUpTo(entities, maxEvents))
+                    .data(FindRequests.oldestNewNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
-            lightblue.data(UpdateRequests.notificationsAsProcessing(notificationEntities));
+            for (NotificationEntity entity : notificationEntities) {
+                entity.setStatus(NotificationEntity.Status.processing);
+            }
+
+            DataBulkRequest updateEntities = new DataBulkRequest();
+            updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(notificationEntities));
+            lightblue.bulkData(updateEntities);
 
             return Arrays.stream(notificationEntities)
                     .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
@@ -77,13 +81,12 @@ public class LightblueNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public void markNotificationsProcessedOrFailed(Collection<Notification> notification,
+    public void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
                 .map(LightblueNotificationRepository::asEntity)
                 .collect(Collectors.toList());
 
-        // TODO: Add field in NotificationEntity for failure messages?
         List<NotificationEntity> failedNotificationEntities = failures.stream()
                 .map(FailedNotification::notification)
                 .map(LightblueNotificationRepository::asEntity)
@@ -93,6 +96,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
         markNotifications.add(UpdateRequests.processingNotificationsAsProcessed(processedNotificationEntities));
         markNotifications.add(UpdateRequests.processingNotificationsAsFailed(failedNotificationEntities));
 
+        // TODO: Deal with failures
         lightblue.bulkData(markNotifications);
     }
 
