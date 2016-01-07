@@ -94,6 +94,8 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         try {
+            // TODO: Update once client bug fixed
+            // https://github.com/lightblue-platform/lightblue-client/issues/202
             LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
 
             for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {

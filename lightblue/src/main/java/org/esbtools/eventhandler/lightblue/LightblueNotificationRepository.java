@@ -72,6 +72,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
             DataBulkRequest updateEntities = new DataBulkRequest();
             updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
                     Arrays.asList(notificationEntities)));
+            // If this fails, intentionally let propagate and release lock.
+            // Another thread, or another poll, will try again.
             lightblue.bulkData(updateEntities);
 
             return Arrays.stream(notificationEntities)
@@ -109,6 +111,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                 UpdateRequests.notificationsStatusAndProcessedDate(failedNotificationEntities));
 
         // TODO: Deal with failures
+        // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markNotifications);
     }
 

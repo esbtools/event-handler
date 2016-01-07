@@ -132,6 +132,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
         // TODO: What if some of these fail?
         // Documents are published, so not world ending, but important.
+        // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markDocumentEvents);
     }
 
