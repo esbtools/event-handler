@@ -33,6 +33,7 @@ import java.sql.Date;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -64,6 +65,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
             NotificationEntity[] notificationEntities = lightblue
                     .data(FindRequests.oldestNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
+
+            if (notificationEntities.length == 0) {
+                return Collections.emptyList();
+            }
 
             for (NotificationEntity entity : notificationEntities) {
                 entity.setStatus(NotificationEntity.Status.processing);
@@ -109,6 +114,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
                 UpdateRequests.notificationsStatusAndProcessedDate(processedNotificationEntities));
         markNotifications.addAll(
                 UpdateRequests.notificationsStatusAndProcessedDate(failedNotificationEntities));
+
+        if (markNotifications.getRequests().isEmpty()) {
+            return;
+        }
 
         // TODO: Deal with failures
         // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
