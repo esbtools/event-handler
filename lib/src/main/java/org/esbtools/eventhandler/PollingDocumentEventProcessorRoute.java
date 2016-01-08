@@ -54,7 +54,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);
-            Map<DocumentEvent, Future<?>> eventsToFutureDocuments = new HashMap<>(documentEvents.size());
+            Map<DocumentEvent, Future<?>> eventsToFutureDocuments =
+                    new HashMap<>(documentEvents.size());
 
             // Intentionally cache all futures before resolving them.
             for (DocumentEvent event : documentEvents) {
@@ -72,6 +73,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
                 try {
                     documents.add(futureDoc.get());
+                    successfulEvents.add(event);
                 } catch (ExecutionException | InterruptedException e) {
                     failedEvents.add(new FailedDocumentEvent(event, e));
                 }
@@ -82,6 +84,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
             exchange.getIn().setBody(Iterables.concat(documents, failedEvents));
         })
         .split(body())
+        .streaming()
         .choice()
             .when(e -> e.getIn().getBody() instanceof FailedDocumentEvent).to(failureEndpoint)
             .otherwise().to(documentEndpoint);
