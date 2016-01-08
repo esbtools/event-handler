@@ -22,6 +22,7 @@ import org.apache.camel.EndpointInject;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.junit4.CamelTestSupport;
+import org.esbtools.eventhandler.testing.FailingDocumentEvent;
 import org.esbtools.eventhandler.testing.SimpleInMemoryDocumentEventRepository;
 import org.esbtools.eventhandler.testing.StringDocumentEvent;
 import org.junit.Test;
@@ -50,19 +51,42 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
     public void shouldTurnDocumentEventsIntoDocumentsInPeriodicIntervals() throws Exception {
         documentEndpoint.expectedMessageCount(30);
 
-        documentEventRepository.addNewDocumentEvents(randomEvents(10));
+        documentEventRepository.addNewDocumentEvents(randomSuccessfulEvents(10));
         Thread.sleep(5000);
-        documentEventRepository.addNewDocumentEvents(randomEvents(10));
+        documentEventRepository.addNewDocumentEvents(randomSuccessfulEvents(10));
         Thread.sleep(5000);
-        documentEventRepository.addNewDocumentEvents(randomEvents(10));
+        documentEventRepository.addNewDocumentEvents(randomSuccessfulEvents(10));
 
         documentEndpoint.assertIsSatisfied();
     }
 
-    public static List<StringDocumentEvent> randomEvents(int amount) {
+    @Test
+    public void shouldSendFailedEventsToTheFailureEndpointButProcessRest() throws Exception {
+        documentEndpoint.expectedMessageCount(5);
+        failureEndpoint.expectedMessageCount(5);
+
+        List<DocumentEvent> events = new ArrayList<>(10);
+        events.addAll(randomFailingEvents(5));
+        events.addAll(randomSuccessfulEvents(5));
+
+        documentEventRepository.addNewDocumentEvents(events);
+
+        documentEndpoint.assertIsSatisfied();
+        failureEndpoint.assertIsSatisfied();
+    }
+
+    public static List<StringDocumentEvent> randomSuccessfulEvents(int amount) {
         List<StringDocumentEvent> events = new ArrayList<>(amount);
         for (int i = 0; i < amount; i++) {
             events.add(new StringDocumentEvent(UUID.randomUUID().toString()));
+        }
+        return events;
+    }
+
+    public static List<FailingDocumentEvent> randomFailingEvents(int amount) {
+        List<FailingDocumentEvent> events = new ArrayList<>(amount);
+        for (int i = 0; i < amount; i++) {
+            events.add(new FailingDocumentEvent());
         }
         return events;
     }
