@@ -41,6 +41,7 @@
         <version.junit>4.12</version.junit>
         <version.mockito>2.0.31-beta</version.mockito>
         <version.truth>0.27</version.truth>
+        <version.awaitility>1.7.0</version.awaitility>
 
         <version.maven-compiler-plugin>3.3</version.maven-compiler-plugin>
         <version.jdk>1.8</version.jdk>
@@ -117,6 +118,12 @@
                 <groupId>com.google.truth</groupId>
                 <artifactId>truth</artifactId>
                 <version>${version.truth}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.jayway.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>${version.awaitility}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

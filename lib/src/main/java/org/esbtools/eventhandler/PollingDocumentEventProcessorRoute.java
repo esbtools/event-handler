@@ -79,10 +79,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
-            // TODO: Failures here should probably not stop documents from being published
-            // But at the same time we have to assume processing events never confirmed were
-            // never published, causing them to be republished. However, we already operate under
-            // the assumption that duplicate messages are not broken.
+            // FIXME: If this fails, we should attempt to "rollback" these events to be
+            // available to the next retrieve events call
             documentEventRepository.markDocumentEventsProcessedOrFailed(successfulEvents, failedEvents);
 
             exchange.getIn().setBody(Iterables.concat(documents, failedEvents));

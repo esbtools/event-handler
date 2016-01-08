@@ -30,6 +30,11 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     private final List<DocumentEvent> documentEvents = new ArrayList<>();
     private final List<DocumentEvent> published = new ArrayList<>();
     private final List<FailedDocumentEvent> failed = new ArrayList<>();
+    private boolean failOnAddingDocumentEvents;
+
+    public List<DocumentEvent> getDocumentEvents() {
+        return documentEvents;
+    }
 
     public List<DocumentEvent> getPublishedEvents() {
         return published;
@@ -39,8 +44,19 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
         return failed;
     }
 
+    public void failOnAddingDocumentEvents() {
+        failOnAddingDocumentEvents = true;
+    }
+
+    public void passOnAddingDocumentEvents() {
+        failOnAddingDocumentEvents = false;
+    }
+
     @Override
     public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents) throws Exception {
+        if (failOnAddingDocumentEvents) {
+            throw new RuntimeException("Simulated failure");
+        }
         this.documentEvents.addAll(documentEvents);
     }
 

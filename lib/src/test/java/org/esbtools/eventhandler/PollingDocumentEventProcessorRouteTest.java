@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler;
 
+import com.jayway.awaitility.Awaitility;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
@@ -25,15 +26,17 @@ import org.apache.camel.test.junit4.CamelTestSupport;
 import org.esbtools.eventhandler.testing.FailingDocumentEvent;
 import org.esbtools.eventhandler.testing.SimpleInMemoryDocumentEventRepository;
 import org.esbtools.eventhandler.testing.StringDocumentEvent;
+import org.hamcrest.Matchers;
 import org.junit.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
-    DocumentEventRepository documentEventRepository = new SimpleInMemoryDocumentEventRepository();
+    SimpleInMemoryDocumentEventRepository documentEventRepository = new SimpleInMemoryDocumentEventRepository();
 
     @EndpointInject(uri = "mock:documents")
     MockEndpoint documentEndpoint;
@@ -62,17 +65,31 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
 
     @Test
     public void shouldSendFailedEventsToTheFailureEndpointButProcessRest() throws Exception {
-        documentEndpoint.expectedMessageCount(5);
-        failureEndpoint.expectedMessageCount(5);
+        failureEndpoint.expectedMessageCount(4);
+        documentEndpoint.expectedMessageCount(6);
 
         List<DocumentEvent> events = new ArrayList<>(10);
-        events.addAll(randomFailingEvents(5));
-        events.addAll(randomSuccessfulEvents(5));
+        events.addAll(randomFailingEvents(4));
+        events.addAll(randomSuccessfulEvents(6));
 
         documentEventRepository.addNewDocumentEvents(events);
 
         documentEndpoint.assertIsSatisfied();
         failureEndpoint.assertIsSatisfied();
+    }
+
+    @Test
+    public void shouldMarkSuccessfulEventsAsPublishedAndFailedAsFailed() throws Exception {
+        List<DocumentEvent> events = new ArrayList<>(10);
+        events.addAll(randomFailingEvents(4));
+        events.addAll(randomSuccessfulEvents(6));
+
+        documentEventRepository.addNewDocumentEvents(events);
+
+        Awaitility.await().atMost(5, TimeUnit.SECONDS)
+                .until(documentEventRepository::getFailedEvents, Matchers.hasSize(4));
+        Awaitility.await().atMost(5, TimeUnit.SECONDS)
+                .until(documentEventRepository::getPublishedEvents, Matchers.hasSize(6));
     }
 
     public static List<StringDocumentEvent> randomSuccessfulEvents(int amount) {

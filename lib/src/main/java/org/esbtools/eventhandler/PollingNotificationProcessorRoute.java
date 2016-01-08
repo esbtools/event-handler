@@ -21,7 +21,6 @@ package org.esbtools.eventhandler;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
