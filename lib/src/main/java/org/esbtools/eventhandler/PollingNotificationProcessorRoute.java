@@ -48,7 +48,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForNotifications?period=" + pollingInterval.get(ChronoUnit.MILLIS))
+        from("timer:pollForNotifications?period=" + pollingInterval.toMillis())
         .routeId("notificationProcessor")
         .process(exchange -> {
             List<? extends Notification> notifications =
