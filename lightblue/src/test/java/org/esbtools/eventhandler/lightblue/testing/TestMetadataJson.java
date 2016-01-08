@@ -31,6 +31,9 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import io.github.alechenninger.lightblue.MetadataGenerator;
 import io.github.alechenninger.lightblue.javabeans.JavaBeansReflector;
 
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 public abstract class TestMetadataJson {
     private static final Extensions<JsonNode> extensions = new Extensions<JsonNode>() {{
         addDefaultExtensions();
@@ -42,14 +45,24 @@ public abstract class TestMetadataJson {
     private static final MetadataGenerator metadataGenerator = new MetadataGenerator(new JavaBeansReflector());
 
     public static LightblueExternalResource.LightblueTestMethods forEntity(Class<?> entityClass) {
-        EntityMetadata entityMd = metadataGenerator.generateMetadata(entityClass);
-        entityMd.setDataStore(new MongoDataStore("${mongo.database}", "${mongo.datasource}", entityMd.getName()));
+        return forEntities(entityClass);
+    }
 
+    public static LightblueExternalResource.LightblueTestMethods forEntities(Class<?>... entityClasses) {
         return new LightblueExternalResource.LightblueTestMethods() {
             @Override
             public JsonNode[] getMetadataJsonNodes() throws Exception {
-                return new JsonNode[] {parser.convert(entityMd)};
+                return Arrays.stream(entityClasses)
+                        .map(TestMetadataJson::entityClassAsTestableJsonMetadata)
+                        .collect(Collectors.toList())
+                        .toArray(new JsonNode[entityClasses.length]);
             }
         };
+    }
+
+    private static JsonNode entityClassAsTestableJsonMetadata(Class<?> entityClass) {
+        EntityMetadata entityMd = metadataGenerator.generateMetadata(entityClass);
+        entityMd.setDataStore(new MongoDataStore("${mongo.database}", "${mongo.datasource}", entityMd.getName()));
+        return parser.convert(entityMd);
     }
 }
