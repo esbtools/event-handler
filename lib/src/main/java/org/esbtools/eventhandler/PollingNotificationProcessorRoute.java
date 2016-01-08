@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -37,7 +38,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final int batchSize;
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
-            DocumentEventRepository documentEventRepository, Duration pollingInterval, int batchSize) {
+            DocumentEventRepository documentEventRepository, Duration pollingInterval,
+            int batchSize) {
         this.notificationRepository = notificationRepository;
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
@@ -64,7 +66,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
             List<Notification> successfulNotifications = new ArrayList<>(notifications.size());
             List<FailedNotification> failedNotifications = new ArrayList<>();
 
-            for (Map.Entry<Notification, Future<Collection<DocumentEvent>>> notificationToFutureEvents
+            for (Entry<Notification, Future<Collection<DocumentEvent>>> notificationToFutureEvents
                     : notificationsToFutureEvents.entrySet()) {
                 Notification notification = notificationToFutureEvents.getKey();
                 Future<Collection<DocumentEvent>> futureEvents = notificationToFutureEvents.getValue();

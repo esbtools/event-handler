@@ -18,14 +18,17 @@
 
 package org.esbtools.eventhandler;
 
+import com.google.common.collect.Iterables;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.stream.Collectors;
 
 public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final DocumentEventRepository documentEventRepository;
@@ -51,18 +54,36 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);
+            Map<DocumentEvent, Future<?>> eventsToFutureDocuments = new HashMap<>(documentEvents.size());
 
-            List<Future<?>> futureDocs = documentEvents.stream()
-                    .map(DocumentEvent::lookupDocument)
-                    .collect(Collectors.toList());
+            // Intentionally cache all futures before resolving them.
+            for (DocumentEvent event : documentEvents) {
+                eventsToFutureDocuments.put(event, event.lookupDocument());
+            }
 
-            documentEventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
-                    Collections.emptyList());
+            List<Object> documents = new ArrayList<>(documentEvents.size());
+            List<DocumentEvent> successfulEvents = new ArrayList<>(documentEvents.size());
+            List<FailedDocumentEvent> failedEvents = new ArrayList<>();
 
-            exchange.getIn().setBody(futureDocs);
+            for (Map.Entry<DocumentEvent, Future<?>> eventToFutureDocument
+                    : eventsToFutureDocuments.entrySet()) {
+                DocumentEvent event = eventToFutureDocument.getKey();
+                Future<?> futureDoc = eventToFutureDocument.getValue();
+
+                try {
+                    documents.add(futureDoc.get());
+                } catch (ExecutionException | InterruptedException e) {
+                    failedEvents.add(new FailedDocumentEvent(event, e));
+                }
+            }
+
+            documentEventRepository.markDocumentEventsProcessedOrFailed(successfulEvents, failedEvents);
+
+            exchange.getIn().setBody(Iterables.concat(documents, failedEvents));
         })
         .split(body())
-        // TODO: add back error handling when we have error info in results
-        .to(documentEndpoint);
+        .choice()
+            .when(e -> e.getIn().getBody() instanceof FailedDocumentEvent).to(failureEndpoint)
+            .otherwise().to(documentEndpoint);
     }
 }

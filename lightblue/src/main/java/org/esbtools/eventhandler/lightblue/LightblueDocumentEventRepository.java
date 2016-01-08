@@ -107,7 +107,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     @Override
-    public void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> documentEvents,
+    public void markDocumentEventsProcessedOrFailed(
+            Collection<? extends DocumentEvent> documentEvents,
             Collection<FailedDocumentEvent> failures) throws LightblueException {
         List<DocumentEventEntity> processed = documentEvents.stream()
                 .map(LightblueDocumentEventRepository::asEntity)
