@@ -74,6 +74,12 @@
                 <artifactId>camel-http4</artifactId>
                 <version>${version.camel}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-test</artifactId>
+                <version>${version.camel}</version>
+                <scope>test</scope>
+            </dependency>
 
             <!-- Libraries: not implementation specific -->
             <dependency>
@@ -111,12 +117,6 @@
                 <groupId>com.google.truth</groupId>
                 <artifactId>truth</artifactId>
                 <version>${version.truth}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-test</artifactId>
-                <version>${version.camel}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

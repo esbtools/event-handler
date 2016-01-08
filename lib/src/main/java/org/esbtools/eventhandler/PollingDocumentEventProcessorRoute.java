@@ -49,7 +49,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForDocumentEvents?period=" + pollingInterval.get(ChronoUnit.MILLIS))
+        from("timer:pollForDocumentEvents?period=" + pollingInterval.toMillis())
         .routeId("documentEventsProcessor")
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
