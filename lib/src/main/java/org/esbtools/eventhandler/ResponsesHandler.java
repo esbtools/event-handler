@@ -28,5 +28,6 @@ import java.util.function.Function;
  * @param <U> The type of responses
  * @param <V> The type of result
  */
-public interface ResponsesHandler<T, U, V> extends Function<Responses<T, U>, V> {
+public interface ResponsesHandler<T, U, V> {
+    V handleResponses(Responses<T, U> responses) throws Exception;
 }

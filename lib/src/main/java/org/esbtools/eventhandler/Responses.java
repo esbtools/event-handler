@@ -27,5 +27,9 @@ package org.esbtools.eventhandler;
  * @param <U> The type of response
  */
 public interface Responses<T, U> {
+    /**
+     * @return The received response for the provided request.
+     * @throws java.util.NoSuchElementException If no response for that request exists.
+     */
     U forRequest(T request);
 }
