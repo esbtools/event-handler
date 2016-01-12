@@ -37,6 +37,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepository implements DocumentEventRepository {
@@ -57,16 +59,16 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      */
     private final int documentEventBatchSize;
     private final Locking locking;
-    private final DocumentEventFactory documentEventFactory;
+    private final Map<String, DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] entities,
             int documentEventBatchSize, String lockingDomain,
-            DocumentEventFactory documentEventFactory, Clock clock) {
+            Map<String, DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
         this.documentEventBatchSize = documentEventBatchSize;
-        this.documentEventFactory = documentEventFactory;
+        this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
 
         locking = lightblue.getLocking(lockingDomain);
@@ -148,10 +150,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     /**
-     * Creates {@link LightblueDocumentEvent}s from entities using {@link #documentEventFactory},
-     * optimizes away superseded and merge-able events, and populates {@code entitiesToUpdate} with
-     * entity status updates that should be persisted to the document event entity collection
-     * before releasing locks.
+     * Creates {@link LightblueDocumentEvent}s from entities using
+     * {@link #documentEventFactoriesByType}, optimizes away superseded and merge-able events, and
+     * populates {@code entitiesToUpdate} with entity status updates that should be persisted to the
+     * document event entity collection before releasing locks.
      *
      * <p>The returned list may include net-new events as the result of merges. These events do not
      * yet have an associated <em>persisted</em> entity, and therefore have no id's.
@@ -173,8 +175,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         List<LightblueDocumentEvent> optimized = new ArrayList<>(maxEvents);
 
         for (final DocumentEventEntity newEventEntity : documentEventEntities) {
-            final LightblueDocumentEvent newEvent = documentEventFactory
-                    .getDocumentEventForEntity(newEventEntity, requester);
+            String typeOfEvent = newEventEntity.getCanonicalType();
+
+            DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
+
+            if (eventFactoryForType == null) {
+                throw new NoSuchElementException("Document event factory not found for document " +
+                        "event of type <" + typeOfEvent + ">. Entity looks like: " + newEventEntity);
+            }
+
+            final LightblueDocumentEvent newEvent =
+                    eventFactoryForType.getDocumentEventForEntity(newEventEntity, requester);
 
             // We have a new event, let's see if it is superseded by or can be merged with any
             // previous events we parsed or created as a result of a previous merge.
