@@ -48,7 +48,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -73,18 +75,26 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
 
     static Clock systemUtc = Clock.systemUTC();
 
+    Map<String, DocumentEventFactory> documentEventFactoriesByType =
+            new HashMap<String, DocumentEventFactory>() {{
+                put("String", StringDocumentEvent::new);
+                put("MultiString", MultiStringDocumentEvent::new);
+            }};
+
+    Map<String, NotificationFactory> notificationFactoryByEntityName =
+            new HashMap<String, NotificationFactory>() {{
+                put("String", StringNotification::new);
+                put("MultiString", MultiStringNotification::new);
+            }};
+
     @Override
     protected void doPreSetup() throws Exception {
         client = LightblueClients.withJavaTimeSerializationSupport(
                 LightblueClientConfigurations.fromLightblueExternalResource(lightblueExternalResource));
         notificationRepository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                "testLockingDomain", new ByEntityNameNotificationFactory()
-                .addByEntityName("String", StringNotification::new)
-                .addByEntityName("MultiString", MultiStringNotification::new), systemUtc);
+                "testLockingDomain", notificationFactoryByEntityName, systemUtc);
         documentEventRepository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, "testLockingDomain", new ByTypeDocumentEventFactory()
-                .addType("String", StringDocumentEvent::new)
-                .addType("MultiString", MultiStringDocumentEvent::new), systemUtc);
+                100, "testLockingDomain", documentEventFactoriesByType, systemUtc);
     }
 
     @Override
