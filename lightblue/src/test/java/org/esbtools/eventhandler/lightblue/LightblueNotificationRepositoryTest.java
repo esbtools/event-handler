@@ -53,7 +53,9 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -74,6 +76,11 @@ public class LightblueNotificationRepositoryTest {
 
     private LightblueNotificationRepository repository;
 
+    private final Map<String, NotificationFactory> notificationFactoryByEntityName =
+            new HashMap<String, NotificationFactory>() {{
+                put("String", StringNotification::new);
+            }};
+
     private static Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     @Before
@@ -86,10 +93,7 @@ public class LightblueNotificationRepositoryTest {
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
         repository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                "testLockingDomain",
-                new ByEntityNameNotificationFactory()
-                        .addByEntityName("String", StringNotification::new),
-                fixedClock);
+                "testLockingDomain", notificationFactoryByEntityName, fixedClock);
     }
 
     @Before
@@ -181,13 +185,11 @@ public class LightblueNotificationRepositoryTest {
 
         LightblueNotificationRepository thread1Repository = new LightblueNotificationRepository(
                 thread1Client, new String[]{"String"}, "testLockingDomain",
-                new ByEntityNameNotificationFactory().addByEntityName("String", StringNotification::new),
-                fixedClock);
+                notificationFactoryByEntityName, fixedClock);
 
         LightblueNotificationRepository thread2Repository = new LightblueNotificationRepository(
                 thread1Client, new String[]{"String"}, "testLockingDomain",
-                new ByEntityNameNotificationFactory().addByEntityName("String", StringNotification::new),
-                fixedClock);
+                notificationFactoryByEntityName, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
