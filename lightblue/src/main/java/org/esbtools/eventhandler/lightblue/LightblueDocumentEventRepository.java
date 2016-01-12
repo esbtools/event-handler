@@ -38,6 +38,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepository implements DocumentEventRepository {
@@ -58,16 +60,16 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      */
     private final int documentEventBatchSize;
     private final Locking locking;
-    private final DocumentEventFactory documentEventFactory;
+    private final Map<String, DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] entities,
             int documentEventBatchSize, String lockingDomain,
-            DocumentEventFactory documentEventFactory, Clock clock) {
+            Map<String, DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
         this.documentEventBatchSize = documentEventBatchSize;
-        this.documentEventFactory = documentEventFactory;
+        this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
 
         locking = lightblue.getLocking(lockingDomain);
@@ -163,10 +165,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     /**
-     * Creates {@link LightblueDocumentEvent}s from entities using {@link #documentEventFactory},
-     * optimizes away superseded and merge-able events, and populates {@code entitiesToUpdate} with
-     * entity status updates that should be persisted to the document event entity collection
-     * before releasing locks.
+     * Creates {@link LightblueDocumentEvent}s from entities using
+     * {@link #documentEventFactoriesByType}, optimizes away superseded and merge-able events, and
+     * populates {@code entitiesToUpdate} with entity status updates that should be persisted to the
+     * document event entity collection before releasing locks.
      *
      * <p>The returned list may include net-new events as the result of merges. These events do not
      * yet have an associated <em>persisted</em> entity, and therefore have no id's.
@@ -187,31 +189,46 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             LightblueRequester requester) {
         List<LightblueDocumentEvent> optimized = new ArrayList<>(maxEvents);
 
-        for (DocumentEventEntity newEventEntity : documentEventEntities) {
-            LightblueDocumentEvent newEvent = documentEventFactory
-                    .getDocumentEventForEntity(newEventEntity, requester);
+        for (final DocumentEventEntity newEventEntity : documentEventEntities) {
+            String typeOfEvent = newEventEntity.getCanonicalType();
 
-            Iterator<LightblueDocumentEvent> optimizedIterator = optimized.iterator();
+            DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
+
+            if (eventFactoryForType == null) {
+                throw new NoSuchElementException("Document event factory not found for document " +
+                        "event of type <" + typeOfEvent + ">. Entity looks like: " + newEventEntity);
+            }
+
+            final LightblueDocumentEvent newEvent =
+                    eventFactoryForType.getDocumentEventForEntity(newEventEntity, requester);
 
             // We have a new event, let's see if it is superseded by or can be merged with any
             // previous events we parsed or created as a result of a previous merge.
+
+            // As we check, if we find we can merge an event, we will merge it, and continue on with
+            // the merger instead. These pointers track which event we are currently optimizing.
+            DocumentEventEntity newOrMergerEventEntity = newEventEntity;
+            LightblueDocumentEvent newOrMergerEvent = newEvent;
+
+            Iterator<LightblueDocumentEvent> optimizedIterator = optimized.iterator();
+
             while (optimizedIterator.hasNext()) {
                 LightblueDocumentEvent previouslyOptimizedEvent = optimizedIterator.next();
 
-                if (newEvent.isSupersededBy(previouslyOptimizedEvent)) {
+                if (newOrMergerEvent.isSupersededBy(previouslyOptimizedEvent)) {
                     // Keep previous event...
                     DocumentEventEntity previousEntity = previouslyOptimizedEvent.wrappedDocumentEventEntity();
-                    previousEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
-                    previousEntity.addSurvivorOfIds(newEventEntity.get_id());
+                    previousEntity.addSurvivorOfIds(newOrMergerEventEntity.getSurvivorOfIds());
+                    previousEntity.addSurvivorOfIds(newOrMergerEventEntity.get_id());
 
                     // ...and throw away this new one.
-                    newEventEntity.setStatus(DocumentEventEntity.Status.superseded);
-                    newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
-                    entitiesToUpdate.add(newEventEntity);
+                    newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.superseded);
+                    newOrMergerEventEntity.setProcessedDate(ZonedDateTime.now(clock));
+                    entitiesToUpdate.add(newOrMergerEventEntity);
 
-                    newEvent = null;
+                    newOrMergerEvent = null;
                     break;
-                } else if (newEvent.couldMergeWith(previouslyOptimizedEvent)) {
+                } else if (newOrMergerEvent.couldMergeWith(previouslyOptimizedEvent)) {
                     // Previous entity was processing; now it is merged and removed from optimized
                     // result list.
                     DocumentEventEntity previousEntity = previouslyOptimizedEvent.wrappedDocumentEventEntity();
@@ -221,35 +238,35 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
                     // This new event will not be included in result list, but we do have to update
                     // its entity to store that it has been merged.
-                    newEventEntity.setStatus(DocumentEventEntity.Status.merged);
-                    newEventEntity.setProcessedDate(ZonedDateTime.now(clock));
-                    entitiesToUpdate.add(newEventEntity);
+                    newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.merged);
+                    newOrMergerEventEntity.setProcessedDate(ZonedDateTime.now(clock));
+                    entitiesToUpdate.add(newOrMergerEventEntity);
 
                     // We create a new event as a result of the merger, and keep this instead of the
                     // others.
-                    LightblueDocumentEvent merger = newEvent.merge(previouslyOptimizedEvent);
+                    LightblueDocumentEvent merger = newOrMergerEvent.merge(previouslyOptimizedEvent);
                     DocumentEventEntity mergerEntity = merger.wrappedDocumentEventEntity();
                     mergerEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
-                    mergerEntity.addSurvivorOfIds(newEventEntity.getSurvivorOfIds());
+                    mergerEntity.addSurvivorOfIds(newOrMergerEventEntity.getSurvivorOfIds());
                     if (previousEntity.get_id() != null) {
                         mergerEntity.addSurvivorOfIds(previousEntity.get_id());
                     }
-                    if (newEventEntity.get_id() != null) {
-                        mergerEntity.addSurvivorOfIds(newEventEntity.get_id());
+                    if (newOrMergerEventEntity.get_id() != null) {
+                        mergerEntity.addSurvivorOfIds(newOrMergerEventEntity.get_id());
                     }
 
-                    newEvent = merger;
-                    newEventEntity = mergerEntity;
+                    newOrMergerEvent = merger;
+                    newOrMergerEventEntity = mergerEntity;
                 }
             }
 
             // Only add the event if we've not hit our limit. We should keep going however even if
             // we have hit our limit, because some of the remaining events may be superseded or
             // merged as a part of the current optimized batch.
-            if (newEvent != null && optimized.size() < maxEvents) {
-                newEventEntity.setStatus(DocumentEventEntity.Status.processing);
-                entitiesToUpdate.add(newEventEntity);
-                optimized.add(newEvent);
+            if (newOrMergerEvent != null && optimized.size() < maxEvents) {
+                newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.processing);
+                entitiesToUpdate.add(newOrMergerEventEntity);
+                optimized.add(newOrMergerEvent);
             }
         }
 

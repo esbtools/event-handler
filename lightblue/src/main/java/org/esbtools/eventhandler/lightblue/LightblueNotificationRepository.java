@@ -35,20 +35,23 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
     private final String[] entities;
     private final Locking locking;
-    private final NotificationFactory notificationFactory;
+    private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
     public LightblueNotificationRepository(LightblueClient lightblue, String[] entities,
-            String lockingDomain, NotificationFactory notificationFactory, Clock clock) {
+            String lockingDomain, Map<String, NotificationFactory> notificationFactoryByEntityName,
+            Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
-        this.notificationFactory = notificationFactory;
+        this.notificationFactoryByEntityName = notificationFactoryByEntityName;
         this.clock = clock;
 
         locking = lightblue.getLocking(lockingDomain);
@@ -82,7 +85,20 @@ public class LightblueNotificationRepository implements NotificationRepository {
             lightblue.bulkData(updateEntities);
 
             return Arrays.stream(notificationEntities)
-                    .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
+                    .map(entity -> {
+                        String entityName = entity.getEntityName();
+
+                        NotificationFactory notificationFactory =
+                                notificationFactoryByEntityName.get(entityName);
+
+                        if (notificationFactory == null) {
+                            throw new NoSuchElementException("No notification factory found for " +
+                                    "notification entity name <" + entityName +">. Notification " +
+                                    "entity looks like: " + entity);
+                        }
+
+                        return notificationFactory.getNotificationForEntity(entity, requester);
+                    })
                     .collect(Collectors.toList());
         } finally {
             locking.release(Locks.forNotificationsForEntities(entities));

@@ -51,8 +51,12 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -75,6 +79,11 @@ public class LightblueDocumentEventRepositoryTest {
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
+    private HashMap<String, DocumentEventFactory> documentEventFactoriesByType =
+            new HashMap<String, DocumentEventFactory>() {{
+                put("String", StringDocumentEvent::new);
+                put("MultiString", MultiStringDocumentEvent::new);
+            }};
 
     @Before
     public void initializeLightblueClientAndRepository() {
@@ -86,10 +95,7 @@ public class LightblueDocumentEventRepositoryTest {
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
         repository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain",
-                new ByTypeDocumentEventFactory()
-                        .addType("String", StringDocumentEvent::new)
-                        .addType("MultiString", MultiStringDocumentEvent::new),
+                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain", documentEventFactoriesByType,
                 fixedClock);
     }
 
@@ -166,15 +172,11 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
-                thread1Client, new String[]{"String"}, 100,
-                "testLockingDomain",
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
-                fixedClock);
+                thread1Client, new String[]{"String"}, 100, "testLockingDomain",
+                documentEventFactoriesByType, fixedClock);
         LightblueDocumentEventRepository thread2Repository = new LightblueDocumentEventRepository(
-                thread2Client, new String[]{"String"}, 100,
-                "testLockingDomain",
-                new ByTypeDocumentEventFactory().addType("String", StringDocumentEvent::new),
-                fixedClock);
+                thread2Client, new String[]{"String"}, 100, "testLockingDomain",
+                documentEventFactoriesByType, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 

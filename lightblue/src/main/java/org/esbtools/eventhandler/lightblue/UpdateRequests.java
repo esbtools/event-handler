@@ -99,6 +99,7 @@ public abstract class UpdateRequests {
             }
 
             // Work around client bug.
+            // https://github.com/lightblue-platform/lightblue-client/issues/225
             request.updates(updates.toArray(new Update[updates.size()]));
 
             requests.add(request);
