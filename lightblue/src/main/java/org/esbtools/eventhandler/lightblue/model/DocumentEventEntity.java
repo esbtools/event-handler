@@ -163,7 +163,7 @@ public class DocumentEventEntity {
         Collections.addAll(survivorOfIds, ids);
     }
 
-    public void addSurvivorOfIds(@Nullable  Collection<String> ids) {
+    public void addSurvivorOfIds(@Nullable Collection<String> ids) {
         if (ids == null) return;
 
         if (survivorOfIds == null) {
