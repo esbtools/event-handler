@@ -29,47 +29,69 @@ import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import java.sql.Date;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
     private final String[] entities;
     private final Locking locking;
-    private final NotificationFactory notificationFactory;
+    private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
     public LightblueNotificationRepository(LightblueClient lightblue, String[] entities,
-            String lockingDomain, NotificationFactory notificationFactory, Clock clock) {
+            String lockingDomain, Map<String, NotificationFactory> notificationFactoryByEntityName,
+            Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
-        this.notificationFactory = notificationFactory;
+        this.notificationFactoryByEntityName = notificationFactoryByEntityName;
         this.clock = clock;
 
         locking = lightblue.getLocking(lockingDomain);
     }
 
     @Override
-    public List<Notification> retrieveOldestNotificationsUpTo(int maxEvents)
+    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
             throws LightblueException {
         try {
-            // TODO: Either block until lock acquired or throw exception and let caller poll
-            // TODO: What happens if app dies before lock release? Do we need TTL and ping?
             blockUntilLockAcquired(Locks.forNotificationsForEntities(entities));
 
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.newNotificationsForEntitiesUpTo(entities, maxEvents))
+                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entities, maxEvents))
                     .parseProcessed(NotificationEntity[].class);
 
-            lightblue.data(UpdateRequests.notificationsAsProcessing(notificationEntities));
+            for (NotificationEntity entity : notificationEntities) {
+                entity.setStatus(NotificationEntity.Status.processing);
+            }
+
+            DataBulkRequest updateEntities = new DataBulkRequest();
+            updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
+                    Arrays.asList(notificationEntities)));
+            lightblue.bulkData(updateEntities);
 
             return Arrays.stream(notificationEntities)
-                    .map(entity -> notificationFactory.getNotificationForEntity(entity, requester))
+                    .map(entity -> {
+                        String entityName = entity.getEntityName();
+
+                        NotificationFactory notificationFactory =
+                                notificationFactoryByEntityName.get(entityName);
+
+                        if (notificationFactory == null) {
+                            throw new NoSuchElementException("No notification factory found for " +
+                                    "notification entity name <" + entityName +">. Notification " +
+                                    "entity looks like: " + entity);
+                        }
+
+                        return notificationFactory.getNotificationForEntity(entity, requester);
+                    })
                     .collect(Collectors.toList());
         } finally {
             locking.release(Locks.forNotificationsForEntities(entities));
@@ -77,22 +99,32 @@ public class LightblueNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public void markNotificationsProcessedOrFailed(Collection<Notification> notification,
-            Collection<FailedNotification> failures) throws Exception {
+    public void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
+            Collection<FailedNotification> failures) throws LightblueException {
         List<NotificationEntity> processedNotificationEntities = notification.stream()
                 .map(LightblueNotificationRepository::asEntity)
+                .peek(entity -> {
+                    entity.setStatus(NotificationEntity.Status.processed);
+                    entity.setProcessedDate(Date.from(clock.instant()));
+                })
                 .collect(Collectors.toList());
 
-        // TODO: Add field in NotificationEntity for failure messages?
         List<NotificationEntity> failedNotificationEntities = failures.stream()
                 .map(FailedNotification::notification)
                 .map(LightblueNotificationRepository::asEntity)
+                .peek(entity -> {
+                    entity.setStatus(NotificationEntity.Status.failed);
+                    entity.setProcessedDate(Date.from(clock.instant()));
+                })
                 .collect(Collectors.toList());
 
         DataBulkRequest markNotifications = new DataBulkRequest();
-        markNotifications.add(UpdateRequests.processingNotificationsAsProcessed(processedNotificationEntities));
-        markNotifications.add(UpdateRequests.processingNotificationsAsFailed(failedNotificationEntities));
+        markNotifications.addAll(
+                UpdateRequests.notificationsStatusAndProcessedDate(processedNotificationEntities));
+        markNotifications.addAll(
+                UpdateRequests.notificationsStatusAndProcessedDate(failedNotificationEntities));
 
+        // TODO: Deal with failures
         lightblue.bulkData(markNotifications);
     }
 
