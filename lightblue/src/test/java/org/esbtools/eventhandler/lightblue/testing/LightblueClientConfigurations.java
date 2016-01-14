@@ -16,11 +16,17 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.testing;
 
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import com.redhat.lightblue.client.LightblueClientConfiguration;
+import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 
-public interface DocumentEventFactory {
-    LightblueDocumentEvent getDocumentEventForEntity(DocumentEventEntity entity,
-            LightblueRequester requester);
+public abstract class LightblueClientConfigurations {
+    public static LightblueClientConfiguration fromLightblueExternalResource(LightblueExternalResource resource) {
+        LightblueClientConfiguration configuration = new LightblueClientConfiguration();
+        configuration.setUseCertAuth(false);
+        configuration.setDataServiceURI(resource.getDataUrl());
+        configuration.setMetadataServiceURI(resource.getMetadataUrl());
+        return configuration;
+    }
 }

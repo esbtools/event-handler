@@ -16,16 +16,18 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.testing;
 
-import com.redhat.lightblue.client.request.data.DataFindRequest;
+import org.esbtools.eventhandler.Notification;
+import org.esbtools.eventhandler.lightblue.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.NotificationFactory;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
-public abstract class Find {
-    public static DataFindRequest newNotificationsForEntitiesUpTo(String[] entities, int maxEvents) {
-        return null;
-    }
+import java.util.NoSuchElementException;
 
-    public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities, int maxEvents) {
-        return null;
+public class EmptyNotificationFactory implements NotificationFactory {
+    @Override
+    public Notification getNotificationForEntity(NotificationEntity entity, LightblueRequester requester) {
+        throw new NoSuchElementException("No notification defined for entity: " + entity);
     }
 }

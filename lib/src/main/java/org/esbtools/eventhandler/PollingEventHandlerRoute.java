@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 // TODO: Split out to two routebuilders, one for notifications and one for document events
 public class PollingEventHandlerRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
-    private final EventRepository eventRepository;
+    private final DocumentEventRepository documentEventRepository;
     private final Duration newEventPollDelay;
     private final int notificationBatchSize;
     private final Duration readyEventPollDelay;
@@ -41,10 +41,10 @@ public class PollingEventHandlerRoute extends RouteBuilder {
     private final String toEsbEndpoint;
 
     public PollingEventHandlerRoute(NotificationRepository notificationRepository,
-            EventRepository eventRepository, Duration newEventPollDelay, int notificationBatchSize,
+            DocumentEventRepository documentEventRepository, Duration newEventPollDelay, int notificationBatchSize,
             Duration readyEventPollDelay, int readyEventBatchSize, String toEsbEndpoint) {
         this.notificationRepository = notificationRepository;
-        this.eventRepository = eventRepository;
+        this.documentEventRepository = documentEventRepository;
         this.newEventPollDelay = newEventPollDelay;
         this.notificationBatchSize = notificationBatchSize;
         this.readyEventPollDelay = readyEventPollDelay;
@@ -78,7 +78,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                         }
                     }
 
-                    eventRepository.addNewDocumentEvents(documentEvents);
+                    documentEventRepository.addNewDocumentEvents(documentEvents);
                     notificationRepository.markNotificationsProcessedOrFailed(notifications,
                             Collections.emptyList());
                 });
@@ -87,7 +87,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
                 .routeId("ready-events")
                 .process(exchange -> {
                     // TODO: Should event repository just lookup the entities in this design?
-                    List<DocumentEvent> documentEvents = eventRepository.
+                    List<? extends DocumentEvent> documentEvents = documentEventRepository.
                             retrievePriorityDocumentEventsUpTo(readyEventBatchSize);
 
                     // TODO: If this fails to return results, should put events back in ready pool
@@ -98,7 +98,7 @@ public class PollingEventHandlerRoute extends RouteBuilder {
 
                     // TODO: discern which docs have failed results
                     // Or add source() API to result and pass result here
-                    eventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
+                    documentEventRepository.markDocumentEventsProcessedOrFailed(documentEvents,
                             Collections.emptyList());
 
                     exchange.getIn().setBody(futureDocs);

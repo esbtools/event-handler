@@ -32,7 +32,6 @@
     </modules>
 
     <properties>
-
         <version.camel>2.16.0</version.camel>
         <version.activemq>5.11.0</version.activemq>
         <version.guava>18.0</version.guava>

@@ -16,17 +16,19 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.testing;
 
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueClientConfiguration;
+import com.redhat.lightblue.client.http.LightblueHttpClient;
+import com.redhat.lightblue.client.util.JSON;
 
-import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
-import java.util.Collection;
-
-public abstract class Insert {
-    public static DataInsertRequest documentEvents(
-            Collection<DocumentEventEntity> documentEventEntities) {
-        return null;
+public abstract class LightblueClients {
+    public static LightblueClient withJavaTimeSerializationSupport(LightblueClientConfiguration config) {
+        ObjectMapper mapper = JSON.getDefaultObjectMapper().registerModule(new JavaTimeModule());
+        return new LightblueHttpClient(config, mapper);
     }
 }

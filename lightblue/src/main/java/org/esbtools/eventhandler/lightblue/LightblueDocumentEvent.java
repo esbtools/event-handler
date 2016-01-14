@@ -19,21 +19,22 @@
 package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.Requester;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
-import java.util.List;
-import java.util.Optional;
-
 /**
- * Connects event implementations to the underlying {@link LightblueEventRepository} data model.
+ * Connects event implementations to the underlying {@link LightblueDocumentEventRepository} data model.
  */
 public interface LightblueDocumentEvent extends DocumentEvent {
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    LightblueDocumentEvent merge(DocumentEvent event);
 
-    Optional<DocumentEventEntity> wrappedDocumentEventEntity();
-
-    DocumentEventEntity toNewDocumentEventEntity();
+    /**
+     * @return Entity backing this document event. Every document event should be backed by an
+     * entity instance. This should refer to that one, mutable instance and should not create a new
+     * one.
+     */
+    DocumentEventEntity wrappedDocumentEventEntity();
 }
