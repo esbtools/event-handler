@@ -31,6 +31,7 @@ import org.esbtools.eventhandler.DocumentEventRepository;
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
+import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -60,14 +61,14 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      */
     private final int documentEventBatchSize;
     private final Locking locking;
-    private final Map<String, DocumentEventFactory> documentEventFactoriesByType;
+    private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
-    public LightblueDocumentEventRepository(LightblueClient lightblue, String[] entities,
+    public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
             int documentEventBatchSize, String lockingDomain,
-            Map<String, DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
+            Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
-        this.entities = entities;
+        this.entities = canonicalTypes;
         this.documentEventBatchSize = documentEventBatchSize;
         this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
@@ -207,8 +208,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
             // As we check, if we find we can merge an event, we will merge it, and continue on with
             // the merger instead. These pointers track which event we are currently optimizing.
-            DocumentEventEntity newOrMergerEventEntity = newEventEntity;
-            LightblueDocumentEvent newOrMergerEvent = newEvent;
+            @Nullable DocumentEventEntity newOrMergerEventEntity = newEventEntity;
+            @Nullable LightblueDocumentEvent newOrMergerEvent = newEvent;
 
             Iterator<LightblueDocumentEvent> optimizedIterator = optimized.iterator();
 
