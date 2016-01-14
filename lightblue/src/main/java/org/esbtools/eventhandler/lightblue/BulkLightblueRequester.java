@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -110,11 +111,15 @@ public class BulkLightblueRequester implements LightblueRequester {
                     if (response instanceof LightblueErrorResponse) {
                         LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
 
-                        for (DataError dataError : errorResponse.getDataErrors()) {
-                            errors.addAll(dataError.getErrors());
-                        }
+                        DataError[] dataErrors = errorResponse.getDataErrors();
 
-                        Collections.addAll(errors, errorResponse.getLightblueErrors());
+                        if (dataErrors != null) {
+                            for (DataError dataError : dataErrors) {
+                                errors.addAll(dataError.getErrors());
+                            }
+
+                            Collections.addAll(errors, errorResponse.getLightblueErrors());
+                        }
                     }
 
                     if (response instanceof LightblueDataResponse) {
@@ -161,7 +166,11 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         @Override
         public LightblueDataResponse forRequest(AbstractLightblueDataRequest request) {
-            return responseMap.get(request);
+            if (responseMap.containsKey(request)) {
+                return responseMap.get(request);
+            }
+
+            throw new NoSuchElementException("No response for request: " + request);
         }
     }
 
@@ -183,7 +192,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             completed = true;
 
             try {
-                result = responsesHandler.apply(responses);
+                result = responsesHandler.handleResponses(responses);
             } catch (Exception e) {
                 exception = e;
             }
@@ -218,7 +227,7 @@ public class BulkLightblueRequester implements LightblueRequester {
                 throw new CancellationException();
             }
 
-            if (completed) {
+            if (!completed) {
                 doQueuedRequestsAndCompleteFutures();
             }
 

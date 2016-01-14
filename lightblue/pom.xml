@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~  Copyright 2015 esbtools Contributors and/or its affiliates.
+  ~  Copyright 2016 esbtools Contributors and/or its affiliates.
   ~
   ~  This file is part of esbtools.
   ~
@@ -98,7 +98,7 @@
             <groupId>com.redhat.lightblue.client</groupId>
             <artifactId>lightblue-client-integration-test</artifactId>
             <version>${version.lightblue-client}</version>
-            <scope>test></scope>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.github.alechenninger.lightblue</groupId>
@@ -106,7 +106,6 @@
             <version>${version.lightblue-java-generator}</version>
             <scope>test</scope>
         </dependency>
-
 
         <!-- Camel and friends -->
         <dependency>
@@ -164,5 +163,18 @@
             <artifactId>awaitility</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <forkCount>1</forkCount>
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
