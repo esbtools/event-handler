@@ -35,6 +35,7 @@ import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents)
             throws LightblueException {
+        if (documentEvents.isEmpty()) {
+            return;
+        }
+
         List<DocumentEventEntity> documentEventEntities = documentEvents.stream()
                 .map(LightblueDocumentEventRepository::asEntity)
                 .collect(Collectors.toList());
@@ -94,6 +99,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
 
+            if (documentEventEntities.length == 0) {
+                return Collections.emptyList();
+            }
+
             List<DocumentEventEntity> entitiesToUpdate = new ArrayList<>();
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
@@ -109,7 +118,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     @Override
-    public void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> documentEvents,
+    public void markDocumentEventsProcessedOrFailed(
+            Collection<? extends DocumentEvent> documentEvents,
             Collection<FailedDocumentEvent> failures) throws LightblueException {
         List<DocumentEventEntity> processed = documentEvents.stream()
                 .map(LightblueDocumentEventRepository::asEntity)
@@ -132,8 +142,13 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         markDocumentEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(processed));
         markDocumentEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(failed));
 
+        if (markDocumentEvents.getRequests().isEmpty()) {
+            return;
+        }
+
         // TODO: What if some of these fail?
         // Documents are published, so not world ending, but important.
+        // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markDocumentEvents);
     }
 
