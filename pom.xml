@@ -46,6 +46,8 @@
         <version.maven-compiler-plugin>3.3</version.maven-compiler-plugin>
         <version.maven-surefire-plugin>2.19</version.maven-surefire-plugin>
         <version.jdk>1.8</version.jdk>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencyManagement>
