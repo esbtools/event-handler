@@ -56,13 +56,10 @@
             <!-- Camel and friends -->
             <dependency>
                 <groupId>org.apache.camel</groupId>
-                <artifactId>camel-core</artifactId>
+                <artifactId>camel-parent</artifactId>
                 <version>${version.camel}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-jms</artifactId>
-                <version>${version.camel}</version>
+                <scope>import</scope>
+                <type>pom</type>
             </dependency>
             <dependency>
                 <groupId>org.apache.activemq</groupId>
@@ -73,27 +70,6 @@
                 <groupId>org.apache.activemq</groupId>
                 <artifactId>activemq-pool</artifactId>
                 <version>${version.activemq}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-http4</artifactId>
-                <version>${version.camel}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-cdi</artifactId>
-                <version>${version.camel}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-jaxb</artifactId>
-                <version>${version.camel}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.camel</groupId>
-                <artifactId>camel-test</artifactId>
-                <version>${version.camel}</version>
-                <scope>test</scope>
             </dependency>
 
             <!-- Libraries: not implementation specific -->
