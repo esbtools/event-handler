@@ -19,15 +19,15 @@
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
-import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.DocumentEventRepository;
+import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 

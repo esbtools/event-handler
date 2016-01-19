@@ -35,7 +35,7 @@
         <version.lightblue-notification-hook-model>0.1.0-SNAPSHOT</version.lightblue-notification-hook-model>
         <version.lightblue-java-generator-api>0.1.1-SNAPSHOT</version.lightblue-java-generator-api>
         <version.lightblue-java-generator>0.1.0-SNAPSHOT</version.lightblue-java-generator>
-        <version.lightblue-client>2.2.0-SNAPSHOT</version.lightblue-client>
+        <version.lightblue-client>3.0.0</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
     </properties>
 
@@ -55,11 +55,6 @@
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
                 <version>${version.jackson}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.redhat.lightblue</groupId>
-                <artifactId>lightblue-core-util</artifactId>
-                <version>1.10.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

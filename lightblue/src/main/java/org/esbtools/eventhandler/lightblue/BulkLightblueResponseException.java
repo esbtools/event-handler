@@ -21,13 +21,36 @@ package org.esbtools.eventhandler.lightblue;
 import com.redhat.lightblue.client.model.Error;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 /**
  * Accumulates lightblue {@link Error errors} for a given batch of requests to a single exception.
  */
 public class BulkLightblueResponseException extends RuntimeException {
+    private final Collection<Error> errors;
+
     public BulkLightblueResponseException(Collection<Error> errors) {
         super(errors.stream()
-                .reduce("", (string, error) -> string + ", [" + error + "]", String::concat));
+                .map(BulkLightblueResponseException::toString)
+                .collect(Collectors.toList())
+                .toString());
+
+        this.errors = errors;
+    }
+
+    public Collection<Error> errors() {
+        return Collections.unmodifiableCollection(errors);
+    }
+
+    /**
+     * The things you do when you don't have a toString() to work with...
+     */
+    private static String toString(Error error) {
+        return "{" +
+                "code: \"" + error.getErrorCode() + "\", " +
+                "context: \"" + error.getContext() + "\", " +
+                "message: \"" + error.getMsg() + "\"" +
+                "}";
     }
 }
