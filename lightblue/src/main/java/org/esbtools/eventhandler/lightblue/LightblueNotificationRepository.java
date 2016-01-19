@@ -61,7 +61,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
     public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
             throws LightblueException {
         try {
-            blockUntilLockAcquired(Locks.forNotificationsForEntities(entities));
+            blockUntilLockAcquired(ResourceIds.forNotificationsForEntities(entities));
 
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
@@ -101,7 +101,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                     })
                     .collect(Collectors.toList());
         } finally {
-            locking.release(Locks.forNotificationsForEntities(entities));
+            locking.release(ResourceIds.forNotificationsForEntities(entities));
         }
     }
 

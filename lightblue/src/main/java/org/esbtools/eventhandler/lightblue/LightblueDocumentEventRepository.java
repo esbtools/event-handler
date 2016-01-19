@@ -20,7 +20,6 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
@@ -33,6 +32,7 @@ import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import javax.annotation.Nullable;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,20 +60,21 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * or superseded), should be put back in the document event entity pool to be processed later.
      */
     private final int documentEventBatchSize;
-    private final Locking locking;
+    private final AutoLocker locker;
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
-    private final Clock clock;
+    private final Clock clock;;
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
             int documentEventBatchSize, String lockingDomain,
-            Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
+            Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType,
+            Duration lockRefresh, Clock clock) {
         this.lightblue = lightblue;
         this.entities = canonicalTypes;
         this.documentEventBatchSize = documentEventBatchSize;
         this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
 
-        locking = lightblue.getLocking(lockingDomain);
+        locker = new AutoLocker(lightblue.getLocking(lockingDomain), Duration.ofSeconds(3));
     }
 
     @Override
@@ -92,10 +93,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
-            throws LightblueException {
-        try {
-            blockUntilLockAcquired(Locks.forDocumentEventsForEntities(entities));
-
+            throws Exception {
+        try (LightblueLock lock = locker.blockUntilAcquiredPingingEvery(
+                Duration.ofSeconds(5), ResourceIds.forDocumentEventsForEntities(entities))) {
             DocumentEventEntity[] documentEventEntities = lightblue
                     .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
@@ -110,11 +110,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             List<LightblueDocumentEvent> optimized = parseAndOptimizeDocumentEventEntitiesUpTo(
                     maxEvents, documentEventEntities, entitiesToUpdate, requester);
 
-            persistNewEntitiesAndStatusUpdatesToExisting(entitiesToUpdate, optimized);
+            persistNewEntitiesAndStatusUpdatesToExisting(entitiesToUpdate, optimized, lock);
 
             return optimized;
-        } finally {
-            locking.release(Locks.forDocumentEventsForEntities(entities));
         }
     }
 
@@ -151,18 +149,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         // Documents are published, so not world ending, but important.
         // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markDocumentEvents);
-    }
-
-    private void blockUntilLockAcquired(String resourceId) throws LightblueException {
-        while (!locking.acquire(resourceId)) {
-            try {
-                // TODO: Parameterize lock polling interval
-                // Or can we do lock call that only returns once lock is available?
-                Thread.sleep(3000L);
-            } catch (InterruptedException e) {
-                // Just try again...
-            }
-        }
     }
 
     /**
@@ -287,7 +273,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      */
     private void persistNewEntitiesAndStatusUpdatesToExisting(
             List<DocumentEventEntity> entitiesToUpdate,
-            List<LightblueDocumentEvent> maybeNewEvents) throws LightblueException {
+            List<LightblueDocumentEvent> maybeNewEvents,
+            LightblueLock requiredLock) throws Exception {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
         List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 
@@ -301,6 +288,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
+
+        if (!requiredLock.ping()) {
+            throw new LostLockException(requiredLock, "Will not process found document events.");
+        }
 
         // TODO: Verify these were all successful
         LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);
