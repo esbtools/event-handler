@@ -25,9 +25,9 @@ import com.redhat.lightblue.client.model.Error;
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
+import com.redhat.lightblue.client.response.LightblueBulkResponseException;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
-import com.redhat.lightblue.client.response.LightblueResponse;
 
 import org.esbtools.eventhandler.ResponsesHandler;
 
@@ -95,9 +95,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         try {
-            // TODO: Update once client bug fixed
-            // https://github.com/lightblue-platform/lightblue-client/issues/202
-            LightblueBulkDataResponse bulkResponse = lightblue.bulkData(bulkRequest);
+            LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
             for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
                 LazyFuture lazyFuture = lazyFutureToRequests.getKey();
@@ -112,17 +110,20 @@ public class BulkLightblueRequester implements LightblueRequester {
                         LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
 
                         DataError[] dataErrors = errorResponse.getDataErrors();
+                        Error[] lightblueErrors = errorResponse.getLightblueErrors();
 
                         if (dataErrors != null) {
                             for (DataError dataError : dataErrors) {
                                 errors.addAll(dataError.getErrors());
                             }
+                        }
 
-                            Collections.addAll(errors, errorResponse.getLightblueErrors());
+                        if (lightblueErrors != null) {
+                            Collections.addAll(errors, lightblueErrors);
                         }
                     }
 
-                        responseMap.put(request, response);
+                    responseMap.put(request, response);
                 }
 
                 if (errors.isEmpty()) {
@@ -136,6 +137,21 @@ public class BulkLightblueRequester implements LightblueRequester {
                 LazyFuture lazyFuture = lazyFutureToRequests.getKey();
                 lazyFuture.completeExceptionally(e);
             }
+        }
+    }
+
+    /**
+     * Swallows exceptions related to errors in individual requests on purpose. The returned
+     * bulk response object may have failed responses.
+     *
+     * @throws LightblueException if something else went wrong, in which case there is no usable
+     *                            response at all.
+     */
+    private LightblueBulkDataResponse tryBulkRequest(DataBulkRequest bulkRequest) throws LightblueException {
+        try {
+            return lightblue.bulkData(bulkRequest);
+        } catch (LightblueBulkResponseException e) {
+            return e.getBulkResponse();
         }
     }
 

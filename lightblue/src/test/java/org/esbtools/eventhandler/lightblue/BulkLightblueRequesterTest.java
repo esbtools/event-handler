@@ -139,8 +139,53 @@ public class BulkLightblueRequesterTest {
         assertEquals("aw3som3cod3r", shouldBeCoder.getUsername());
     }
 
-    // TODO: Test error scenarios once lightblue bulk response error handling is fixed
-    // See: https://github.com/lightblue-platform/lightblue-client/issues/202
+    @Test
+    public void shouldCompleteFutureWithAllErrorsInFutureExceptionIfFailed() throws Exception {
+        DataFindRequest badFindTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        badFindTester.where(Query.withValue("badField", Query.BinOp.eq, "cooltester2000"));
+        badFindTester.select(Projection.includeFieldRecursively("*"));
+
+        DataFindRequest badFindCoder = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        badFindCoder.where(Query.withValue("badField", Query.BinOp.eq, "aw3som3cod3r"));
+        badFindCoder.select(Projection.includeFieldRecursively("*"));
+
+        Future<String> future = requester.request(badFindCoder, badFindTester)
+                .then((responses -> "should not get here"));
+
+        try {
+            future.get();
+        } catch (ExecutionException e) {
+            assertThat(e.getCause()).isInstanceOf(BulkLightblueResponseException.class);
+
+            BulkLightblueResponseException cause = (BulkLightblueResponseException) e.getCause();
+
+            assertThat(cause.errors()).hasSize(2);
+        }
+    }
+
+    @Test
+    public void shouldOnlyFailFuturesWhichHaveFailedResponses() throws Exception {
+        insertUser("cooltester2000");
+
+        DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
+        findTester.select(Projection.includeFieldRecursively("*"));
+
+        DataFindRequest badRequest = new DataFindRequest("badRequest");
+        badRequest.select(Projection.includeFieldRecursively("*"));
+        badRequest.where(Query.withValue("foo", Query.BinOp.eq, "bar"));
+
+        Future<String> shouldFail = requester.request(badRequest).then(responses -> "fail");
+        Future<TestUser> shouldSucceed = requester.request(findTester).then(responses -> {
+            return responses.forRequest(findTester).parseProcessed(TestUser.class);
+        });
+
+        assertThat(shouldSucceed.get().getUsername()).isEqualTo("cooltester2000");
+
+        expectedException.expect(ExecutionException.class);
+
+        shouldFail.get();
+    }
 
     private void insertUser(String username) throws LightblueException {
         DataInsertRequest insertRequest = new DataInsertRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
