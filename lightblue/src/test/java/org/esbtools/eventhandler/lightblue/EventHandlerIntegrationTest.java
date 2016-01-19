@@ -19,9 +19,9 @@
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
-import com.redhat.lightblue.client.response.LightblueException;
 
 import com.jayway.awaitility.Awaitility;
 import org.apache.camel.EndpointInject;

@@ -19,6 +19,7 @@
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.model.DataError;
 import com.redhat.lightblue.client.model.Error;
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
@@ -26,7 +27,6 @@ import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
-import com.redhat.lightblue.client.response.LightblueException;
 import com.redhat.lightblue.client.response.LightblueResponse;
 
 import org.esbtools.eventhandler.ResponsesHandler;
@@ -106,7 +106,7 @@ public class BulkLightblueRequester implements LightblueRequester {
                 List<Error> errors = new ArrayList<>();
 
                 for (AbstractLightblueDataRequest request : requests) {
-                    LightblueResponse response = bulkResponse.getResponse(request);
+                    LightblueDataResponse response = bulkResponse.getResponse(request);
 
                     if (response instanceof LightblueErrorResponse) {
                         LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
@@ -122,9 +122,7 @@ public class BulkLightblueRequester implements LightblueRequester {
                         }
                     }
 
-                    if (response instanceof LightblueDataResponse) {
-                        responseMap.put(request, (LightblueDataResponse) response);
-                    }
+                        responseMap.put(request, response);
                 }
 
                 if (errors.isEmpty()) {

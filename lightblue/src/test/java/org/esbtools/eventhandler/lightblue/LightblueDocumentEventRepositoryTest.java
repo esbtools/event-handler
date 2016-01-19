@@ -23,12 +23,12 @@ import static org.junit.Assert.assertEquals;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueClientConfiguration;
+import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Projection;
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
-import com.redhat.lightblue.client.response.LightblueException;
 
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
