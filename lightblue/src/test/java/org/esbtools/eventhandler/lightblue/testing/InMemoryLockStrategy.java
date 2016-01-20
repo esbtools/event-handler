@@ -24,6 +24,7 @@ import org.esbtools.eventhandler.lightblue.LostLockException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +36,7 @@ public class InMemoryLockStrategy implements LockStrategy {
             Collections.synchronizedMap(new HashMap<>());
 
     private final String clientId;
-    private final List<String> acquiredResources = new ArrayList<>();
+    private final List<String> acquiredResources = Collections.synchronizedList(new ArrayList<>());
 
     public InMemoryLockStrategy() {
         this(UUID.randomUUID().toString());
@@ -51,13 +52,20 @@ public class InMemoryLockStrategy implements LockStrategy {
             try {
                 acquireAll(resourceIds);
             } catch (IllegalStateException e) {
-                acquiredResources.forEach(resourcesToClients::remove);
+                releaseAll();
                 Thread.sleep(500);
                 continue;
             }
 
-            return new InMemoryLockedResource();
+            return new InMemoryLockedResource(resourceIds);
         }
+    }
+
+    public void releaseAll() {
+        List<String> currentlyAcquired = new ArrayList<>(acquiredResources);
+        currentlyAcquired.forEach(resourcesToClients::remove);
+        acquiredResources.removeAll(currentlyAcquired);
+
     }
 
     private void acquireAll(String[] resourceIds) throws InterruptedException {
@@ -73,14 +81,23 @@ public class InMemoryLockStrategy implements LockStrategy {
     }
 
     private class InMemoryLockedResource implements LockedResource {
+        private final List<String> resourceIds;
+
+        public InMemoryLockedResource(String... resourceIds) {
+            this.resourceIds = Arrays.asList(resourceIds);
+        }
+
         @Override
         public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
-            // Lock is never lost
+            if (!acquiredResources.containsAll(resourceIds)) {
+                throw new LostLockException(this, lostLockMessage);
+            }
         }
 
         @Override
         public void close() throws IOException {
-            acquiredResources.forEach(resourcesToClients::remove);
+            resourceIds.forEach(resourcesToClients::remove);
+            acquiredResources.removeAll(resourceIds);
         }
     }
 }
