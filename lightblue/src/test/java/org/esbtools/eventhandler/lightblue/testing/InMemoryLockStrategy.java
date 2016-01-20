@@ -61,7 +61,7 @@ public class InMemoryLockStrategy implements LockStrategy {
             if (allowLockButImmediateLoseIt) {
                 releaseAll();
             }
-            
+
             return new InMemoryLockedResource(resourceIds);
         }
     }

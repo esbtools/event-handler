@@ -178,16 +178,22 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
-                thread1Client, new String[]{"String"}, 100, new InMemoryLockStrategy(),
+                thread1Client, new String[]{"String"}, 50, new InMemoryLockStrategy(),
                 documentEventFactoriesByType, fixedClock);
         LightblueDocumentEventRepository thread2Repository = new LightblueDocumentEventRepository(
-                thread2Client, new String[]{"String"}, 100, new InMemoryLockStrategy(),
+                thread2Client, new String[]{"String"}, 50, new InMemoryLockStrategy(),
                 documentEventFactoriesByType, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
-            insertDocumentEventEntities(randomNewDocumentEventEntities(100));
+            DocumentEventEntity[] entities = randomNewDocumentEventEntities(20);
+
+            List<String> expectedValues = Arrays.stream(entities)
+                    .map(e -> e.getParameterByKey("value"))
+                    .collect(Collectors.toList());
+
+            insertDocumentEventEntities(entities);
 
             CountDownLatch bothThreadsStarted = new CountDownLatch(2);
 
@@ -196,15 +202,16 @@ public class LightblueDocumentEventRepositoryTest {
 
             Future<List<LightblueDocumentEvent>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread1Repository.retrievePriorityDocumentEventsUpTo(100);
+                return thread1Repository.retrievePriorityDocumentEventsUpTo(15);
             });
             Future<List<LightblueDocumentEvent>> futureThread2Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread2Repository.retrievePriorityDocumentEventsUpTo(100);
+                return thread2Repository.retrievePriorityDocumentEventsUpTo(15);
             });
 
             bothThreadsStarted.await();
 
+            // This sleep is a bit hacky but, testing concurrency is hard...
             Thread.sleep(5000);
 
             thread2Client.unpause();
@@ -213,14 +220,17 @@ public class LightblueDocumentEventRepositoryTest {
             List<LightblueDocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
             List<LightblueDocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
 
-            if (thread1Events.isEmpty()) {
-                assertEquals("Either both threads got events, or some events weren't retrieved.",
-                        100, thread2Events.size());
-            } else {
-                assertEquals("Either both threads got events, or some events weren't retrieved.",
-                        100, thread1Events.size());
-                assertEquals("Both threads got events!", 0, thread2Events.size());
-            }
+            List<String> retrievedValues = new ArrayList<>();
+
+            retrievedValues.addAll(thread1Events.stream()
+                    .map(e -> e.wrappedDocumentEventEntity().getParameterByKey("value"))
+                    .collect(Collectors.toList()));
+
+            retrievedValues.addAll(thread2Events.stream()
+                    .map(e -> e.wrappedDocumentEventEntity().getParameterByKey("value"))
+                    .collect(Collectors.toList()));
+
+            assertThat(retrievedValues).containsExactlyElementsIn(expectedValues);
         } finally {
             executor.shutdown();
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -386,7 +396,7 @@ public class LightblueDocumentEventRepositoryTest {
             throws Exception {
         // 4 which are not able to be merged, and 7 which can be.
         // Batch size should be 10, so one of these will remain unprocessed.
-        insertDocumentEventEntities(
+        insertDocumentEventEntitiesInOrder(
                 newMultiStringDocumentEventEntity("should merge 1"),
                 newStringDocumentEventEntity("1"),
                 newMultiStringDocumentEventEntity("should merge 2"),
@@ -578,7 +588,7 @@ public class LightblueDocumentEventRepositoryTest {
         DocumentEventEntity[] entities = new DocumentEventEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = newStringDocumentEventEntity(UUID.randomUUID().toString());
+            entities[i] = newStringDocumentEventEntity(Integer.toString(i));
         }
 
         return entities;
@@ -587,6 +597,21 @@ public class LightblueDocumentEventRepositoryTest {
     private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
         DataInsertRequest insertEntities = new DataInsertRequest(
                 DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+        insertEntities.create(entities);
+        client.data(insertEntities);
+    }
+
+    /** Orders the entities by priority */
+    private void insertDocumentEventEntitiesInOrder(DocumentEventEntity... entities) throws LightblueException {
+        DataInsertRequest insertEntities = new DataInsertRequest(
+                DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+
+        int startPriority = 50;
+
+        for (DocumentEventEntity entity : entities) {
+            entity.setPriority(startPriority--);
+        }
+
         insertEntities.create(entities);
         client.data(insertEntities);
     }
