@@ -22,15 +22,14 @@ import java.io.Closeable;
 
 public interface LockedResource extends Closeable {
     /**
-     * Checks if the lock is still acquired.
+     * Checks if the lock is still acquired or throws a {@link LostLockException}.
      *
-     * <p>Otherwise, throws {@link LostLockException}, which you should catch if you need to perform
-     * any clean up around losing the lock. The thrown exception will include the provided
-     * {@code lostLockMessage} which should explain what will happen as a result of the lock being
-     * lost.
+     * <p>You should catch the {@code LostLockException} if you need to perform any clean up around
+     * losing the lock. The thrown exception will include the provided {@code lostLockMessage} which
+     * should explain what will happen as a result of the lock being lost.
      *
-     * <p>If the ping fails for another reason, a {@link LostLockException} is also thrown, with the
-     * underlying failure as its cause.
+     * <p>If the ping fails for another reason, we pessimistically assume the lock was lost, so
+     * a {@link LostLockException} is also thrown, with the underlying failure as its cause.
      */
-    void ping(String lostLockMessage) throws LostLockException;
+    void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException;
 }

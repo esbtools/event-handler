@@ -286,7 +286,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
         insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
 
-        requiredLock.ping("Will not process found document events.");
+        requiredLock.ensureAcquiredOrThrow("Will not process found document events.");
 
         // TODO: Verify these were all successful
         LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);

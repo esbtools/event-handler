@@ -87,7 +87,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
-        public void ping(String lostLockMessage) throws LostLockException {
+        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
             try {
                 if (!locking.ping(callerId, resourceId)) {
                     throw new LostLockException(this, lostLockMessage);
@@ -172,12 +172,12 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
-        public void ping(String lostLockMessage) throws LostLockException {
+        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
             List<LostLockException> lostLockExceptions = new ArrayList<>(0);
 
             for (LockedResource lock : locks) {
                 try {
-                    lock.ping(lostLockMessage);
+                    lock.ensureAcquiredOrThrow(lostLockMessage);
                 } catch (LostLockException e) {
                     lostLockExceptions.add(e);
                 }

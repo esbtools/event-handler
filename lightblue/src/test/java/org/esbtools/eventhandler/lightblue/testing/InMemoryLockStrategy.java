@@ -74,7 +74,7 @@ public class InMemoryLockStrategy implements LockStrategy {
 
     private class InMemoryLockedResource implements LockedResource {
         @Override
-        public void ping(String lostLockMessage) throws LostLockException {
+        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
             // Lock is never lost
         }
 
