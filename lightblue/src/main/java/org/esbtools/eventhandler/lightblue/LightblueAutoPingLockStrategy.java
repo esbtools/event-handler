@@ -79,17 +79,11 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                 throw new LockNotAvailableException(callerId, resourceId);
             }
 
-            this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(() -> {
-                try {
-                    if (!locking.ping(callerId, resourceId)) {
-                        throw new RuntimeException(
-                                new LostLockException(this, "Lost lock. Will stop pinging."));
-                    }
-                } catch (LightblueException e) {
-                    logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>",
-                            callerId, resourceId, e);
-                }
-            }, autoPingInterval.toMillis(), autoPingInterval.toMillis(), TimeUnit.MILLISECONDS);
+            this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
+                    new PingTask(this),
+                    /* initial delay*/ autoPingInterval.toMillis(),
+                    /* delay */ autoPingInterval.toMillis(),
+                    TimeUnit.MILLISECONDS);
         }
 
         @Override
@@ -113,6 +107,35 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
             } catch (LightblueException e) {
                 throw new IOException("Unable to release lock. callerId: " + callerId +
                         ", resourceId: " + resourceId, e);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "AutoPingingLock{" +
+                    "resourceId='" + resourceId + '\'' +
+                    ", callerId='" + callerId + '\'' +
+                    ", lockingDomain='" + locking.getDomain() + '\'' +
+                    '}';
+        }
+
+        static class PingTask implements Runnable {
+            final AutoPingingLock lock;
+
+            PingTask(AutoPingingLock lock) {
+                this.lock = lock;
+            }
+
+            @Override
+            public void run() {
+                try {
+                    if (!lock.locking.ping(lock.callerId, lock.resourceId)) {
+                        throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
+                    }
+                } catch (LightblueException e) {
+                    logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>",
+                            lock.callerId, lock.resourceId, e);
+                }
             }
         }
     }
@@ -188,6 +211,13 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
                 throw new MultipleIOExceptions(exceptions);
             }
+        }
+
+        @Override
+        public String toString() {
+            return "AggregateAutoPingingLock{" +
+                    "locks=" + locks +
+                    '}';
         }
 
         final static class MultipleIOExceptions extends IOException {
