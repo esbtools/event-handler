@@ -93,8 +93,15 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
-        public boolean ping() throws LightblueException {
-            return locking.ping(callerId, resourceId);
+        public void ping(String lostLockMessage) throws LostLockException {
+            try {
+                if (!locking.ping(callerId, resourceId)) {
+                    throw new LostLockException(this, lostLockMessage);
+                }
+            } catch (LightblueException e) {
+                throw new LostLockException(this, "Failed to ping lock, assuming lost. " +
+                        lostLockMessage, e);
+            }
         }
 
         @Override
@@ -142,29 +149,24 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
-        public boolean ping() throws Exception {
-            List<Exception> exceptions = new ArrayList<>(0);
-            boolean allLocksStillValid = true;
+        public void ping(String lostLockMessage) throws LostLockException {
+            List<LostLockException> lostLockExceptions = new ArrayList<>(0);
 
             for (LockedResource lock : locks) {
                 try {
-                    if (!lock.ping()) {
-                        allLocksStillValid = false;
-                    }
-                } catch (Exception e) {
-                    exceptions.add(e);
+                    lock.ping(lostLockMessage);
+                } catch (LostLockException e) {
+                    lostLockExceptions.add(e);
                 }
             }
 
-            if (!exceptions.isEmpty()) {
-                if (exceptions.size() == 1) {
-                    throw exceptions.get(0);
+            if (!lostLockExceptions.isEmpty()) {
+                if (lostLockExceptions.size() == 1) {
+                    throw lostLockExceptions.get(0);
                 }
 
-                throw new MultipleExceptions(exceptions);
+                throw new LostLockException(lostLockExceptions);
             }
-
-            return allLocksStillValid;
         }
 
         @Override
@@ -185,14 +187,6 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                 }
 
                 throw new MultipleIOExceptions(exceptions);
-            }
-        }
-
-        final static class MultipleExceptions extends Exception {
-            MultipleExceptions(List<Exception> exceptions) {
-                super("Multiple Exceptions occurred. See suppressed exceptions.");
-
-                exceptions.forEach(this::addSuppressed);
             }
         }
 

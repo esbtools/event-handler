@@ -18,12 +18,21 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import java.util.List;
+
 public class LostLockException extends Exception {
-    private final LockedResource lock;
 
     public LostLockException(LockedResource lock, String message) {
         super(message + " [Lock: " + lock + "]");
+    }
 
-        this.lock = lock;
+    public LostLockException(LockedResource lock, String message, Exception cause) {
+        super(message + " [Lock: " + lock + "]", cause);
+    }
+
+    public LostLockException(List<LostLockException> lostLocks) {
+        super();
+
+        lostLocks.forEach(this::addSuppressed);
     }
 }

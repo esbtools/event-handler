@@ -20,6 +20,7 @@ package org.esbtools.eventhandler.lightblue.testing;
 
 import org.esbtools.eventhandler.lightblue.LockStrategy;
 import org.esbtools.eventhandler.lightblue.LockedResource;
+import org.esbtools.eventhandler.lightblue.LostLockException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -73,8 +74,8 @@ public class InMemoryLockStrategy implements LockStrategy {
 
     private class InMemoryLockedResource implements LockedResource {
         @Override
-        public boolean ping() throws Exception {
-            return true;
+        public void ping(String lostLockMessage) throws LostLockException {
+            // Lock is never lost
         }
 
         @Override

@@ -32,7 +32,6 @@ import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import javax.annotation.Nullable;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -62,7 +61,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final int documentEventBatchSize;
     private final LockStrategy lockStrategy;
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
-    private final Clock clock;;
+    private final Clock clock;
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
             int documentEventBatchSize, LockStrategy lockStrategy,
@@ -287,9 +286,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
         insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
 
-        if (!requiredLock.ping()) {
-            throw new LostLockException(requiredLock, "Will not process found document events.");
-        }
+        requiredLock.ping("Will not process found document events.");
 
         // TODO: Verify these were all successful
         LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);
