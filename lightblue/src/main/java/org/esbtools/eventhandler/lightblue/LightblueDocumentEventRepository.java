@@ -263,9 +263,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * persisted ids.
      *
      * @param entitiesToUpdate List of existing entities which have status updates.
-     * @param maybeNewEvents List of document events which may have yet-to-be-persisted entities. These
-     *                  entities will be persisted and ids retrieved to mutate the events in this
-     *                  list with those ids.
+     * @param maybeNewEvents List of document events which may have yet-to-be-persisted entities.
+     *         these entities will be persisted and ids retrieved to mutate the events in this list
+     *         list with those ids.
      * @throws LightblueException
      */
     private void persistNewEntitiesAndStatusUpdatesToExisting(
