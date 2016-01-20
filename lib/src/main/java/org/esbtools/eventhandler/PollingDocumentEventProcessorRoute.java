@@ -38,7 +38,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final String documentEndpoint;
     private final String failureEndpoint;
 
-    private final static AtomicInteger idCounter = new AtomicInteger(1);
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
             Duration pollingInterval, int batchSize, String documentEndpoint,

@@ -29,12 +29,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
     private final int batchSize;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval,
@@ -48,7 +51,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from("timer:pollForNotifications?period=" + pollingInterval.toMillis())
-        .routeId("notificationProcessor")
+        .routeId("notificationProcessor-" + idCounter.getAndIncrement())
         .process(exchange -> {
             List<? extends Notification> notifications =
                     notificationRepository.retrieveOldestNotificationsUpTo(batchSize);

@@ -31,15 +31,19 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import org.esbtools.eventhandler.FailedNotification;
+import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringNotification;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -51,6 +55,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -70,6 +75,9 @@ public class LightblueNotificationRepositoryTest {
     @ClassRule
     public static LightblueExternalResource lightblueExternalResource =
             new LightblueExternalResource(TestMetadataJson.forEntity(NotificationEntity.class));
+
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
 
     private LightblueClient client;
 
@@ -92,7 +100,7 @@ public class LightblueNotificationRepositoryTest {
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
         repository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                "testLockingDomain", notificationFactoryByEntityName, fixedClock);
+                new InMemoryLockStrategy(), notificationFactoryByEntityName, fixedClock);
     }
 
     @Before
@@ -101,7 +109,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldRetrieveNotificationsForSpecifiedEntities() throws LightblueException {
+    public void shouldRetrieveNotificationsForSpecifiedEntities() throws Exception {
         NotificationEntity notIncludedEntity = new NotificationEntity();
         notIncludedEntity.setEntityName("other");
         notIncludedEntity.setEntityData(Arrays.asList(new NotificationEntity.PathAndValue("foo", null)));
@@ -124,7 +132,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldOnlyRetrieveUnprocessedNotifications() throws LightblueException {
+    public void shouldOnlyRetrieveUnprocessedNotifications() throws Exception {
         NotificationEntity unprocessedEntity = notificationEntityForStringInsert("right");
         NotificationEntity processingEntity = notificationEntityForStringInsert("wrong");
         processingEntity.setStatus(NotificationEntity.Status.processing);
@@ -143,7 +151,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldRetrieveNotificationsOldestFirstUpToRequestedMax() throws LightblueException {
+    public void shouldRetrieveNotificationsOldestFirstUpToRequestedMax() throws Exception {
         NotificationEntity entity1 = notificationEntityForStringInsert("1", fixedClock.instant());
         NotificationEntity entity2 = notificationEntityForStringInsert("2", fixedClock.instant().plus(1, ChronoUnit.MINUTES));
         NotificationEntity entity3 = notificationEntityForStringInsert("3", fixedClock.instant().plus(2, ChronoUnit.MINUTES));
@@ -162,8 +170,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldMarkRetrievedNotificationsAsProcessing()
-            throws LightblueException {
+    public void shouldMarkRetrievedNotificationsAsProcessing() throws Exception {
         insertNotificationEntities(randomNotificationEntities(4));
 
         repository.retrieveOldestNotificationsUpTo(4);
@@ -183,17 +190,23 @@ public class LightblueNotificationRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueNotificationRepository thread1Repository = new LightblueNotificationRepository(
-                thread1Client, new String[]{"String"}, "testLockingDomain",
+                thread1Client, new String[]{"String"}, new InMemoryLockStrategy(),
                 notificationFactoryByEntityName, fixedClock);
 
         LightblueNotificationRepository thread2Repository = new LightblueNotificationRepository(
-                thread1Client, new String[]{"String"}, "testLockingDomain",
+                thread1Client, new String[]{"String"}, new InMemoryLockStrategy(),
                 notificationFactoryByEntityName, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
-            insertNotificationEntities(randomNotificationEntities(100));
+            NotificationEntity[] entities = randomNotificationEntities(20);
+
+            List<String> expectedValues = Arrays.stream(entities)
+                    .map(e -> e.getEntityDataForField("value"))
+                    .collect(Collectors.toList());
+
+            insertNotificationEntities(entities);
 
             CountDownLatch bothThreadsStarted = new CountDownLatch(2);
 
@@ -202,11 +215,11 @@ public class LightblueNotificationRepositoryTest {
 
             Future<List<LightblueNotification>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread1Repository.retrieveOldestNotificationsUpTo(100);
+                return thread1Repository.retrieveOldestNotificationsUpTo(15);
             });
             Future<List<LightblueNotification>> futureThread2Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread2Repository.retrieveOldestNotificationsUpTo(100);
+                return thread2Repository.retrieveOldestNotificationsUpTo(15);
             });
 
             bothThreadsStarted.await();
@@ -219,14 +232,17 @@ public class LightblueNotificationRepositoryTest {
             List<LightblueNotification> thread1Notifications = futureThread1Events.get(5, TimeUnit.SECONDS);
             List<LightblueNotification> thread2Notifications = futureThread2Events.get(5, TimeUnit.SECONDS);
 
-            if (thread1Notifications.isEmpty()) {
-                assertEquals("Either both threads got notifications, or some weren't retrieved.",
-                        100, thread2Notifications.size());
-            } else {
-                assertEquals("Either both threads got notifications, or some weren't retrieved.",
-                        100, thread1Notifications.size());
-                assertEquals("Both threads got notifications!", 0, thread2Notifications.size());
-            }
+            List<String> retrievedValues = new ArrayList<>();
+
+            retrievedValues.addAll(thread1Notifications.stream()
+                    .map(e -> e.wrappedNotificationEntity().getEntityDataForField("value"))
+                    .collect(Collectors.toList()));
+
+            retrievedValues.addAll(thread2Notifications.stream()
+                    .map(e -> e.wrappedNotificationEntity().getEntityDataForField("value"))
+                    .collect(Collectors.toList()));
+
+            assertThat(retrievedValues).containsExactlyElementsIn(expectedValues);
         } finally {
             executor.shutdown();
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -236,7 +252,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldLeaveUnretrievedNotificationsAsUnprocessed() throws LightblueException {
+    public void shouldLeaveUnretrievedNotificationsAsUnprocessed() throws Exception {
         insertNotificationEntities(randomNotificationEntities(10));
 
         List<String> retrievedIds = repository.retrieveOldestNotificationsUpTo(5).stream()
@@ -286,6 +302,41 @@ public class LightblueNotificationRepositoryTest {
         assertThat(foundFailed.get(0).getEntityDataForField("value")).isEqualTo("should fail");
     }
 
+    @Test
+    public void shouldThrowLostLockExceptionIfLockLostBeforeNotificationStatusUpdatesPersisted() throws Exception {
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+        InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        LightblueNotificationRepository repository = new LightblueNotificationRepository(client,
+                new String[]{"String"}, lockStrategy, notificationFactoryByEntityName,
+                Clock.systemUTC());
+
+        slowClient.pauseOnNextRequest();
+
+        insertNotificationEntities(randomNotificationEntities(20));
+
+        try {
+            // Sneakily steal away any acquired locks
+            lockStrategy.allowLockButImmediateLoseIt();
+
+            // We will block this task with the slow client; do it in another thread to avoid blocking
+            // test.
+            Future<?> futureDocEvents = executor.submit(() -> repository.retrieveOldestNotificationsUpTo(10));
+
+            // This will cause processing to continue, which should notice the lock expired...
+            slowClient.unpause();
+
+            // ...throwing an exception.
+            expectedException.expectCause(Matchers.instanceOf(LostLockException.class));
+
+            futureDocEvents.get();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest request = new DataFindRequest(
@@ -324,7 +375,7 @@ public class LightblueNotificationRepositoryTest {
         NotificationEntity[] entities = new NotificationEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = notificationEntityForStringInsert(UUID.randomUUID().toString());
+            entities[i] = notificationEntityForStringInsert(Integer.toString(i));
         }
 
         return entities;

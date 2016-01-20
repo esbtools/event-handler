@@ -42,27 +42,25 @@ import java.util.stream.Collectors;
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
     private final String[] entities;
-    private final Locking locking;
+    private final LockStrategy lockStrategy;
     private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
     public LightblueNotificationRepository(LightblueClient lightblue, String[] entities,
-            String lockingDomain, Map<String, NotificationFactory> notificationFactoryByEntityName,
-            Clock clock) {
+            LockStrategy lockStrategy,
+            Map<String, NotificationFactory> notificationFactoryByEntityName, Clock clock) {
         this.lightblue = lightblue;
         this.entities = entities;
         this.notificationFactoryByEntityName = notificationFactoryByEntityName;
         this.clock = clock;
-
-        locking = lightblue.getLocking(lockingDomain);
+        this.lockStrategy = lockStrategy;
     }
 
     @Override
     public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
-            throws LightblueException {
-        try {
-            blockUntilLockAcquired(ResourceIds.forNotificationsForEntities(entities));
-
+            throws Exception {
+        try (LockedResource lock = lockStrategy
+                .blockUntilAcquired(ResourceIds.forNotificationsForEntities(entities))) {
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
@@ -80,10 +78,14 @@ public class LightblueNotificationRepository implements NotificationRepository {
             DataBulkRequest updateEntities = new DataBulkRequest();
             updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
                     Arrays.asList(notificationEntities)));
+
+            lock.ensureAcquiredOrThrow("Will not process retrieved notifications.");
+
             // If this fails, intentionally let propagate and release lock.
             // Another thread, or another poll, will try again.
             lightblue.bulkData(updateEntities);
 
+            // TODO: This work should be done before status updates so we can populate failures
             return Arrays.stream(notificationEntities)
                     .map(entity -> {
                         String entityName = entity.getEntityName();
@@ -100,8 +102,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         return notificationFactory.getNotificationForEntity(entity, requester);
                     })
                     .collect(Collectors.toList());
-        } finally {
-            locking.release(ResourceIds.forNotificationsForEntities(entities));
         }
     }
 
@@ -138,18 +138,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
         // TODO: Deal with failures
         // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markNotifications);
-    }
-
-    private void blockUntilLockAcquired(String resourceId) throws LightblueException {
-        while (!locking.acquire(resourceId)) {
-            try {
-                // TODO: Parameterize lock polling interval
-                // Or can we do lock call that only returns once lock is available?
-                Thread.sleep(3000L);
-            } catch (InterruptedException e) {
-                // Just try again...
-            }
-        }
     }
 
     private static NotificationEntity asEntity(Notification notification) {

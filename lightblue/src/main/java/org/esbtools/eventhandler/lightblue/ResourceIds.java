@@ -21,8 +21,14 @@ package org.esbtools.eventhandler.lightblue;
 import com.google.common.base.Joiner;
 
 public abstract class ResourceIds {
-    public static String forNotificationsForEntities(String[] entities) {
-        return "notification-" + Joiner.on('-').join(entities);
+    public static String[] forNotificationsForEntities(String[] entities) {
+        String[] resourceIds = new String[entities.length];
+
+        for (int i = 0; i < entities.length; i++) {
+            resourceIds[i] = "notification_" + entities[i];
+        }
+
+        return resourceIds;
     }
 
     public static String[] forDocumentEventsForEntities(String[] entities) {
