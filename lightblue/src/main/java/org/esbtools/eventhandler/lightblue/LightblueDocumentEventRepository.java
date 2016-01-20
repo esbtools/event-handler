@@ -271,7 +271,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private void persistNewEntitiesAndStatusUpdatesToExisting(
             List<DocumentEventEntity> entitiesToUpdate,
             List<LightblueDocumentEvent> maybeNewEvents,
-            LockedResource requiredLock) throws Exception {
+            LockedResource requiredLock) throws LightblueException, LostLockException {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
         List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 

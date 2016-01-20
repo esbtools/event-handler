@@ -37,6 +37,7 @@ public class InMemoryLockStrategy implements LockStrategy {
 
     private final String clientId;
     private final List<String> acquiredResources = Collections.synchronizedList(new ArrayList<>());
+    private boolean allowLockButImmediateLoseIt = false;
 
     public InMemoryLockStrategy() {
         this(UUID.randomUUID().toString());
@@ -57,6 +58,10 @@ public class InMemoryLockStrategy implements LockStrategy {
                 continue;
             }
 
+            if (allowLockButImmediateLoseIt) {
+                releaseAll();
+            }
+            
             return new InMemoryLockedResource(resourceIds);
         }
     }
@@ -78,6 +83,10 @@ public class InMemoryLockStrategy implements LockStrategy {
 
             acquiredResources.add(resourceId);
         }
+    }
+
+    public void allowLockButImmediateLoseIt() {
+        allowLockButImmediateLoseIt = true;
     }
 
     private class InMemoryLockedResource implements LockedResource {

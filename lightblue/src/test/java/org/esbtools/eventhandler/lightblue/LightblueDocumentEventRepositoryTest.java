@@ -39,9 +39,12 @@ import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import javax.annotation.Nullable;
 import java.net.UnknownHostException;
@@ -71,6 +74,9 @@ public class LightblueDocumentEventRepositoryTest {
     public static LightblueExternalResource lightblueExternalResource =
             new LightblueExternalResource(TestMetadataJson.forEntity(DocumentEventEntity.class));
 
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
+
     private LightblueClient client;
 
     private LightblueDocumentEventRepository repository;
@@ -78,7 +84,6 @@ public class LightblueDocumentEventRepositoryTest {
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
-    private static final String LOCKING_DOMAIN = "testLockingDomain";
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
@@ -487,6 +492,41 @@ public class LightblueDocumentEventRepositoryTest {
 
         assertEquals(entity1, publishedEntity);
         assertEquals(entity2, failedEntity);
+    }
+
+    @Test
+    public void shouldThrowLostLockExceptionIfLockLostBeforeDocumentEventStatusUpdatesPersisted() throws Exception {
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+        InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        LightblueDocumentEventRepository repository = new LightblueDocumentEventRepository(client,
+                new String[]{"String"}, 50, lockStrategy, documentEventFactoriesByType,
+                Clock.systemUTC());
+
+        slowClient.pauseOnNextRequest();
+
+        insertDocumentEventEntities(randomNewDocumentEventEntities(20));
+
+        try {
+            // Sneakily steal away any acquired locks
+            lockStrategy.allowLockButImmediateLoseIt();
+
+            // We will block this task with the slow client; do it in another thread to avoid blocking
+            // test.
+            Future<?> futureDocEvents = executor.submit(() -> repository.retrievePriorityDocumentEventsUpTo(10));
+
+            // This will cause processing to continue, which should notice the lock expired...
+            slowClient.unpause();
+
+            // ...throwing an exception.
+            expectedException.expectCause(Matchers.instanceOf(LostLockException.class));
+
+            futureDocEvents.get();
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
