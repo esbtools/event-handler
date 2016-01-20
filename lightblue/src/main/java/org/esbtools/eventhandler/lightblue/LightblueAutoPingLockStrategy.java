@@ -68,7 +68,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         private static final Logger logger = LoggerFactory.getLogger(AutoPingingLock.class);
 
-        public AutoPingingLock(Locking locking, String callerId, String resourceId,
+        AutoPingingLock(Locking locking, String callerId, String resourceId,
                 Duration autoPingInterval, Duration ttl) throws LightblueException,
                 LockNotAvailableException {
             this.callerId = callerId;
@@ -143,7 +143,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
     static final class AggregateAutoPingingLock implements LockedResource {
         private final List<AutoPingingLock> locks;
 
-        public AggregateAutoPingingLock(String callerId, String[] resourceIds, Locking locking,
+        AggregateAutoPingingLock(String callerId, String[] resourceIds, Locking locking,
                 Duration autoPingInterval) throws LightblueException, LockNotAvailableException {
             locks = new ArrayList<>(resourceIds.length);
 
