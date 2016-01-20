@@ -63,7 +63,10 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
 
     LightblueNotificationRepository notificationRepository;
 
-    LightblueDocumentEventRepository documentEventRepository;
+    // Use two configurations to test concurrency.
+    LightblueDocumentEventRepository documentEventRepository1;
+
+    LightblueDocumentEventRepository documentEventRepository2;
 
     LightblueClient client;
 
@@ -92,22 +95,29 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         client = LightblueClients.withJavaTimeSerializationSupport(
                 LightblueClientConfigurations.fromLightblueExternalResource(lightblueExternalResource));
 
-        LightblueAutoPingLockStrategy lockStrategy = new LightblueAutoPingLockStrategy(
+        LightblueAutoPingLockStrategy lockStrategy1 = new LightblueAutoPingLockStrategy(
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+
+        LightblueAutoPingLockStrategy lockStrategy2 = new LightblueAutoPingLockStrategy(
                 client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
 
         notificationRepository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
                 "testLockingDomain", notificationFactoryByEntityName, systemUtc);
-        documentEventRepository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, lockStrategy, documentEventFactoriesByType, systemUtc);
+        documentEventRepository1 = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
+                100, lockStrategy1, documentEventFactoriesByType, systemUtc);
+        documentEventRepository2 = new LightblueDocumentEventRepository(client, new String[]{"String"},
+                100, lockStrategy2, documentEventFactoriesByType, systemUtc);
     }
 
     @Override
     protected RouteBuilder[] createRouteBuilders() throws Exception {
         return new RouteBuilder[] {
-                new PollingNotificationProcessorRoute(notificationRepository, documentEventRepository,
+                new PollingNotificationProcessorRoute(notificationRepository, documentEventRepository1,
                         Duration.ofSeconds(1), 50),
-                new PollingDocumentEventProcessorRoute(documentEventRepository, Duration.ofSeconds(1),
-                        20, "mock:documents", "mock:failures")
+                new PollingDocumentEventProcessorRoute(documentEventRepository1, Duration.ofSeconds(1),
+                        20, "mock:documents", "mock:failures"),
+                new PollingDocumentEventProcessorRoute(documentEventRepository2, Duration.ofSeconds(1),
+                        10, "mock:documents", "mock:failures")
         };
     }
 
