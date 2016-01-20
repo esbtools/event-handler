@@ -18,12 +18,11 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-public class LostLockException extends Exception {
-    private final LockedResource lock;
-
-    public LostLockException(LockedResource lock, String message) {
-        super(message + " [Lock: " + lock + "]");
-
-        this.lock = lock;
-    }
+public interface LockStrategy {
+    /**
+     * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
+     * together, returning an instance representing the acquired lock. Order of provided resources
+     * does not matter.
+     */
+    LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
 }

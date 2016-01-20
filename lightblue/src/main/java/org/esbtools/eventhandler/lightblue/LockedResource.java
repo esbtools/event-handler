@@ -18,12 +18,16 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-public class LostLockException extends Exception {
-    private final LockedResource lock;
+import java.io.Closeable;
 
-    public LostLockException(LockedResource lock, String message) {
-        super(message + " [Lock: " + lock + "]");
-
-        this.lock = lock;
-    }
+public interface LockedResource extends Closeable {
+    /**
+     * Checks if the lock is still acquired, and if so, extends the lock's lifetime (if relevant)
+     * and returns {@code true}.
+     *
+     * <p>Otherwise, returns {@code false}.
+     *
+     * <p>May throw an exception in the event of IO exceptions and the like.
+     */
+    boolean ping() throws Exception;
 }

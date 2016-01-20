@@ -1,3 +1,21 @@
+/*
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
+ *
+ *  This file is part of esbtools.
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueException;
@@ -16,17 +34,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class AutoLocker implements LockStrategy {
+public class LightblueAutoPingLockStrategy implements LockStrategy {
     private final Locking locking;
     private final Duration tryAcquireInterval;
+    private final Duration autoPingInterval;
 
-    public AutoLocker(Locking locking, Duration tryAcquireInterval) {
+    public LightblueAutoPingLockStrategy(Locking locking, Duration tryAcquireInterval,
+            Duration autoPingInterval) {
         this.locking = locking;
         this.tryAcquireInterval = tryAcquireInterval;
+        this.autoPingInterval = autoPingInterval;
     }
 
-    public LightblueLock blockUntilAcquiredPingingEvery(Duration autoPingInterval,
-            String... resourceIds) throws InterruptedException {
+    @Override
+    public LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException {
         while (true) {
             try {
                 return new AggregateAutoPingingLock(locking.getCallerId(), resourceIds, locking,
@@ -37,7 +58,7 @@ public class AutoLocker implements LockStrategy {
         }
     }
 
-    static final class AutoPingingLock implements LightblueLock {
+    static final class AutoPingingLock implements LockedResource {
         private final String callerId;
         private final String resourceId;
         private final Locking locking;
@@ -89,10 +110,8 @@ public class AutoLocker implements LockStrategy {
         }
     }
 
-    static final class AggregateAutoPingingLock implements LightblueLock {
+    static final class AggregateAutoPingingLock implements LockedResource {
         private final List<AutoPingingLock> locks;
-
-        private static final Logger logger = LoggerFactory.getLogger(AggregateAutoPingingLock.class);
 
         public AggregateAutoPingingLock(String callerId, String[] resourceIds, Locking locking,
                 Duration autoPingInterval) throws LightblueException, LockNotAvailableException {
@@ -112,6 +131,8 @@ public class AutoLocker implements LockStrategy {
                 try {
                     close();
                 } catch (IOException io) {
+                    io.addSuppressed(e);
+
                     throw new LightblueException("Caught IOException trying to release locks. " +
                             "Unreleased locks should expire in " + ttl, io);
                 }
@@ -121,19 +142,26 @@ public class AutoLocker implements LockStrategy {
         }
 
         @Override
-        public boolean ping() {
+        public boolean ping() throws Exception {
+            List<Exception> exceptions = new ArrayList<>(0);
             boolean allLocksStillValid = true;
 
-            for (LightblueLock lock : locks) {
+            for (LockedResource lock : locks) {
                 try {
                     if (!lock.ping()) {
                         allLocksStillValid = false;
                     }
-                } catch (LightblueException e) {
-                    logger.error("Failed to ping lock. Pessimistically assuming invalid. " +
-                            "Lock was: {}", lock, e);
-                    allLocksStillValid = false;
+                } catch (Exception e) {
+                    exceptions.add(e);
                 }
+            }
+
+            if (!exceptions.isEmpty()) {
+                if (exceptions.size() == 1) {
+                    throw exceptions.get(0);
+                }
+
+                throw new MultipleExceptions(exceptions);
             }
 
             return allLocksStillValid;
@@ -143,7 +171,7 @@ public class AutoLocker implements LockStrategy {
         public void close() throws IOException {
             List<IOException> exceptions = new ArrayList<>(0);
 
-            for (LightblueLock lock : locks) {
+            for (LockedResource lock : locks) {
                 try {
                     lock.close();
                 } catch (IOException e) {
@@ -160,12 +188,26 @@ public class AutoLocker implements LockStrategy {
             }
         }
 
+        final static class MultipleExceptions extends Exception {
+            MultipleExceptions(List<Exception> exceptions) {
+                super("Multiple Exceptions occurred. See suppressed exceptions.");
+
+                exceptions.forEach(this::addSuppressed);
+            }
+        }
+
         final static class MultipleIOExceptions extends IOException {
             MultipleIOExceptions(List<IOException> exceptions) {
                 super("Multiple IOExceptions occurred. See suppressed exceptions.");
 
                 exceptions.forEach(this::addSuppressed);
             }
+        }
+    }
+
+    static class LockNotAvailableException extends Exception {
+        public LockNotAvailableException(String callerId, String resourceId) {
+            super("callerId: " + callerId + ", resourceId: " + resourceId);
         }
     }
 }

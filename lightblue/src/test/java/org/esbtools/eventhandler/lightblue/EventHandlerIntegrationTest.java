@@ -91,10 +91,14 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     protected void doPreSetup() throws Exception {
         client = LightblueClients.withJavaTimeSerializationSupport(
                 LightblueClientConfigurations.fromLightblueExternalResource(lightblueExternalResource));
+
+        LightblueAutoPingLockStrategy lockStrategy = new LightblueAutoPingLockStrategy(
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+
         notificationRepository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
                 "testLockingDomain", notificationFactoryByEntityName, systemUtc);
         documentEventRepository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, "testLockingDomain", documentEventFactoriesByType, systemUtc);
+                100, lockStrategy, documentEventFactoriesByType, systemUtc);
     }
 
     @Override

@@ -60,21 +60,19 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * or superseded), should be put back in the document event entity pool to be processed later.
      */
     private final int documentEventBatchSize;
-    private final AutoLocker locker;
+    private final LockStrategy lockStrategy;
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;;
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
-            int documentEventBatchSize, String lockingDomain,
-            Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType,
-            Duration lockRefresh, Clock clock) {
+            int documentEventBatchSize, LockStrategy lockStrategy,
+            Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
         this.entities = canonicalTypes;
         this.documentEventBatchSize = documentEventBatchSize;
         this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
-
-        locker = new AutoLocker(lightblue.getLocking(lockingDomain), Duration.ofSeconds(3));
+        this.lockStrategy = lockStrategy;
     }
 
     @Override
@@ -94,8 +92,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
-        try (LightblueLock lock = locker.blockUntilAcquiredPingingEvery(
-                Duration.ofSeconds(5), ResourceIds.forDocumentEventsForEntities(entities))) {
+        try (LockedResource lock = lockStrategy
+                .blockUntilAcquired(ResourceIds.forDocumentEventsForEntities(entities))) {
             DocumentEventEntity[] documentEventEntities = lightblue
                     .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
@@ -274,7 +272,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private void persistNewEntitiesAndStatusUpdatesToExisting(
             List<DocumentEventEntity> entitiesToUpdate,
             List<LightblueDocumentEvent> maybeNewEvents,
-            LightblueLock requiredLock) throws Exception {
+            LockedResource requiredLock) throws Exception {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
         List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 

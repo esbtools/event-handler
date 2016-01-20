@@ -32,6 +32,7 @@ import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
@@ -77,6 +78,7 @@ public class LightblueDocumentEventRepositoryTest {
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
+    private static final String LOCKING_DOMAIN = "testLockingDomain";
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
@@ -94,7 +96,7 @@ public class LightblueDocumentEventRepositoryTest {
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
         repository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                DOCUMENT_EVENT_BATCH_SIZE, "testLockingDomain", documentEventFactoriesByType,
+                DOCUMENT_EVENT_BATCH_SIZE, new InMemoryLockStrategy(), documentEventFactoriesByType,
                 fixedClock);
     }
 
@@ -104,7 +106,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldRetrieveDocumentEventsForSpecifiedEntities() throws LightblueException {
+    public void shouldRetrieveDocumentEventsForSpecifiedEntities() throws Exception {
         DocumentEventEntity stringEvent = newStringDocumentEventEntity("foo");
 
         DocumentEventEntity otherEvent = DocumentEventEntity.newlyCreated("Other", 50,
@@ -124,7 +126,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldMarkRetrievedDocumentEventsAsProcessing() throws LightblueException {
+    public void shouldMarkRetrievedDocumentEventsAsProcessing() throws Exception {
         DocumentEventEntity stringEvent1 = newStringDocumentEventEntity("foo");
         DocumentEventEntity stringEvent2 = newStringDocumentEventEntity("bar");
 
@@ -142,7 +144,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldOnlyRetrieveUnprocessedEvents() throws LightblueException {
+    public void shouldOnlyRetrieveUnprocessedEvents() throws Exception {
         DocumentEventEntity stringEvent = newStringDocumentEventEntity("right");
         DocumentEventEntity processingEvent = newStringDocumentEventEntity("wrong");
         processingEvent.setStatus(DocumentEventEntity.Status.processing);
@@ -171,10 +173,10 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
-                thread1Client, new String[]{"String"}, 100, "testLockingDomain",
+                thread1Client, new String[]{"String"}, 100, new InMemoryLockStrategy(),
                 documentEventFactoriesByType, fixedClock);
         LightblueDocumentEventRepository thread2Repository = new LightblueDocumentEventRepository(
-                thread2Client, new String[]{"String"}, 100, "testLockingDomain",
+                thread2Client, new String[]{"String"}, 100, new InMemoryLockStrategy(),
                 documentEventFactoriesByType, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -223,7 +225,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldRetrieveDocumentEventsInPriorityOrder() throws LightblueException {
+    public void shouldRetrieveDocumentEventsInPriorityOrder() throws Exception {
         insertDocumentEventEntities(
                 newRandomStringDocumentEventEntityWithPriorityOverride(5),
                 newRandomStringDocumentEventEntityWithPriorityOverride(100),
@@ -245,7 +247,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldIgnoreSupersededEventsAndMarkAsSupersededAndTrackVictimIds() throws LightblueException {
+    public void shouldIgnoreSupersededEventsAndMarkAsSupersededAndTrackVictimIds() throws Exception {
         Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
         Instant expectedProcessedDate = ZonedDateTime.now(fixedClock).toInstant();
 
@@ -282,7 +284,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldMergeEventsInBatchAndMarkAsMergedAndTrackVictims() throws LightblueException {
+    public void shouldMergeEventsInBatchAndMarkAsMergedAndTrackVictims() throws Exception {
         insertDocumentEventEntities(
                 newMultiStringDocumentEventEntity("1"),
                 newMultiStringDocumentEventEntity("2"),
@@ -309,7 +311,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldPersistMergerEntitiesAsProcessingAndUpdateRetrievedWithIdIfCreatedDuringRetrieval()
-            throws LightblueException {
+            throws Exception {
         insertDocumentEventEntities(
                 newMultiStringDocumentEventEntity("1"),
                 newMultiStringDocumentEventEntity("2"),
@@ -334,7 +336,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldReturnNoMoreThanMaxEventsDespiteBatchSizeAndLeaveRemainingEventsUnprocessed()
-            throws LightblueException {
+            throws Exception {
         insertDocumentEventEntities(randomNewDocumentEventEntities(5));
 
         List<LightblueDocumentEvent> returnedEvents = repository.retrievePriorityDocumentEventsUpTo(2);
@@ -354,7 +356,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldSearchThroughNoMoreThanBatchSize() throws LightblueException {
+    public void shouldSearchThroughNoMoreThanBatchSize() throws Exception {
         insertDocumentEventEntities(randomNewDocumentEventEntities(DOCUMENT_EVENT_BATCH_SIZE + 1));
 
         List<LightblueDocumentEvent> returnedEvents =
@@ -376,7 +378,7 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldOnlyReturnUpToMaxEventsAskedForButShouldOptimizeAmongUpToBatchSizeEvents()
-            throws LightblueException {
+            throws Exception {
         // 4 which are not able to be merged, and 7 which can be.
         // Batch size should be 10, so one of these will remain unprocessed.
         insertDocumentEventEntities(
