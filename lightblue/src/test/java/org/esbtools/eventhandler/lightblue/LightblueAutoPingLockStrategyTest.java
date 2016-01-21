@@ -91,7 +91,6 @@ public class LightblueAutoPingLockStrategyTest {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-
         });
 
         // Should unblock eventually...
