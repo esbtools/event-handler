@@ -52,6 +52,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final Clock clock;
 
     private final Set<String> supportedTypes;
+    /** Cached to avoid extra garbage. */
+    private final String[] supportedTypesArray;
 
     private static final Logger logger = LoggerFactory.getLogger(LightblueDocumentEventRepository.class);
 
@@ -65,6 +67,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         this.clock = clock;
 
         supportedTypes = documentEventFactoriesByType.keySet();
+        supportedTypesArray = supportedTypes.toArray(new String[supportedTypes.size()]);
     }
 
     @Override
@@ -84,17 +87,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
-        String[] supportedAndEnabled = getSupportedAndEnabledEventTypes();
+        String[] typesToProcess = getSupportedAndEnabledEventTypes();
         int documentEventsBatchSize = config.getDocumentEventsBatchSize();
 
-        if (supportedAndEnabled.length == 0 || documentEventsBatchSize == 0) {
+        if (typesToProcess.length == 0 || documentEventsBatchSize == 0) {
             return Collections.emptyList();
         }
 
         try (LockedResource lock = lockStrategy
-                .blockUntilAcquired(ResourceIds.forDocumentEventsForTypes(supportedAndEnabled))) {
+                .blockUntilAcquired(ResourceIds.forDocumentEventsForTypes(typesToProcess))) {
             DocumentEventEntity[] documentEventEntities = lightblue
-                    .data(FindRequests.priorityDocumentEventsForTypesUpTo(supportedAndEnabled, documentEventsBatchSize))
+                    .data(FindRequests.priorityDocumentEventsForTypesUpTo(typesToProcess, documentEventsBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
 
             if (documentEventEntities.length == 0) {
@@ -111,12 +114,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
             return optimized;
         }
-    }
-
-    private String[] getSupportedAndEnabledEventTypes() {
-        List<String> supportedAndEnabled = new ArrayList<>(supportedTypes);
-        supportedAndEnabled.retainAll(config.getCanonicalTypesToProcess());
-        return supportedAndEnabled.toArray(new String[supportedAndEnabled.size()]);
     }
 
     @Override
@@ -152,6 +149,18 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         // Documents are published, so not world ending, but important.
         // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markDocumentEvents);
+    }
+
+    private String[] getSupportedAndEnabledEventTypes() {
+        Set<String> canonicalTypesToProcess = config.getCanonicalTypesToProcess();
+
+        if (canonicalTypesToProcess.containsAll(supportedTypes)) {
+            return supportedTypesArray;
+        }
+
+        List<String> supportedAndEnabled = new ArrayList<>(supportedTypes);
+        supportedAndEnabled.retainAll(canonicalTypesToProcess);
+        return supportedAndEnabled.toArray(new String[supportedAndEnabled.size()]);
     }
 
     /**

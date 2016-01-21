@@ -103,10 +103,15 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         LightblueAutoPingLockStrategy lockStrategy2 = new LightblueAutoPingLockStrategy(
                 client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
 
-        notificationRepository1 = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                lockStrategy1, notificationFactoryByEntityName, systemUtc);
-        notificationRepository2 = new LightblueNotificationRepository(client, new String[]{"MultiString"},
-                lockStrategy2, notificationFactoryByEntityName, systemUtc);
+        LightblueNotificationRepositoryConfig notificationConfigRepo1 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"));
+        LightblueNotificationRepositoryConfig notificationConfigRepo2 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String"));
+
+        notificationRepository1 = new LightblueNotificationRepository(client, lockStrategy1,
+                notificationConfigRepo1, notificationFactoryByEntityName, systemUtc);
+        notificationRepository2 = new LightblueNotificationRepository(client, lockStrategy2,
+                notificationConfigRepo2, notificationFactoryByEntityName, systemUtc);
 
         LightblueDocumentEventRepositoryConfig configForRepo1 =
                 new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"), 100);

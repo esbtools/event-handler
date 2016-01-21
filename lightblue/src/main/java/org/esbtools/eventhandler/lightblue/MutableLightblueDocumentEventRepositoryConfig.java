@@ -30,17 +30,27 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     private final Set<String> canonicalTypesToProcess = Collections.synchronizedSet(new HashSet<>());
     private final AtomicInteger documentEventsBatchSize = new AtomicInteger(0);
 
+    /**
+     * Uses empty default values, which will configure a repository to never retrieve anything.
+     */
     public MutableLightblueDocumentEventRepositoryConfig() {}
 
+    /**
+     * Uses provided as initial values.
+     */
     public MutableLightblueDocumentEventRepositoryConfig(Collection<String> initialCanonicalTypesToProcess,
             int initialDocumentEventsBatchSize) {
         canonicalTypesToProcess.addAll(initialCanonicalTypesToProcess);
         documentEventsBatchSize.set(initialDocumentEventsBatchSize);
     }
 
+    /**
+     * Returns a new {@code Set} with the current state of the canonical types. Updates to
+     * configured canonical types will not be visible to the returned {@code Set}.
+     */
     @Override
     public Set<String> getCanonicalTypesToProcess() {
-        return Collections.unmodifiableSet(canonicalTypesToProcess);
+        return new HashSet<>(canonicalTypesToProcess);
     }
 
     public MutableLightblueDocumentEventRepositoryConfig setCanonicalTypesToProcess(Collection<String> types) {
