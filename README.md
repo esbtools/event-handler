@@ -1,6 +1,6 @@
 # event-handler
 
-Event in, message out.
+Notification in, document out.
 
 Specifically, this event handler is designed to handle events (in the form of _notifications_ and/or
 _document events_) from one system and produce canonical document messages (per the EIP) to be
