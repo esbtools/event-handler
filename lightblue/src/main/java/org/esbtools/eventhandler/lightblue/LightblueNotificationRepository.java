@@ -66,7 +66,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
+    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxNotifications)
             throws Exception {
         String[] entitiesToProcess = getSupportedAndEnabledEntityNames();
 
@@ -75,7 +75,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxEvents))
+                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxNotifications))
                     .parseProcessed(NotificationEntity[].class);
 
             if (notificationEntities.length == 0) {
