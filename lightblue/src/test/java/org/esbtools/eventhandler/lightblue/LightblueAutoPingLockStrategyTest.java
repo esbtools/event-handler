@@ -20,6 +20,7 @@ package org.esbtools.eventhandler.lightblue;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -76,6 +77,27 @@ public class LightblueAutoPingLockStrategyTest {
         });
 
         InMemoryLocking.releaseAll();
+    }
+
+    @Test(timeout = 4000)
+    public void shouldBlockUntilLockAcquired() throws Exception {
+        client1Locking.acquire("resource1");
+
+        // In another thread, release lock after some delay...
+        executor.submit(() -> {
+            try {
+                Thread.sleep(2000);
+                InMemoryLocking.releaseAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        });
+
+        // Should unblock eventually...
+        lockedResources.add(client2StrategyWith2SecondPing.blockUntilAcquired("resource1"));
+
+        assertFalse(client1Locking.acquire("resource1"));
     }
 
     @Test(expected = TimeoutException.class)
