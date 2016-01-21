@@ -29,29 +29,72 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Uses lightblue's locking APIs with TTL, automatically pinging the lock in the background until it
+ * is released.
+ *
+ * <p>Lightblue locks without TTLs are unsafe. If a client crashes, the lock will not be released.
+ * However, locks with TTLs may expire prematurely. By pinging the lock in a separate thread
+ * periodically, we can substantially lesson the likelihood of unintentionally losing the lock.
+ *
+ * <p>Consumers are expected to check the lock at critical points to ensure it did not expire by
+ * calling {@link LockedResource#ensureAcquiredOrThrow(String)}.
+ */
 public class LightblueAutoPingLockStrategy implements LockStrategy {
     private final Locking locking;
     private final Duration tryAcquireInterval;
     private final Duration autoPingInterval;
+    private final Duration timeToLive;
 
+    /**
+     * Same as {@link #LightblueAutoPingLockStrategy(Locking, Duration, Duration, Duration)}
+     * except the {@code timeToLive} duration defaults to 5 times the {@code autoPingInterval}.
+     */
     public LightblueAutoPingLockStrategy(Locking locking, Duration tryAcquireInterval,
             Duration autoPingInterval) {
+        this(locking, tryAcquireInterval, autoPingInterval, autoPingInterval.multipliedBy(5));
+    }
+
+    /**
+     * Validates {@code timeToLive} is greater than the {@code autoPingInterval}.
+     * @param locking
+     * @param tryAcquireInterval If the asked resources cannot be acquire, will wait this duration
+     *                           before trying again.
+     * @param autoPingInterval Amount of time in between automatic pings of acquired locks.
+     * @param timeToLive Time until locks automatically expire. Should be [much] larger than the
+     *                   {@code autoPingInterval} to ensure locks do not accidentally expire.
+     */
+    public LightblueAutoPingLockStrategy(Locking locking, Duration tryAcquireInterval,
+            Duration autoPingInterval, Duration timeToLive) {
         this.locking = locking;
         this.tryAcquireInterval = tryAcquireInterval;
         this.autoPingInterval = autoPingInterval;
+        this.timeToLive = timeToLive;
+
+        if (timeToLive.compareTo(autoPingInterval) <= 0) {
+            throw new IllegalArgumentException("Time to live should be greater than auto ping " +
+                    "interval, otherwise the lock will likely be lost.");
+        }
     }
 
     @Override
     public LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException {
+        Objects.requireNonNull(resourceIds, "resourceIds");
+
+        if (resourceIds.length == 0) {
+            throw new IllegalArgumentException("Must provide one or more resourceIds.");
+        }
+
         while (true) {
             try {
                 return new AggregateAutoPingingLock(locking.getCallerId(), resourceIds, locking,
-                        autoPingInterval);
+                        autoPingInterval, timeToLive);
             } catch (Exception e) {
                 Thread.sleep(tryAcquireInterval.toMillis());
             }
@@ -144,13 +187,10 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         private final List<AutoPingingLock> locks;
 
         AggregateAutoPingingLock(String callerId, String[] resourceIds, Locking locking,
-                Duration autoPingInterval) throws LightblueException, LockNotAvailableException {
+                Duration autoPingInterval, Duration ttl) throws LightblueException, LockNotAvailableException {
             locks = new ArrayList<>(resourceIds.length);
 
             Arrays.sort(resourceIds, null);
-
-            // TODO: Parameterize ttl x autoping factor?
-            Duration ttl = autoPingInterval.multipliedBy(5);
 
             try {
                 for (String resourceId : resourceIds) {

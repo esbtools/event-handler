@@ -18,21 +18,35 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class LostLockException extends Exception {
+    private final List<LockedResource> lostLocks;
 
     public LostLockException(LockedResource lock, String message) {
         super(message + " [Lock: " + lock + "]");
+
+        this.lostLocks = Collections.singletonList(lock);
     }
 
     public LostLockException(LockedResource lock, String message, Exception cause) {
         super(message + " [Lock: " + lock + "]", cause);
+
+        lostLocks = Collections.singletonList(lock);
     }
 
-    public LostLockException(List<LostLockException> lostLocks) {
+    public LostLockException(List<LostLockException> lostLockExceptions) {
         super();
 
-        lostLocks.forEach(this::addSuppressed);
+        this.lostLocks = Collections.unmodifiableList(lostLockExceptions.stream()
+                .peek(this::addSuppressed)
+                .flatMap(e -> e.lostLocks().stream())
+                .collect(Collectors.toList()));
+    }
+
+    public List<LockedResource> lostLocks() {
+        return lostLocks;
     }
 }

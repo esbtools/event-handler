@@ -18,6 +18,10 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+/**
+ * Abstracts an atomic exclusive locking mechanism which is used to coordinate concurrent work on
+ * logical "resources."
+ */
 public interface LockStrategy {
     /**
      * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
