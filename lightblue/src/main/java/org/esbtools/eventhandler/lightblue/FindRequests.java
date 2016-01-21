@@ -56,13 +56,13 @@ public abstract class FindRequests {
      * {@link org.esbtools.eventhandler.lightblue.model.DocumentEventEntity.Status#unprocessed}
      * document events.
      */
-    public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,
+    public static DataFindRequest priorityDocumentEventsForTypesUpTo(String[] types,
             int maxEvents) {
         DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
 
         findEntities.where(Query.and(
-                Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(entities)),
+                Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(types)),
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed)));
         findEntities.select(Projection.includeFieldRecursively("*"));
         findEntities.sort(Sort.desc("priority"));

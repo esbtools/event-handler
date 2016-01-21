@@ -107,10 +107,16 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
                 lockStrategy1, notificationFactoryByEntityName, systemUtc);
         notificationRepository2 = new LightblueNotificationRepository(client, new String[]{"MultiString"},
                 lockStrategy2, notificationFactoryByEntityName, systemUtc);
-        documentEventRepository1 = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, lockStrategy1, documentEventFactoriesByType, systemUtc);
-        documentEventRepository2 = new LightblueDocumentEventRepository(client, new String[]{"String"},
-                100, lockStrategy2, documentEventFactoriesByType, systemUtc);
+
+        LightblueDocumentEventRepositoryConfig configForRepo1 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"), 100);
+        LightblueDocumentEventRepositoryConfig configForRepo2 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String"), 100);
+
+        documentEventRepository1 = new LightblueDocumentEventRepository(client,
+                lockStrategy1, configForRepo1, documentEventFactoriesByType, systemUtc);
+        documentEventRepository2 = new LightblueDocumentEventRepository(client,
+                lockStrategy2, configForRepo2, documentEventFactoriesByType, systemUtc);
     }
 
     @Override
