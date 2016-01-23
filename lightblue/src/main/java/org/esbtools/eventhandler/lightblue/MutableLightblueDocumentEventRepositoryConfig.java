@@ -65,7 +65,7 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     }
 
     @Override
-    public int getDocumentEventsBatchSize() {
+    public Integer getDocumentEventsBatchSize() {
         return documentEventsBatchSize.get();
     }
 

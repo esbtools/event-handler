@@ -25,6 +25,7 @@ import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.model.EventHandlerConfigEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 public abstract class FindRequests {
@@ -69,5 +70,16 @@ public abstract class FindRequests {
         findEntities.range(0, maxEvents - 1);
 
         return findEntities;
+    }
+
+    public static DataFindRequest eventHandlerConfigForDomain(String configDomain) {
+        DataFindRequest findConfig = new DataFindRequest(
+                EventHandlerConfigEntity.ENTITY_NAME,
+                EventHandlerConfigEntity.ENTITY_VERSION);
+
+        findConfig.where(Query.withValue("domain", Query.BinOp.eq, configDomain));
+        findConfig.select(Projection.includeFieldRecursively("*"));
+
+        return findConfig;
     }
 }

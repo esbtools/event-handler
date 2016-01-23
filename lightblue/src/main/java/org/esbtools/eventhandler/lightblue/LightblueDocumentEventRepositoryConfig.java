@@ -46,5 +46,5 @@ public interface LightblueDocumentEventRepositoryConfig {
      * @see DocumentEvent#couldMergeWith(DocumentEvent)
      * @see DocumentEvent#isSupersededBy(DocumentEvent)
      */
-    int getDocumentEventsBatchSize();
+    Integer getDocumentEventsBatchSize();
 }

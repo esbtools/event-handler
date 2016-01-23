@@ -21,5 +21,8 @@ package org.esbtools.eventhandler.lightblue;
 import java.util.Set;
 
 public interface LightblueNotificationRepositoryConfig {
+    /**
+     * Governs whether or not notifications are processed based on their associated entity's name.
+     */
     Set<String> getEntityNamesToProcess();
 }
