@@ -22,6 +22,8 @@ import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedNotification;
@@ -52,6 +54,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
     /** Cached to avoid extra garbage. */
     private final String[] supportedEntityNamesArray;
 
+    private static final Logger logger = LoggerFactory.getLogger(LightblueNotificationRepository.class);
+
     public LightblueNotificationRepository(LightblueClient lightblue, LockStrategy lockStrategy,
             LightblueNotificationRepositoryConfig config,
             Map<String, NotificationFactory> notificationFactoryByEntityName, Clock clock) {
@@ -69,6 +73,18 @@ public class LightblueNotificationRepository implements NotificationRepository {
     public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxNotifications)
             throws Exception {
         String[] entitiesToProcess = getSupportedAndEnabledEntityNames();
+
+        if (entitiesToProcess.length == 0) {
+            logger.info("Not retrieving any notifications because either there are no enabled " +
+                    "or supported entity names to process. Supported entity names are {}. " +
+                    "Of those, enabled entity names are {}",
+                    supportedEntityNames, Arrays.toString(entitiesToProcess));
+            return Collections.emptyList();
+        }
+
+        if (maxNotifications == 0) {
+            return Collections.emptyList();
+        }
 
         try (LockedResource lock = lockStrategy
                 .blockUntilAcquired(ResourceIds.forNotificationsForEntities(entitiesToProcess))) {
@@ -153,6 +169,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
     private String[] getSupportedAndEnabledEntityNames() {
         Set<String> entityNamesToProcess = config.getEntityNamesToProcess();
+
+        if (entityNamesToProcess == null) {
+            return new String[0];
+        }
 
         if (entityNamesToProcess.containsAll(supportedEntityNames)) {
             return supportedEntityNamesArray;

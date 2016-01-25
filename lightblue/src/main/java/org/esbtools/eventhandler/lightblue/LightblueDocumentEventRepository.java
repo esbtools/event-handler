@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -88,9 +89,19 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
         String[] typesToProcess = getSupportedAndEnabledEventTypes();
-        int documentEventsBatchSize = config.getDocumentEventsBatchSize();
+        Integer documentEventsBatchSize = config.getDocumentEventsBatchSize();
 
-        if (typesToProcess.length == 0 || documentEventsBatchSize == 0) {
+        if (typesToProcess.length == 0 || documentEventsBatchSize == null ||
+                documentEventsBatchSize == 0) {
+            logger.info("Not retrieving any document events because either there are no enabled " +
+                    "or supported types to process or documentEventBatchSize is 0. Supported " +
+                    "types are {}. Of those, enabled types are {}. " +
+                    "Document event batch size is {}.",
+                    supportedTypes, Arrays.toString(typesToProcess), documentEventsBatchSize);
+            return Collections.emptyList();
+        }
+
+        if (maxEvents == 0) {
             return Collections.emptyList();
         }
 
@@ -153,6 +164,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
     private String[] getSupportedAndEnabledEventTypes() {
         Set<String> canonicalTypesToProcess = config.getCanonicalTypesToProcess();
+
+        if (canonicalTypesToProcess == null) {
+            return new String[0];
+        }
 
         if (canonicalTypesToProcess.containsAll(supportedTypes)) {
             return supportedTypesArray;
