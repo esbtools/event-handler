@@ -20,7 +20,6 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
@@ -30,50 +29,46 @@ import org.esbtools.eventhandler.DocumentEventRepository;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepository implements DocumentEventRepository {
     private final LightblueClient lightblue;
-    private final String[] entities;
-
-    /**
-     * The amount of document events to sort through for optimizations at one time.
-     *
-     * <p>This should be much larger than that actual number of events you want to publish at one
-     * time due to optimizations that reduce the actual number of publishable events. For example,
-     * in a batch of 100 events, if 50 of them are redundant or able to be merged, you'll end up
-     * with only 50 discrete events. If you only grabbed 50, you might miss some of those potential
-     * optimizations.
-     *
-     * <p>Events not included to be published among the batch (not including events that were merged
-     * or superseded), should be put back in the document event entity pool to be processed later.
-     */
-    private final int documentEventBatchSize;
-    private final Locking locking;
+    private final LightblueDocumentEventRepositoryConfig config;
+    private final LockStrategy lockStrategy;
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
-    public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
-            int documentEventBatchSize, String lockingDomain,
+    private final Set<String> supportedTypes;
+    /** Cached to avoid extra garbage. */
+    private final String[] supportedTypesArray;
+
+    private static final Logger logger = LoggerFactory.getLogger(LightblueDocumentEventRepository.class);
+
+    public LightblueDocumentEventRepository(LightblueClient lightblue,
+            LockStrategy lockStrategy, LightblueDocumentEventRepositoryConfig config,
             Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
-        this.entities = canonicalTypes;
-        this.documentEventBatchSize = documentEventBatchSize;
+        this.lockStrategy = lockStrategy;
+        this.config = config;
         this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
 
-        locking = lightblue.getLocking(lockingDomain);
+        supportedTypes = documentEventFactoriesByType.keySet();
+        supportedTypesArray = supportedTypes.toArray(new String[supportedTypes.size()]);
     }
 
     @Override
@@ -92,12 +87,28 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
-            throws LightblueException {
-        try {
-            blockUntilLockAcquired(Locks.forDocumentEventsForEntities(entities));
+            throws Exception {
+        String[] typesToProcess = getSupportedAndEnabledEventTypes();
+        Integer documentEventsBatchSize = config.getDocumentEventsBatchSize();
 
+        if (typesToProcess.length == 0 || documentEventsBatchSize == null ||
+                documentEventsBatchSize == 0) {
+            logger.info("Not retrieving any document events because either there are no enabled " +
+                    "or supported types to process or documentEventBatchSize is 0. Supported " +
+                    "types are {}. Of those, enabled types are {}. " +
+                    "Document event batch size is {}.",
+                    supportedTypes, Arrays.toString(typesToProcess), documentEventsBatchSize);
+            return Collections.emptyList();
+        }
+
+        if (maxEvents == 0) {
+            return Collections.emptyList();
+        }
+
+        try (LockedResource lock = lockStrategy
+                .blockUntilAcquired(ResourceIds.forDocumentEventsForTypes(typesToProcess))) {
             DocumentEventEntity[] documentEventEntities = lightblue
-                    .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
+                    .data(FindRequests.priorityDocumentEventsForTypesUpTo(typesToProcess, documentEventsBatchSize))
                     .parseProcessed(DocumentEventEntity[].class);
 
             if (documentEventEntities.length == 0) {
@@ -110,11 +121,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             List<LightblueDocumentEvent> optimized = parseAndOptimizeDocumentEventEntitiesUpTo(
                     maxEvents, documentEventEntities, entitiesToUpdate, requester);
 
-            persistNewEntitiesAndStatusUpdatesToExisting(entitiesToUpdate, optimized);
+            persistNewEntitiesAndStatusUpdatesToExisting(entitiesToUpdate, optimized, lock);
 
             return optimized;
-        } finally {
-            locking.release(Locks.forDocumentEventsForEntities(entities));
         }
     }
 
@@ -153,16 +162,20 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         lightblue.bulkData(markDocumentEvents);
     }
 
-    private void blockUntilLockAcquired(String resourceId) throws LightblueException {
-        while (!locking.acquire(resourceId)) {
-            try {
-                // TODO: Parameterize lock polling interval
-                // Or can we do lock call that only returns once lock is available?
-                Thread.sleep(3000L);
-            } catch (InterruptedException e) {
-                // Just try again...
-            }
+    private String[] getSupportedAndEnabledEventTypes() {
+        Set<String> canonicalTypesToProcess = config.getCanonicalTypesToProcess();
+
+        if (canonicalTypesToProcess == null) {
+            return new String[0];
         }
+
+        if (canonicalTypesToProcess.containsAll(supportedTypes)) {
+            return supportedTypesArray;
+        }
+
+        List<String> supportedAndEnabled = new ArrayList<>(supportedTypes);
+        supportedAndEnabled.retainAll(canonicalTypesToProcess);
+        return supportedAndEnabled.toArray(new String[supportedAndEnabled.size()]);
     }
 
     /**
@@ -174,11 +187,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * <p>The returned list may include net-new events as the result of merges. These events do not
      * yet have an associated <em>persisted</em> entity, and therefore have no id's.
      *
+     * <p>Events for canonical types not supported will log warnings. Event processing will not be
+     * interrupted. If this happens it is a bug, however.
+     *
      * @param maxEvents The maximum number of parsed document events to return. Not to be confused
-     *                  with {@link #documentEventBatchSize}.
+     *                  with {@link #config}'s
+     *                  {@link LightblueDocumentEventRepositoryConfig#getDocumentEventsBatchSize()
+     *                  documentEventsBatchSize}.
      * @param documentEventEntities The priority-first entities from lightblue.
      * @param entitiesToUpdate A mutable collection of entities who's status modifications should be
-     *                         persisted back into lightblue.
+     *                         persisted back into lightblue. This gets populated by the
+     *                         optimization process.
      * @param requester Used by {@link LightblueDocumentEvent} implementations to lookup their
      *                  corresponding documents.
      * @return An optimized list of parsed or merged document events ready to be published. No more
@@ -196,8 +215,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
 
             if (eventFactoryForType == null) {
-                throw new NoSuchElementException("Document event factory not found for document " +
-                        "event of type <" + typeOfEvent + ">. Entity looks like: " + newEventEntity);
+                logger.warn("No document event factory configured for document event of type '{}'." +
+                        "Entity looks like: {}", typeOfEvent, newEventEntity);
+                continue;
             }
 
             final LightblueDocumentEvent newEvent =
@@ -280,14 +300,15 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * persisted ids.
      *
      * @param entitiesToUpdate List of existing entities which have status updates.
-     * @param maybeNewEvents List of document events which may have yet-to-be-persisted entities. These
-     *                  entities will be persisted and ids retrieved to mutate the events in this
-     *                  list with those ids.
+     * @param maybeNewEvents List of document events which may have yet-to-be-persisted entities.
+     *         these entities will be persisted and ids retrieved to mutate the events in this list
+     *         list with those ids.
      * @throws LightblueException
      */
     private void persistNewEntitiesAndStatusUpdatesToExisting(
             List<DocumentEventEntity> entitiesToUpdate,
-            List<LightblueDocumentEvent> maybeNewEvents) throws LightblueException {
+            List<LightblueDocumentEvent> maybeNewEvents,
+            LockedResource requiredLock) throws LightblueException, LostLockException {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
         List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 
@@ -301,6 +322,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
+
+        requiredLock.ensureAcquiredOrThrow("Will not process found document events.");
 
         // TODO: Verify these were all successful
         LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);

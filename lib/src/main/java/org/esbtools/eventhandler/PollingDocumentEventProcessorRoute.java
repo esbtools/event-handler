@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final DocumentEventRepository documentEventRepository;
@@ -36,6 +37,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final int batchSize;
     private final String documentEndpoint;
     private final String failureEndpoint;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
             Duration pollingInterval, int batchSize, String documentEndpoint,
@@ -50,7 +53,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from("timer:pollForDocumentEvents?period=" + pollingInterval.toMillis())
-        .routeId("documentEventsProcessor")
+        .routeId("documentEventsProcessor-" + idCounter.getAndIncrement())
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);

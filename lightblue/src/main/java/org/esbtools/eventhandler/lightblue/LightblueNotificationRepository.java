@@ -22,6 +22,8 @@ import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
 import com.redhat.lightblue.client.request.DataBulkRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedNotification;
@@ -31,42 +33,65 @@ import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import java.sql.Date;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
-    private final String[] entities;
-    private final Locking locking;
+    private final LightblueNotificationRepositoryConfig config;
+    private final LockStrategy lockStrategy;
     private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
-    public LightblueNotificationRepository(LightblueClient lightblue, String[] entities,
-            String lockingDomain, Map<String, NotificationFactory> notificationFactoryByEntityName,
-            Clock clock) {
+    private final Set<String> supportedEntityNames;
+    /** Cached to avoid extra garbage. */
+    private final String[] supportedEntityNamesArray;
+
+    private static final Logger logger = LoggerFactory.getLogger(LightblueNotificationRepository.class);
+
+    public LightblueNotificationRepository(LightblueClient lightblue, LockStrategy lockStrategy,
+            LightblueNotificationRepositoryConfig config,
+            Map<String, NotificationFactory> notificationFactoryByEntityName, Clock clock) {
         this.lightblue = lightblue;
-        this.entities = entities;
+        this.lockStrategy = lockStrategy;
+        this.config = config;
         this.notificationFactoryByEntityName = notificationFactoryByEntityName;
         this.clock = clock;
 
-        locking = lightblue.getLocking(lockingDomain);
+        supportedEntityNames = notificationFactoryByEntityName.keySet();
+        supportedEntityNamesArray = supportedEntityNames.toArray(new String[supportedEntityNames.size()]);
     }
 
     @Override
-    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxEvents)
-            throws LightblueException {
-        try {
-            blockUntilLockAcquired(Locks.forNotificationsForEntities(entities));
+    public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxNotifications)
+            throws Exception {
+        String[] entitiesToProcess = getSupportedAndEnabledEntityNames();
 
+        if (entitiesToProcess.length == 0) {
+            logger.info("Not retrieving any notifications because either there are no enabled " +
+                    "or supported entity names to process. Supported entity names are {}. " +
+                    "Of those, enabled entity names are {}",
+                    supportedEntityNames, Arrays.toString(entitiesToProcess));
+            return Collections.emptyList();
+        }
+
+        if (maxNotifications == 0) {
+            return Collections.emptyList();
+        }
+
+        try (LockedResource lock = lockStrategy
+                .blockUntilAcquired(ResourceIds.forNotificationsForEntities(entitiesToProcess))) {
             BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
 
             NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entities, maxEvents))
+                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxNotifications))
                     .parseProcessed(NotificationEntity[].class);
 
             if (notificationEntities.length == 0) {
@@ -80,10 +105,14 @@ public class LightblueNotificationRepository implements NotificationRepository {
             DataBulkRequest updateEntities = new DataBulkRequest();
             updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
                     Arrays.asList(notificationEntities)));
+
+            lock.ensureAcquiredOrThrow("Will not process retrieved notifications.");
+
             // If this fails, intentionally let propagate and release lock.
             // Another thread, or another poll, will try again.
             lightblue.bulkData(updateEntities);
 
+            // TODO: This work should be done before status updates so we can populate failures
             return Arrays.stream(notificationEntities)
                     .map(entity -> {
                         String entityName = entity.getEntityName();
@@ -100,8 +129,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         return notificationFactory.getNotificationForEntity(entity, requester);
                     })
                     .collect(Collectors.toList());
-        } finally {
-            locking.release(Locks.forNotificationsForEntities(entities));
         }
     }
 
@@ -140,16 +167,20 @@ public class LightblueNotificationRepository implements NotificationRepository {
         lightblue.bulkData(markNotifications);
     }
 
-    private void blockUntilLockAcquired(String resourceId) throws LightblueException {
-        while (!locking.acquire(resourceId)) {
-            try {
-                // TODO: Parameterize lock polling interval
-                // Or can we do lock call that only returns once lock is available?
-                Thread.sleep(3000L);
-            } catch (InterruptedException e) {
-                // Just try again...
-            }
+    private String[] getSupportedAndEnabledEntityNames() {
+        Set<String> entityNamesToProcess = config.getEntityNamesToProcess();
+
+        if (entityNamesToProcess == null) {
+            return new String[0];
         }
+
+        if (entityNamesToProcess.containsAll(supportedEntityNames)) {
+            return supportedEntityNamesArray;
+        }
+
+        List<String> supportedAndEnabled = new ArrayList<>(supportedEntityNames);
+        supportedAndEnabled.retainAll(entityNamesToProcess);
+        return supportedAndEnabled.toArray(new String[supportedAndEnabled.size()]);
     }
 
     private static NotificationEntity asEntity(Notification notification) {

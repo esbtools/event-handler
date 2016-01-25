@@ -61,9 +61,14 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     public static LightblueExternalResource lightblueExternalResource = new LightblueExternalResource(
                     TestMetadataJson.forEntities(NotificationEntity.class, DocumentEventEntity.class));
 
-    LightblueNotificationRepository notificationRepository;
+    // Use two configurations to test concurrency.
+    LightblueNotificationRepository notificationRepository1;
 
-    LightblueDocumentEventRepository documentEventRepository;
+    LightblueNotificationRepository notificationRepository2;
+
+    LightblueDocumentEventRepository documentEventRepository1;
+
+    LightblueDocumentEventRepository documentEventRepository2;
 
     LightblueClient client;
 
@@ -91,19 +96,45 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     protected void doPreSetup() throws Exception {
         client = LightblueClients.withJavaTimeSerializationSupport(
                 LightblueClientConfigurations.fromLightblueExternalResource(lightblueExternalResource));
-        notificationRepository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                "testLockingDomain", notificationFactoryByEntityName, systemUtc);
-        documentEventRepository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, "testLockingDomain", documentEventFactoriesByType, systemUtc);
+
+        LightblueAutoPingLockStrategy lockStrategy1 = new LightblueAutoPingLockStrategy(
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+
+        LightblueAutoPingLockStrategy lockStrategy2 = new LightblueAutoPingLockStrategy(
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+
+        LightblueNotificationRepositoryConfig notificationConfigRepo1 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"));
+        LightblueNotificationRepositoryConfig notificationConfigRepo2 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String"));
+
+        notificationRepository1 = new LightblueNotificationRepository(client, lockStrategy1,
+                notificationConfigRepo1, notificationFactoryByEntityName, systemUtc);
+        notificationRepository2 = new LightblueNotificationRepository(client, lockStrategy2,
+                notificationConfigRepo2, notificationFactoryByEntityName, systemUtc);
+
+        LightblueDocumentEventRepositoryConfig configForRepo1 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"), 100);
+        LightblueDocumentEventRepositoryConfig configForRepo2 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String"), 100);
+
+        documentEventRepository1 = new LightblueDocumentEventRepository(client,
+                lockStrategy1, configForRepo1, documentEventFactoriesByType, systemUtc);
+        documentEventRepository2 = new LightblueDocumentEventRepository(client,
+                lockStrategy2, configForRepo2, documentEventFactoriesByType, systemUtc);
     }
 
     @Override
     protected RouteBuilder[] createRouteBuilders() throws Exception {
         return new RouteBuilder[] {
-                new PollingNotificationProcessorRoute(notificationRepository, documentEventRepository,
+                new PollingNotificationProcessorRoute(notificationRepository1, documentEventRepository1,
                         Duration.ofSeconds(1), 50),
-                new PollingDocumentEventProcessorRoute(documentEventRepository, Duration.ofSeconds(1),
-                        20, "mock:documents", "mock:failures")
+                new PollingNotificationProcessorRoute(notificationRepository2, documentEventRepository2,
+                        Duration.ofSeconds(1), 35),
+                new PollingDocumentEventProcessorRoute(documentEventRepository1, Duration.ofSeconds(1),
+                        20, "mock:documents", "mock:failures"),
+                new PollingDocumentEventProcessorRoute(documentEventRepository2, Duration.ofSeconds(1),
+                        10, "mock:documents", "mock:failures")
         };
     }
 
