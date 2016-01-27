@@ -20,14 +20,17 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
@@ -101,8 +104,15 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
     }
 
-    static final class AutoPingingLock implements LockedResource {
+    @Override
+    public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
+        return new AutoPingingLocks<>(resources, maxResources, locking.getCallerId(), locking,
+                timeToLive);
+    }
+
+    static final class AutoPingingLock<T> implements LockedResource<T> {
         private final String callerId;
+        private final T resource;
         private final String resourceId;
         private final Locking locking;
         private final ScheduledExecutorService autoPingScheduler =
@@ -111,22 +121,29 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         private static final Logger logger = LoggerFactory.getLogger(AutoPingingLock.class);
 
-        AutoPingingLock(Locking locking, String callerId, String resourceId,
+        AutoPingingLock(Locking locking, String callerId, T resource,
                 Duration autoPingInterval, Duration ttl) throws LightblueException,
                 LockNotAvailableException {
             this.callerId = callerId;
-            this.resourceId = resourceId;
+            this.resource = resource;
             this.locking = locking;
 
-            if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
-                throw new LockNotAvailableException(callerId, resourceId);
-            }
+            try {
+                resourceId = URLEncoder.encode(resource.toString(), "UTF-8");
 
-            this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
-                    new PingTask(this),
-                    /* initial delay*/ autoPingInterval.toMillis(),
-                    /* delay */ autoPingInterval.toMillis(),
-                    TimeUnit.MILLISECONDS);
+                if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
+                    throw new LockNotAvailableException(callerId, resourceId);
+                }
+
+                this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
+                        new PingTask(this),
+                        /* initial delay*/ autoPingInterval.toMillis(),
+                        /* delay */ autoPingInterval.toMillis(),
+                        TimeUnit.MILLISECONDS);
+            } catch (UnsupportedEncodingException e) {
+                // FIXME: What to do about this stupid exception...
+                throw new RuntimeException(e);
+            }
         }
 
         @Override
@@ -139,6 +156,11 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                 throw new LostLockException(this, "Failed to ping lock, assuming lost. " +
                         lostLockMessage, e);
             }
+        }
+
+        @Override
+        public T getResource() {
+            return resource;
         }
 
         @Override
@@ -179,6 +201,77 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                     logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>",
                             lock.callerId, lock.resourceId, e);
                 }
+            }
+        }
+    }
+
+    static final class AutoPingingLocks<T> implements LockedResources<T> {
+        private final List<AutoPingingLock<T>> locks;
+        private final List<T> resourcesAcquired;
+
+        static final Logger logger = LoggerFactory.getLogger(AutoPingingLocks.class);
+
+        AutoPingingLocks(Collection<T> resources, int maxResources, String callerId,
+                Locking locking, Duration ttl) {
+            locks = new ArrayList<>(resources.size());
+            resourcesAcquired = new ArrayList<>(resources.size());
+
+            for (T resource : resources) {
+                try {
+                    locks.add(new AutoPingingLock<>(locking, callerId, resource, ttl.dividedBy(2),
+                            ttl));
+                    resourcesAcquired.add(resource);
+                } catch (LightblueException e) {
+                    logger.warn("LightblueException trying to acquire lock for resource: " +
+                            resource + ", callerId: " + callerId, e);
+                } catch (LockNotAvailableException ignored) {
+                        // Fall through...
+                }
+
+                if (locks.size() == maxResources) {
+                    break;
+                }
+            }
+        }
+
+        @Override
+        public List<T> getResources() {
+            return Collections.unmodifiableList(resourcesAcquired);
+        }
+
+        @Override
+        public List<T> checkForLostResources() {
+            List<T> lost = new ArrayList<>();
+
+            for (LockedResource<T> lock : locks) {
+                try {
+                    lock.ensureAcquiredOrThrow("");
+                } catch (LostLockException e) {
+                    lost.add(lock.getResource());
+                }
+            }
+
+            return lost;
+        }
+
+        @Override
+        public void close() throws IOException {
+            List<IOException> exceptions = new ArrayList<>(0);
+
+            for (LockedResource lock : locks) {
+                try {
+                    lock.close();
+                } catch (IOException e) {
+                    exceptions.add(e);
+                }
+            }
+
+            if (!exceptions.isEmpty()) {
+                if (exceptions.size() == 1) {
+                    throw exceptions.get(0);
+                }
+
+                throw new MultipleIOExceptions(exceptions);
             }
         }
     }
@@ -233,6 +326,11 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
+        public Object getResource() {
+            return null;
+        }
+
+        @Override
         public void close() throws IOException {
             List<IOException> exceptions = new ArrayList<>(0);
 
@@ -259,19 +357,19 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                     "locks=" + locks +
                     '}';
         }
-
-        final static class MultipleIOExceptions extends IOException {
-            MultipleIOExceptions(List<IOException> exceptions) {
-                super("Multiple IOExceptions occurred. See suppressed exceptions.");
-
-                exceptions.forEach(this::addSuppressed);
-            }
-        }
     }
 
     static class LockNotAvailableException extends Exception {
         public LockNotAvailableException(String callerId, String resourceId) {
             super("callerId: " + callerId + ", resourceId: " + resourceId);
+        }
+    }
+
+    static class MultipleIOExceptions extends IOException {
+        MultipleIOExceptions(List<IOException> exceptions) {
+            super("Multiple IOExceptions occurred. See suppressed exceptions.");
+
+            exceptions.forEach(this::addSuppressed);
         }
     }
 }

@@ -18,22 +18,30 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.request.DataBulkRequest;
-import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentEventRepository;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.model.Error;
+import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
+import com.redhat.lightblue.client.response.LightblueBulkResponseException;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
+import com.redhat.lightblue.client.response.LightblueErrorResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -63,6 +71,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
+    private static final Logger logger = LoggerFactory.getLogger(LightblueDocumentEventRepository.class);
+
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
             int documentEventBatchSize, LockStrategy lockStrategy,
             Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
@@ -91,26 +101,84 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
-        try (LockedResource lock = lockStrategy
-                .blockUntilAcquired(ResourceIds.forDocumentEventsForEntities(entities))) {
-            DocumentEventEntity[] documentEventEntities = lightblue
-                    .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
-                    .parseProcessed(DocumentEventEntity[].class);
+        // TODO: Also find expired processing
+        DocumentEventEntity[] documentEventEntities = lightblue
+                .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
+                .parseProcessed(DocumentEventEntity[].class);
 
-            if (documentEventEntities.length == 0) {
-                return Collections.emptyList();
+        if (documentEventEntities.length == 0) {
+            return Collections.emptyList();
+        }
+
+        Multimap<Identity, LightblueDocumentEvent> docEventsByIdentity = ArrayListMultimap.create();
+        BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
+
+        for (DocumentEventEntity eventEntity : documentEventEntities) {
+            String typeOfEvent = eventEntity.getCanonicalType();
+
+            DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
+
+            if (eventFactoryForType == null) {
+                // TODO: in dynamic config branch i have refactor that makes this impossible
+                throw new NoSuchElementException("Document event factory not found for document " +
+                        "event of type <" + typeOfEvent + ">. Entity looks like: " + eventEntity);
             }
 
-            List<DocumentEventEntity> entitiesToUpdate = new ArrayList<>();
-            BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
+            // TODO: catch failures here, fail only events which failed to parse
+            LightblueDocumentEvent newEvent =
+                    eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
 
-            List<LightblueDocumentEvent> optimized = parseAndOptimizeDocumentEventEntitiesUpTo(
-                    maxEvents, documentEventEntities, entitiesToUpdate, requester);
-
-            persistNewEntitiesAndStatusUpdatesToExisting(entitiesToUpdate, optimized, lock);
-
-            return optimized;
+            docEventsByIdentity.put(newEvent.identity(), newEvent);
         }
+
+        try (LockedResources<Identity> lock =
+                     lockStrategy.tryAcquireUpTo(maxEvents, docEventsByIdentity.keySet())) {
+            List<Identity> lockedIdentities = lock.getResources();
+
+            List<Identity> retrievedIdentities = new ArrayList<>(docEventsByIdentity.keySet());
+
+            for (Identity retrievedIdentity : retrievedIdentities) {
+                if (!lockedIdentities.contains(retrievedIdentity)) {
+                    docEventsByIdentity.removeAll(retrievedIdentity);
+                } else {
+                    optimizeDocumentEventsUpTo(docEventsByIdentity.get(retrievedIdentity));
+                }
+            }
+
+            List<LightblueDocumentEvent> updated =
+                    persistNewEntitiesAndStatusUpdatesToExisting(docEventsByIdentity, lock);
+
+            return updated.stream()
+                    .sorted((o1, o2) -> o2.wrappedDocumentEventEntity().getPriority() -
+                            o1.wrappedDocumentEventEntity().getPriority())
+                    .filter(event -> event.wrappedDocumentEventEntity().getStatus()
+                            .equals(DocumentEventEntity.Status.processing))
+                    .collect(Collectors.toList());
+        }
+    }
+
+    @Override
+    public List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events) {
+        List<LightblueDocumentEvent> filtered = new ArrayList<>(events.size());
+
+        for (DocumentEvent event : events) {
+            if (!(event instanceof LightblueDocumentEvent)) {
+                throw new IllegalArgumentException("Unknown event type. Only " +
+                        "LightblueDocumentEvent is supported. Event type was: " +
+                        event.getClass());
+            }
+
+            LightblueDocumentEvent lightblueEvent = (LightblueDocumentEvent) event;
+
+            ZonedDateTime processingDate = lightblueEvent.wrappedDocumentEventEntity().getProcessingDate();
+            ZonedDateTime expireDate = processingDate.plusMinutes(5);
+
+            if (clock.instant().isBefore(expireDate.toInstant())) {
+                filtered.add(lightblueEvent);
+            }
+        }
+
+        return filtered;
     }
 
     @Override
@@ -142,9 +210,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return;
         }
 
-        // TODO: What if some of these fail?
-        // Documents are published, so not world ending, but important.
-        // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
         lightblue.bulkData(markDocumentEvents);
     }
 
@@ -157,42 +222,27 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * <p>The returned list may include net-new events as the result of merges. These events do not
      * yet have an associated <em>persisted</em> entity, and therefore have no id's.
      *
-     * @param maxEvents The maximum number of parsed document events to return. Not to be confused
-     *                  with {@link #documentEventBatchSize}.
-     * @param documentEventEntities The priority-first entities from lightblue.
-     * @param entitiesToUpdate A mutable collection of entities who's status modifications should be
-     *                         persisted back into lightblue.
-     * @param requester Used by {@link LightblueDocumentEvent} implementations to lookup their
-     *                  corresponding documents.
+     * @param events The priority-first parsed events from lightblue, modified in place.
+     *               TODO: update this javadoc
      * @return An optimized list of parsed or merged document events ready to be published. No more
      * than {@code maxEvents} will be returned. List may include events with newly computed entities
      * that are not yet persisted.
      */
-    private List<LightblueDocumentEvent> parseAndOptimizeDocumentEventEntitiesUpTo(int maxEvents,
-            DocumentEventEntity[] documentEventEntities, List<DocumentEventEntity> entitiesToUpdate,
-            LightblueRequester requester) {
-        List<LightblueDocumentEvent> optimized = new ArrayList<>(maxEvents);
+    private void optimizeDocumentEventsUpTo(Collection<LightblueDocumentEvent> events) {
+        // TODO: This algorithm be able to be optimized more now that we are modifying the collection
+        // in place and we know all events have same identity.
 
-        for (final DocumentEventEntity newEventEntity : documentEventEntities) {
-            String typeOfEvent = newEventEntity.getCanonicalType();
+        List<LightblueDocumentEvent> newEvents = new ArrayList<>(events);
+        List<LightblueDocumentEvent> optimized = new ArrayList<>();
 
-            DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
-
-            if (eventFactoryForType == null) {
-                throw new NoSuchElementException("Document event factory not found for document " +
-                        "event of type <" + typeOfEvent + ">. Entity looks like: " + newEventEntity);
-            }
-
-            final LightblueDocumentEvent newEvent =
-                    eventFactoryForType.getDocumentEventForEntity(newEventEntity, requester);
-
+        for (final LightblueDocumentEvent newEvent : newEvents) {
             // We have a new event, let's see if it is superseded by or can be merged with any
             // previous events we parsed or created as a result of a previous merge.
 
             // As we check, if we find we can merge an event, we will merge it, and continue on with
             // the merger instead. These pointers track which event we are currently optimizing.
-            @Nullable DocumentEventEntity newOrMergerEventEntity = newEventEntity;
             @Nullable LightblueDocumentEvent newOrMergerEvent = newEvent;
+            DocumentEventEntity newOrMergerEventEntity = newEvent.wrappedDocumentEventEntity();
 
             Iterator<LightblueDocumentEvent> optimizedIterator = optimized.iterator();
 
@@ -208,7 +258,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     // ...and throw away this new one.
                     newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.superseded);
                     newOrMergerEventEntity.setProcessedDate(ZonedDateTime.now(clock));
-                    entitiesToUpdate.add(newOrMergerEventEntity);
 
                     newOrMergerEvent = null;
                     break;
@@ -224,7 +273,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     // its entity to store that it has been merged.
                     newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.merged);
                     newOrMergerEventEntity.setProcessedDate(ZonedDateTime.now(clock));
-                    entitiesToUpdate.add(newOrMergerEventEntity);
 
                     // We create a new event as a result of the merger, and keep this instead of the
                     // others.
@@ -244,17 +292,15 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 }
             }
 
-            // Only add the event if we've not hit our limit. We should keep going however even if
-            // we have hit our limit, because some of the remaining events may be superseded or
-            // merged as a part of the current optimized batch.
-            if (newOrMergerEvent != null && optimized.size() < maxEvents) {
+            if (newOrMergerEvent != null) {
                 newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.processing);
-                entitiesToUpdate.add(newOrMergerEventEntity);
                 optimized.add(newOrMergerEvent);
+
+                if (!events.contains(newOrMergerEvent)) {
+                    events.add(newOrMergerEvent);
+                }
             }
         }
-
-        return optimized;
     }
 
     /**
@@ -262,44 +308,108 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * new event entities among document event list, and updates entities for those events with
      * persisted ids.
      *
-     * @param entitiesToUpdate List of existing entities which have status updates.
-     * @param maybeNewEvents List of document events which may have yet-to-be-persisted entities.
-     *         these entities will be persisted and ids retrieved to mutate the events in this list
-     *         list with those ids.
+     * TODO: update this javadoc
+     *
      * @throws LightblueException
      */
-    private void persistNewEntitiesAndStatusUpdatesToExisting(
-            List<DocumentEventEntity> entitiesToUpdate,
-            List<LightblueDocumentEvent> maybeNewEvents,
-            LockedResource requiredLock) throws LightblueException, LostLockException {
+    private List<LightblueDocumentEvent> persistNewEntitiesAndStatusUpdatesToExisting(
+            Multimap<Identity, LightblueDocumentEvent> docEventsByIdentity,
+            LockedResources<Identity> identityLocks) throws LightblueException, LostLockException {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
-        List<LightblueDocumentEvent> newEvents = new ArrayList<>();
 
-        // Add requests to plop in new entities in order.
-        for (LightblueDocumentEvent event : maybeNewEvents) {
+        for (Identity lostIdentity : identityLocks.checkForLostResources()) {
+            logger.warn("Lost lock for event identity: {}", lostIdentity);
+            docEventsByIdentity.removeAll(lostIdentity);
+        }
+
+        if (docEventsByIdentity.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<LightblueDocumentEvent> eventsAsList = new ArrayList<>(docEventsByIdentity.values());
+
+        // TODO: We make single request per event here (wrapped in bulk request). Could optimize.
+        // See: https://github.com/esbtools/event-handler/issues/11
+        for (LightblueDocumentEvent event : eventsAsList) {
             DocumentEventEntity entity = event.wrappedDocumentEventEntity();
-            if (entity.get_id() == null) {
-                newEvents.add(event);
+
+            if (entity.get_id() == null && entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
                 insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
+            } else {
+                ZonedDateTime processingTime = ZonedDateTime.now(clock);
+                insertAndUpdateEvents.add(
+                        UpdateRequests.documentEventAsProcessingIfCurrent(entity, processingTime));
             }
         }
 
-        insertAndUpdateEvents.addAll(UpdateRequests.documentEventsStatusAndProcessedDate(entitiesToUpdate));
+        LightblueBulkDataResponse bulkResponse;
 
-        requiredLock.ensureAcquiredOrThrow("Will not process found document events.");
-
-        // TODO: Verify these were all successful
-        LightblueBulkDataResponse bulkResponse = lightblue.bulkData(insertAndUpdateEvents);
-        List<LightblueDataResponse> responses = bulkResponse.getResponses();
-
-        // Read responses for new entities in order, update corresponding events' entities with
-        // new ids.
-        for (int i = 0; i < newEvents.size(); i++) {
-            LightblueDataResponse response = responses.get(i);
-            LightblueDocumentEvent newEvent = newEvents.get(i);
-            DocumentEventEntity newEntity = response.parseProcessed(DocumentEventEntity.class);
-            newEvent.wrappedDocumentEventEntity().set_id(newEntity.get_id());
+        try {
+            bulkResponse = lightblue.bulkData(insertAndUpdateEvents);
+        } catch (LightblueBulkResponseException e) {
+            // If some failed, that's okay. We have to iterate through responses either way.
+            // We'll check for errors then.
+            bulkResponse = e.getBulkResponse();
         }
+
+        Iterator<LightblueDocumentEvent> eventsIterator = eventsAsList.iterator();
+        Iterator<LightblueDataResponse> responsesIterator = bulkResponse.getResponses().iterator();
+
+        while (eventsIterator.hasNext()) {
+            if (!responsesIterator.hasNext()) {
+                throw new IllegalStateException("Mismatched number of requests and responses! " +
+                        "Events looked like: <{}>. Responses looked like");
+            }
+
+            LightblueDataResponse response = responsesIterator.next();
+            LightblueDocumentEvent event = eventsIterator.next();
+            DocumentEventEntity entity = event.wrappedDocumentEventEntity();
+
+            if (response instanceof LightblueErrorResponse) {
+                LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
+
+                // Likely transient failure; leave event alone to be tried again later.
+                if (errorResponse.hasDataErrors() || errorResponse.hasLightblueErrors()) {
+                    if (logger.isWarnEnabled()) {
+                        List<Error> errors = new ArrayList<>();
+
+                        Collections.addAll(errors, errorResponse.getLightblueErrors());
+                        Collections.addAll(errors, Arrays.stream(errorResponse.getDataErrors())
+                                .flatMap(dataError -> dataError.getErrors().stream())
+                                .toArray(Error[]::new));
+
+                        List<String> errorStrings = errors.stream()
+                                .map(e -> "Code: " + e.getErrorCode() + ", " +
+                                        "Context: " + e.getContext() + ", " +
+                                        "Message: " + e.getMsg())
+                                .collect(Collectors.toList());
+
+                        logger.warn("Event update failed. Will not process. Event was: <{}>. " +
+                                "Errors: <{}>", event, errorStrings);
+                    }
+
+                    eventsIterator.remove();
+
+                    continue;
+                }
+            }
+
+            if (response.parseModifiedCount() == 0) {
+                logger.warn("Event updated by another thread. Will not process. Event was: {}", event);
+
+                eventsIterator.remove();
+
+                continue;
+            }
+
+            // If known entity has no id, must've been insert. Populate id in returned entity.
+            if (entity.get_id() == null) {
+                DocumentEventEntity processed = response.parseProcessed(DocumentEventEntity.class);
+                entity.set_id(processed.get_id());
+            }
+        }
+
+        return eventsAsList;
     }
 
     private static DocumentEventEntity asEntity(DocumentEvent event) {
@@ -307,7 +417,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return ((LightblueDocumentEvent) event).wrappedDocumentEventEntity();
         }
 
-        throw new EventHandlerException("Unknown event type. Only LightblueDocumentEvent are " +
+        throw new EventHandlerException("Unknown event type. Only LightblueDocumentEvent is " +
                 "supported. Event type was: " + event.getClass());
     }
 }

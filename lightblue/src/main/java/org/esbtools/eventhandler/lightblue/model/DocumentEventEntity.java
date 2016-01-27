@@ -18,9 +18,8 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
-import com.redhat.lightblue.client.util.ClientConstants;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.redhat.lightblue.client.util.ClientConstants;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.MinItems;
@@ -54,6 +53,7 @@ public class DocumentEventEntity {
     private Status status;
     private Integer priority;
     private ZonedDateTime creationDate;
+    private ZonedDateTime processingDate;
     private ZonedDateTime processedDate;
     private Set<String> survivorOfIds;
 
@@ -126,6 +126,15 @@ public class DocumentEventEntity {
     @Required
     public void setCreationDate(ZonedDateTime creationDate) {
         this.creationDate = creationDate;
+    }
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)
+    public ZonedDateTime getProcessingDate() {
+        return processingDate;
+    }
+
+    public void setProcessingDate(ZonedDateTime processingDate) {
+        this.processingDate = processingDate;
     }
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)

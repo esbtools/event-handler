@@ -69,6 +69,11 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     }
 
     @Override
+    public List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events) {
+        return events;
+    }
+
+    @Override
     public void markDocumentEventsProcessedOrFailed(
             Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception {

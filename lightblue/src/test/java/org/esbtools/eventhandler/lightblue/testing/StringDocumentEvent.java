@@ -20,8 +20,11 @@ package org.esbtools.eventhandler.lightblue.testing;
 
 import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.lightblue.Identity;
+import org.esbtools.eventhandler.lightblue.KeyValueIdentity;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
 import org.esbtools.eventhandler.lightblue.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.TypeAndValueIdentity;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import java.time.Clock;
@@ -109,6 +112,11 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
     @Override
     public LightblueDocumentEvent merge(DocumentEvent event) {
         throw new UnsupportedOperationException("Can't do that");
+    }
+
+    @Override
+    public Identity identity() {
+        return new TypeAndValueIdentity(StringDocumentEvent.class, value);
     }
 
     @Override

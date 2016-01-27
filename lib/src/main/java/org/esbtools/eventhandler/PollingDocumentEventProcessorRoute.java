@@ -82,8 +82,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
-            // FIXME: If this fails, we should attempt to "rollback" these events to be
-            // available to the next retrieve events call
+            // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
+            // That we truly know if successfully published or not.
             documentEventRepository.markDocumentEventsProcessedOrFailed(successfulEvents, failedEvents);
 
             exchange.getIn().setBody(Iterables.concat(documents, failedEvents));

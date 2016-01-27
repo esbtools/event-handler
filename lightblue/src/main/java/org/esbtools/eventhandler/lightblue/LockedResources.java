@@ -19,21 +19,10 @@
 package org.esbtools.eventhandler.lightblue;
 
 import java.io.Closeable;
+import java.util.List;
 
-public interface LockedResource<T> extends Closeable {
-    /**
-     * Checks if the lock is still acquired or throws a {@link LostLockException}.
-     *
-     * <p>Code that relies on a lock should perform this check at critical points.
-     *
-     * <p>You should catch the {@code LostLockException} if you need to perform any clean up around
-     * losing the lock. The thrown exception will include the provided {@code lostLockMessage} which
-     * should explain what will happen as a result of the lock being lost.
-     *
-     * <p>If the check fails for another reason, we pessimistically assume the lock was lost, so
-     * a {@link LostLockException} is also thrown, with the underlying failure as its cause.
-     */
-    void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException;
+public interface LockedResources<T> extends Closeable {
+    List<T> getResources();
 
-    T getResource();
+    List<T> checkForLostResources();
 }

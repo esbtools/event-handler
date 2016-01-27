@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue.testing;
 import com.google.common.base.Joiner;
 import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.lightblue.Identity;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
 import org.esbtools.eventhandler.lightblue.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
@@ -131,6 +132,11 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
         mergedValues.addAll(this.values);
 
         return new MultiStringDocumentEvent(mergedValues, clock);
+    }
+
+    @Override
+    public Identity identity() {
+        return new TypeIdentity(MultiStringDocumentEvent.class);
     }
 
     @Override

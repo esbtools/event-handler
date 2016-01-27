@@ -18,20 +18,17 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
-import java.util.Set;
-
-/**
- * Abstracts an atomic exclusive locking mechanism which is used to coordinate concurrent work on
- * logical "resources."
- */
-public interface LockStrategy {
+public interface Identity {
     /**
-     * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
-     * together, returning an instance representing the acquired lock. Order of provided resources
-     * does not matter.
+     * Semantic, not reference equality.
      */
-    LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
+    @Override
+    boolean equals(Object o);
 
-    <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources);
+    /**
+     * Strings which should also be a reflection of equality. That is, two identities which are
+     * equal, <em>must</em> have equal {@code toString()}.
+     */
+    @Override
+    String toString();
 }

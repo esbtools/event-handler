@@ -19,19 +19,15 @@
 package org.esbtools.eventhandler.lightblue;
 
 import java.util.Collection;
-import java.util.Set;
 
-/**
- * Abstracts an atomic exclusive locking mechanism which is used to coordinate concurrent work on
- * logical "resources."
- */
-public interface LockStrategy {
-    /**
-     * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
-     * together, returning an instance representing the acquired lock. Order of provided resources
-     * does not matter.
-     */
-    LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
+public class SimpleLightblueLockStrategy implements LockStrategy {
+    @Override
+    public LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException {
+        return null;
+    }
 
-    <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources);
+    @Override
+    public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
+        return null;
+    }
 }

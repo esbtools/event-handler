@@ -18,13 +18,13 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
+
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.Query.BinOp;
 import com.redhat.lightblue.client.Update;
 import com.redhat.lightblue.client.request.data.DataUpdateRequest;
-
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.lightbluenotificationhook.NotificationEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,5 +106,43 @@ public abstract class UpdateRequests {
         }
 
         return requests;
+    }
+
+    public static DataUpdateRequest documentEventAsProcessingIfCurrent(DocumentEventEntity entity,
+            ZonedDateTime newProcessingTime) {
+        DataUpdateRequest request = new DataUpdateRequest(
+                DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+
+        List<Query> idStatusAndDateMatch = new ArrayList<>();
+        List<Update> updateStatusAndDate = new ArrayList<>(2);
+
+        ZonedDateTime previousProcessingDate = entity.getProcessingDate();
+        ZonedDateTime processedDate = entity.getProcessedDate();
+
+        idStatusAndDateMatch.add(Query.withValue("_id", BinOp.eq, entity.get_id()));
+
+        if (previousProcessingDate != null) {
+            idStatusAndDateMatch.add(Query.withValue(
+                    "processingDate", BinOp.eq,
+                    Date.from(previousProcessingDate.toInstant())));
+            idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.processing.toString()));
+        } else {
+            idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.unprocessed.toString()));
+            updateStatusAndDate.add(Update.set("status", entity.getStatus().toString()));
+        }
+
+        if (processedDate != null) {
+            updateStatusAndDate.add(Update.set("processedDate", Date.from(processedDate.toInstant())));
+        }
+
+        // FIXME: This is weird, shouldn't be doing this here
+        entity.setProcessingDate(newProcessingTime);
+        updateStatusAndDate.add(Update.set("processingDate", Date.from(newProcessingTime.toInstant())));
+
+        request.where(Query.and(idStatusAndDateMatch));
+        request.updates(updateStatusAndDate);
+
+        return request;
     }
 }

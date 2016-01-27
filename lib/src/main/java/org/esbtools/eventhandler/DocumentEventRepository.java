@@ -53,7 +53,19 @@ public interface DocumentEventRepository {
      */
     List<? extends DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
 
-    // TODO: Handle failed
+    /**
+     * Some repository implementations may have timeouts on event processing to facilitate failure
+     * recovery, such as non-transactional data stores.
+     *
+     * <p>If this is not relevant to a particular implementation, it should just return the provided
+     * list.
+     *
+     * @param events Events to check for expiration. Will not be mutated.
+     * @return A list that has all source events which are not expired. May be the same (reference)
+     * list as provided.
+     */
+    List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events);
+
     void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception;
 }
