@@ -44,9 +44,9 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
     }
 
     @Override
-    public List<? extends Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception {
-        maxEvents = maxEvents > notifications.size() ? notifications.size() : maxEvents;
-        List<Notification> retrieved = new ArrayList<>(notifications.subList(0, maxEvents));
+    public List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception {
+        maxNotifications = maxNotifications > notifications.size() ? notifications.size() : maxNotifications;
+        List<Notification> retrieved = new ArrayList<>(notifications.subList(0, maxNotifications));
         notifications.removeAll(retrieved);
         return retrieved;
     }

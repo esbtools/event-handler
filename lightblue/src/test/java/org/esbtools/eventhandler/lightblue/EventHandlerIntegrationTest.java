@@ -103,14 +103,25 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         LightblueAutoPingLockStrategy lockStrategy2 = new LightblueAutoPingLockStrategy(
                 client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
 
-        notificationRepository1 = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                lockStrategy1, notificationFactoryByEntityName, systemUtc);
-        notificationRepository2 = new LightblueNotificationRepository(client, new String[]{"MultiString"},
-                lockStrategy2, notificationFactoryByEntityName, systemUtc);
-        documentEventRepository1 = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                100, lockStrategy1, documentEventFactoriesByType, systemUtc);
-        documentEventRepository2 = new LightblueDocumentEventRepository(client, new String[]{"String"},
-                100, lockStrategy2, documentEventFactoriesByType, systemUtc);
+        LightblueNotificationRepositoryConfig notificationConfigRepo1 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"));
+        LightblueNotificationRepositoryConfig notificationConfigRepo2 =
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String"));
+
+        notificationRepository1 = new LightblueNotificationRepository(client, lockStrategy1,
+                notificationConfigRepo1, notificationFactoryByEntityName, systemUtc);
+        notificationRepository2 = new LightblueNotificationRepository(client, lockStrategy2,
+                notificationConfigRepo2, notificationFactoryByEntityName, systemUtc);
+
+        LightblueDocumentEventRepositoryConfig configForRepo1 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"), 100);
+        LightblueDocumentEventRepositoryConfig configForRepo2 =
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String"), 100);
+
+        documentEventRepository1 = new LightblueDocumentEventRepository(client,
+                lockStrategy1, configForRepo1, documentEventFactoriesByType, systemUtc);
+        documentEventRepository2 = new LightblueDocumentEventRepository(client,
+                lockStrategy2, configForRepo2, documentEventFactoriesByType, systemUtc);
     }
 
     @Override

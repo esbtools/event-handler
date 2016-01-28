@@ -18,14 +18,15 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.model.EventHandlerConfigEntity;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
+
 import com.redhat.lightblue.client.Literal;
 import com.redhat.lightblue.client.Projection;
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
-
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import java.time.ZonedDateTime;
 import java.util.Date;
@@ -59,13 +60,13 @@ public abstract class FindRequests {
      * {@link org.esbtools.eventhandler.lightblue.model.DocumentEventEntity.Status#unprocessed}
      * document events.
      */
-    public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,
-            int maxEvents, ZonedDateTime expiredProcessingDate) {
+    public static DataFindRequest priorityDocumentEventsForTypesUpTo(String[] types,
+        int maxEvents, ZonedDateTime expiredProcessingDate) {
         DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
 
         findEntities.where(Query.and(
-                Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(entities)),
+                Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(types)),
                 Query.or(
                         Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed),
                         Query.and(
@@ -77,5 +78,16 @@ public abstract class FindRequests {
         findEntities.range(0, maxEvents - 1);
 
         return findEntities;
+    }
+
+    public static DataFindRequest eventHandlerConfigForDomain(String configDomain) {
+        DataFindRequest findConfig = new DataFindRequest(
+                EventHandlerConfigEntity.ENTITY_NAME,
+                EventHandlerConfigEntity.ENTITY_VERSION);
+
+        findConfig.where(Query.withValue("domain", Query.BinOp.eq, configDomain));
+        findConfig.select(Projection.includeFieldRecursively("*"));
+
+        return findConfig;
     }
 }

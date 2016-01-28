@@ -24,13 +24,13 @@ import java.util.List;
 public interface NotificationRepository {
 
     /**
-     * Retrieves the oldest {@code maxEvents} {@link Notification notifications}, oldest first.
+     * Retrieves the oldest {@code maxNotifications} {@link Notification notifications}, oldest first.
      *
      * <p>Once retrieved, a notification should not be retrieved again, atomically. That is, many
      * threads looking up notifications at the same time should all et a unique non-overlapping sample
      * of the oldest notifications. Subsequent calls should always return a unique set.
      */
-    List<? extends Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception;
+    List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception;
 
     void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception;

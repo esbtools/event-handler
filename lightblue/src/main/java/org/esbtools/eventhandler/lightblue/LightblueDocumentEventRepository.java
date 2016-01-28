@@ -49,25 +49,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class LightblueDocumentEventRepository implements DocumentEventRepository {
     private final LightblueClient lightblue;
-    private final String[] entities;
-
-    /**
-     * The amount of document events to sort through for optimizations at one time.
-     *
-     * <p>This should be much larger than that actual number of events you want to publish at one
-     * time due to optimizations that reduce the actual number of publishable events. For example,
-     * in a batch of 100 events, if 50 of them are redundant or able to be merged, you'll end up
-     * with only 50 discrete events. If you only grabbed 50, you might miss some of those potential
-     * optimizations.
-     *
-     * <p>Events not included to be published among the batch (not including events that were merged
-     * or superseded), should be put back in the document event entity pool to be processed later.
-     */
-    private final int documentEventBatchSize;
+    private final LightblueDocumentEventRepositoryConfig config;
     private final LockStrategy lockStrategy;
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
@@ -76,17 +63,23 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final Duration processingTimeout = Duration.ofMinutes(10);
     private final Duration expireThreshold = Duration.ofMinutes(2);
 
+    private final Set<String> supportedTypes;
+    /** Cached to avoid extra garbage. */
+    private final String[] supportedTypesArray;
+
     private static final Logger logger = LoggerFactory.getLogger(LightblueDocumentEventRepository.class);
 
-    public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
-            int documentEventBatchSize, LockStrategy lockStrategy,
+    public LightblueDocumentEventRepository(LightblueClient lightblue,
+            LockStrategy lockStrategy, LightblueDocumentEventRepositoryConfig config,
             Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType, Clock clock) {
         this.lightblue = lightblue;
-        this.entities = canonicalTypes;
-        this.documentEventBatchSize = documentEventBatchSize;
+        this.lockStrategy = lockStrategy;
+        this.config = config;
         this.documentEventFactoriesByType = documentEventFactoriesByType;
         this.clock = clock;
-        this.lockStrategy = lockStrategy;
+
+        supportedTypes = documentEventFactoriesByType.keySet();
+        supportedTypesArray = supportedTypes.toArray(new String[supportedTypes.size()]);
     }
 
     @Override
@@ -106,9 +99,26 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
+        String[] typesToProcess = getSupportedAndEnabledEventTypes();
+        Integer documentEventsBatchSize = config.getDocumentEventsBatchSize();
+
+        if (typesToProcess.length == 0 || documentEventsBatchSize == null ||
+                documentEventsBatchSize == 0) {
+            logger.info("Not retrieving any document events because either there are no enabled " +
+                            "or supported types to process or documentEventBatchSize is 0. Supported " +
+                            "types are {}. Of those, enabled types are {}. " +
+                            "Document event batch size is {}.",
+                    supportedTypes, Arrays.toString(typesToProcess), documentEventsBatchSize);
+            return Collections.emptyList();
+        }
+
+        if (maxEvents == 0) {
+            return Collections.emptyList();
+        }
+
         DocumentEventEntity[] documentEventEntities = lightblue
-                .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(
-                        entities, documentEventBatchSize,
+                .data(FindRequests.priorityDocumentEventsForTypesUpTo(
+                        typesToProcess, documentEventsBatchSize,
                         ZonedDateTime.now(clock).minus(processingTimeout)))
                 .parseProcessed(DocumentEventEntity[].class);
 
@@ -217,6 +227,22 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         lightblue.bulkData(markDocumentEvents);
+    }
+
+    private String[] getSupportedAndEnabledEventTypes() {
+        Set<String> canonicalTypesToProcess = config.getCanonicalTypesToProcess();
+
+        if (canonicalTypesToProcess == null) {
+            return new String[0];
+        }
+
+        if (canonicalTypesToProcess.containsAll(supportedTypes)) {
+            return supportedTypesArray;
+        }
+
+        List<String> supportedAndEnabled = new ArrayList<>(supportedTypes);
+        supportedAndEnabled.retainAll(canonicalTypesToProcess);
+        return supportedAndEnabled.toArray(new String[supportedAndEnabled.size()]);
     }
 
     /**

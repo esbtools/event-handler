@@ -92,17 +92,21 @@ public class LightblueDocumentEventRepositoryTest {
                 put("MultiString", MultiStringDocumentEvent::new);
             }};
 
+    private MutableLightblueDocumentEventRepositoryConfig config = new MutableLightblueDocumentEventRepositoryConfig()
+            .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
+            .setDocumentEventsBatchSize(DOCUMENT_EVENT_BATCH_SIZE);
+
     @Before
     public void initializeLightblueClientAndRepository() {
-        LightblueClientConfiguration config = LightblueClientConfigurations
+        LightblueClientConfiguration lbClientConfig = LightblueClientConfigurations
                 .fromLightblueExternalResource(lightblueExternalResource);
-        client = LightblueClients.withJavaTimeSerializationSupport(config);
+        client = LightblueClients.withJavaTimeSerializationSupport(lbClientConfig);
 
         // TODO: Try and reduce places canonical types are specified
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
-        repository = new LightblueDocumentEventRepository(client, new String[]{"String", "MultiString"},
-                DOCUMENT_EVENT_BATCH_SIZE, new InMemoryLockStrategy(), documentEventFactoriesByType,
+        repository = new LightblueDocumentEventRepository(client,
+                new InMemoryLockStrategy(), config, documentEventFactoriesByType,
                 fixedClock);
     }
 
@@ -178,11 +182,16 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread1Client = new SlowDataLightblueClient(client);
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
+        // Larger batch size is needed to guarantee we get all events in both threads.
+        MutableLightblueDocumentEventRepositoryConfig config = new MutableLightblueDocumentEventRepositoryConfig()
+                .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
+                .setDocumentEventsBatchSize(20);
+
         LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
-                thread1Client, new String[]{"String"}, 50, new InMemoryLockStrategy(),
+                thread1Client, new InMemoryLockStrategy(), config,
                 documentEventFactoriesByType, fixedClock);
         LightblueDocumentEventRepository thread2Repository = new LightblueDocumentEventRepository(
-                thread2Client, new String[]{"String"}, 50, new InMemoryLockStrategy(),
+                thread2Client, new InMemoryLockStrategy(), config,
                 documentEventFactoriesByType, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -514,7 +523,7 @@ public class LightblueDocumentEventRepositoryTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         LightblueDocumentEventRepository repository = new LightblueDocumentEventRepository(client,
-                new String[]{"String"}, 50, lockStrategy, documentEventFactoriesByType,
+                lockStrategy, config, documentEventFactoriesByType,
                 Clock.systemUTC());
 
         slowClient.pauseOnNextRequest();
@@ -539,6 +548,23 @@ public class LightblueDocumentEventRepositoryTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    public void shouldRecognizeUpdatesToProvidedConfiguration() throws Exception {
+        insertDocumentEventEntities(
+                newMultiStringDocumentEventEntity("1"),
+                newMultiStringDocumentEventEntity("2"),
+                newStringDocumentEventEntity("3"),
+                newStringDocumentEventEntity("4"));
+
+        config.setCanonicalTypesToProcess(Arrays.asList("String"));
+        config.setDocumentEventsBatchSize(1);
+
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(4);
+
+        assertThat(retrieved).hasSize(1);
+        assertThat(retrieved.get(0).wrappedDocumentEventEntity().getParameterByKey("value")).isAnyOf("3", "4");
     }
 
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)

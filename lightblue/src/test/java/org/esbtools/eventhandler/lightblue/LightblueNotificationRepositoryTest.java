@@ -34,6 +34,7 @@ import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
+import org.esbtools.eventhandler.lightblue.testing.MultiStringNotification;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringNotification;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
@@ -85,21 +86,26 @@ public class LightblueNotificationRepositoryTest {
     private final Map<String, NotificationFactory> notificationFactoryByEntityName =
             new HashMap<String, NotificationFactory>() {{
                 put("String", StringNotification::new);
+                put("MultiString", MultiStringNotification::new);
             }};
+
+    private final MutableLightblueNotificationRepositoryConfig config =
+            new MutableLightblueNotificationRepositoryConfig()
+            .setEntityNamesToProcess(notificationFactoryByEntityName.keySet());
 
     private static Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     @Before
     public void initializeLightblueClientAndRepository() {
-        LightblueClientConfiguration config = LightblueClientConfigurations
+        LightblueClientConfiguration lbClientConfig = LightblueClientConfigurations
                 .fromLightblueExternalResource(lightblueExternalResource);
-        client = LightblueClients.withJavaTimeSerializationSupport(config);
+        client = LightblueClients.withJavaTimeSerializationSupport(lbClientConfig);
 
         // TODO: Try and reduce places canonical types are specified
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
-        repository = new LightblueNotificationRepository(client, new String[]{"String", "MultiString"},
-                new InMemoryLockStrategy(), notificationFactoryByEntityName, fixedClock);
+        repository = new LightblueNotificationRepository(client, new InMemoryLockStrategy(), config,
+                notificationFactoryByEntityName, fixedClock);
     }
 
     @Before
@@ -189,11 +195,11 @@ public class LightblueNotificationRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueNotificationRepository thread1Repository = new LightblueNotificationRepository(
-                thread1Client, new String[]{"String"}, new InMemoryLockStrategy(),
+                thread1Client, new InMemoryLockStrategy(), config,
                 notificationFactoryByEntityName, fixedClock);
 
         LightblueNotificationRepository thread2Repository = new LightblueNotificationRepository(
-                thread1Client, new String[]{"String"}, new InMemoryLockStrategy(),
+                thread1Client, new InMemoryLockStrategy(), config,
                 notificationFactoryByEntityName, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -309,7 +315,7 @@ public class LightblueNotificationRepositoryTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         LightblueNotificationRepository repository = new LightblueNotificationRepository(client,
-                new String[]{"String"}, lockStrategy, notificationFactoryByEntityName,
+                lockStrategy, config, notificationFactoryByEntityName,
                 Clock.systemUTC());
 
         slowClient.pauseOnNextRequest();
@@ -334,6 +340,21 @@ public class LightblueNotificationRepositoryTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    public void shouldRecognizeUpdatesToProvidedConfiguration() throws Exception {
+        insertNotificationEntities(
+                notificationEntityForMultiStringInsert("1"),
+                notificationEntityForMultiStringInsert("2"),
+                notificationEntityForStringInsert("3"));
+
+        config.setEntityNamesToProcess(Arrays.asList("String"));
+
+        List<LightblueNotification> retrieved = repository.retrieveOldestNotificationsUpTo(3);
+
+        assertThat(retrieved).hasSize(1);
+        assertThat(retrieved.get(0).wrappedNotificationEntity().getEntityDataForField("value")).isEqualTo("3");
     }
 
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)
@@ -368,6 +389,11 @@ public class LightblueNotificationRepositoryTest {
             Instant occurrenceDate) {
         return new StringNotification(value, NotificationEntity.Operation.INSERT, "tester",
                 Clock.fixed(occurrenceDate, ZoneOffset.UTC)).wrappedNotificationEntity();
+    }
+
+    private static NotificationEntity notificationEntityForMultiStringInsert(String value) {
+        return new MultiStringNotification(Arrays.asList(value), NotificationEntity.Operation.INSERT,
+                "tester", fixedClock).wrappedNotificationEntity();
     }
 
     private static NotificationEntity[] randomNotificationEntities(int amount) {
