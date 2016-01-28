@@ -57,14 +57,13 @@ public interface DocumentEventRepository {
      * Some repository implementations may have timeouts on event processing to facilitate failure
      * recovery, such as non-transactional data stores.
      *
-     * <p>If this is not relevant to a particular implementation, it should just return the provided
-     * list.
+     * <p>If this is not relevant to a particular implementation, it should just return an empty
+     * list
      *
      * @param events Events to check for expiration. Will not be mutated.
-     * @return A list that has all source events which are not expired. May be the same (reference)
-     * list as provided.
+     * @return A list that has all source events which are expired.
      */
-    List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events);
+    Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events);
 
     void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception;

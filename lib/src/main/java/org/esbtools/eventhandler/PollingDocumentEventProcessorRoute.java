@@ -22,7 +22,6 @@ import com.google.common.collect.Iterables;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,8 +64,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 eventsToFutureDocuments.put(event, event.lookupDocument());
             }
 
-            List<Object> documents = new ArrayList<>(documentEvents.size());
-            List<DocumentEvent> successfulEvents = new ArrayList<>(documentEvents.size());
+            Map<DocumentEvent, Object> eventsToDocuments = new HashMap<>(documentEvents.size());
             List<FailedDocumentEvent> failedEvents = new ArrayList<>();
 
             for (Map.Entry<DocumentEvent, Future<?>> eventToFutureDocument
@@ -75,18 +73,21 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 Future<?> futureDoc = eventToFutureDocument.getValue();
 
                 try {
-                    documents.add(futureDoc.get());
-                    successfulEvents.add(event);
+                    eventsToDocuments.put(event, futureDoc.get());
                 } catch (ExecutionException | InterruptedException e) {
                     failedEvents.add(new FailedDocumentEvent(event, e));
                 }
             }
 
+            documentEventRepository
+                    .checkExpired(eventsToDocuments.keySet())
+                    .forEach(eventsToDocuments::remove);
+
             // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
             // That we truly know if successfully published or not.
-            documentEventRepository.markDocumentEventsProcessedOrFailed(successfulEvents, failedEvents);
+            documentEventRepository.markDocumentEventsProcessedOrFailed(eventsToDocuments.keySet(), failedEvents);
 
-            exchange.getIn().setBody(Iterables.concat(documents, failedEvents));
+            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
         })
         .split(body())
         .streaming()

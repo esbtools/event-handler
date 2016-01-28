@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,6 +72,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
+    // TODO: Parameterize these
+    private final Duration processingTimeout = Duration.ofMinutes(10);
+    private final Duration expireThreshold = Duration.ofMinutes(2);
+
     private static final Logger logger = LoggerFactory.getLogger(LightblueDocumentEventRepository.class);
 
     public LightblueDocumentEventRepository(LightblueClient lightblue, String[] canonicalTypes,
@@ -101,9 +106,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     @Override
     public List<LightblueDocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents)
             throws Exception {
-        // TODO: Also find expired processing
         DocumentEventEntity[] documentEventEntities = lightblue
-                .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(entities, documentEventBatchSize))
+                .data(FindRequests.priorityDocumentEventsForEntitiesUpTo(
+                        entities, documentEventBatchSize,
+                        ZonedDateTime.now(clock).minus(processingTimeout)))
                 .parseProcessed(DocumentEventEntity[].class);
 
         if (documentEventEntities.length == 0) {
@@ -158,8 +164,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     @Override
-    public List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events) {
-        List<LightblueDocumentEvent> filtered = new ArrayList<>(events.size());
+    public Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events) {
+        List<LightblueDocumentEvent> expired = new ArrayList<>(events.size());
 
         for (DocumentEvent event : events) {
             if (!(event instanceof LightblueDocumentEvent)) {
@@ -171,14 +177,14 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             LightblueDocumentEvent lightblueEvent = (LightblueDocumentEvent) event;
 
             ZonedDateTime processingDate = lightblueEvent.wrappedDocumentEventEntity().getProcessingDate();
-            ZonedDateTime expireDate = processingDate.plusMinutes(5);
+            ZonedDateTime expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
 
-            if (clock.instant().isBefore(expireDate.toInstant())) {
-                filtered.add(lightblueEvent);
+            if (clock.instant().isAfter(expireDate.toInstant())) {
+                expired.add(lightblueEvent);
             }
         }
 
-        return filtered;
+        return expired;
     }
 
     @Override

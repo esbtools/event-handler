@@ -182,7 +182,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         NotificationEntity[] entities = new NotificationEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = notificationEntityForStringInsert(UUID.randomUUID().toString());
+            entities[i] = notificationEntityForStringInsert(Integer.toString(i));
         }
 
         return entities;
@@ -192,7 +192,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         NotificationEntity[] entities = new NotificationEntity[amount];
 
         for (int i = 0; i < amount; i++) {
-            entities[i] = notificationEntityForMultiStringInsert(Arrays.asList(UUID.randomUUID().toString()));
+            entities[i] = notificationEntityForMultiStringInsert(Arrays.asList(Integer.toString(i * -1)));
         }
 
         return entities;

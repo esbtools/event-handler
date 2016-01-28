@@ -24,6 +24,7 @@ import org.esbtools.eventhandler.FailedDocumentEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepository {
@@ -69,8 +70,8 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     }
 
     @Override
-    public List<? extends DocumentEvent> filterExpired(List<? extends DocumentEvent> events) {
-        return events;
+    public Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events) {
+        return Collections.emptyList();
     }
 
     @Override

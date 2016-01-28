@@ -27,6 +27,9 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import java.time.ZonedDateTime;
+import java.util.Date;
+
 public abstract class FindRequests {
     /**
      * You generally don't want to retrieve notifications which have already started being processed
@@ -57,13 +60,18 @@ public abstract class FindRequests {
      * document events.
      */
     public static DataFindRequest priorityDocumentEventsForEntitiesUpTo(String[] entities,
-            int maxEvents) {
+            int maxEvents, ZonedDateTime expiredProcessingDate) {
         DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
 
         findEntities.where(Query.and(
                 Query.withValues("canonicalType", Query.NaryOp.in, Literal.values(entities)),
-                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed)));
+                Query.or(
+                        Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed),
+                        Query.and(
+                                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processing),
+                                Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate.toInstant())))
+                )));
         findEntities.select(Projection.includeFieldRecursively("*"));
         findEntities.sort(Sort.desc("priority"));
         findEntities.range(0, maxEvents - 1);
