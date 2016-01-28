@@ -340,6 +340,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             DocumentEventEntity entity = event.wrappedDocumentEventEntity();
 
             if (entity.get_id() == null && entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
+                entity.setProcessingDate(ZonedDateTime.now(clock));
                 insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
             } else {
                 ZonedDateTime processingTime = ZonedDateTime.now(clock);
