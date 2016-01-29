@@ -29,6 +29,7 @@ import io.github.alechenninger.lightblue.Version;
 
 import javax.annotation.Nullable;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -191,6 +192,7 @@ public class DocumentEventEntity {
                 ", status=" + status +
                 ", priority=" + priority +
                 ", creationDate=" + creationDate +
+                ", processingDate=" + processingDate +
                 ", processedDate=" + processedDate +
                 ", survivorOfIds=" + survivorOfIds +
                 '}';
@@ -207,6 +209,7 @@ public class DocumentEventEntity {
                 status == that.status &&
                 Objects.equals(priority, that.priority) &&
                 Objects.equals(creationDate, that.creationDate) &&
+                Objects.equals(processingDate, that.processingDate) &&
                 Objects.equals(processedDate, that.processedDate) &&
                 Objects.equals(survivorOfIds, that.survivorOfIds);
     }
@@ -214,7 +217,7 @@ public class DocumentEventEntity {
     @Override
     public int hashCode() {
         return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
-                processedDate, survivorOfIds);
+                processingDate, processedDate, survivorOfIds);
     }
 
     public enum Status {

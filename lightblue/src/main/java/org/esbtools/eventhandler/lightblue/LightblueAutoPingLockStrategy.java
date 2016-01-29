@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -96,7 +97,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         while (true) {
             try {
-                return new AggregateAutoPingingLock(locking.getCallerId(), resourceIds, locking,
+                String callerId = UUID.randomUUID().toString();
+                return new AggregateAutoPingingLock(callerId, resourceIds, locking,
                         autoPingInterval, timeToLive);
             } catch (Exception e) {
                 Thread.sleep(tryAcquireInterval.toMillis());
@@ -106,8 +108,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
     @Override
     public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
-        return new AutoPingingLocks<>(resources, maxResources, locking.getCallerId(), locking,
-                timeToLive);
+        String callerId = UUID.randomUUID().toString();
+        return new AutoPingingLocks<>(resources, maxResources, callerId, locking, timeToLive);
     }
 
     static final class AutoPingingLock<T> implements LockedResource<T> {

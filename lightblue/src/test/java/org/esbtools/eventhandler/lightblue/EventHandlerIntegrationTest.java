@@ -140,8 +140,8 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
 
     @Test
     public void shouldTurnNotificationsIntoDocuments() throws LightblueException {
-        NotificationEntity[] stringEntities = randomStringNotificationEntities(100);
-        NotificationEntity[] multiStringEntities = randomMultiStringNotificationEntities(100);
+        NotificationEntity[] stringEntities = randomStringNotificationEntities(200);
+        NotificationEntity[] multiStringEntities = randomMultiStringNotificationEntities(0);
 
         List<String> expectedValues = new ArrayList<>(200);
         Arrays.stream(stringEntities)
@@ -166,6 +166,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     }
 
     private void insertNotificationEntities(NotificationEntity... entities) throws LightblueException {
+        if (entities.length == 0) return;
         DataInsertRequest insertEntities = new DataInsertRequest(
                 NotificationEntity.ENTITY_NAME, NotificationEntity.ENTITY_VERSION);
         insertEntities.create(entities);

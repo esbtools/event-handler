@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public class InMemoryLockStrategy implements LockStrategy {
-    private static final Map<Object, String> resourcesToClients =
+    private static final Map<String, String> resourcesToClients =
             Collections.synchronizedMap(new HashMap<>());
 
     private final String clientId;
@@ -78,7 +78,7 @@ public class InMemoryLockStrategy implements LockStrategy {
                 break;
             }
 
-            String otherClientOrNull = resourcesToClients.putIfAbsent(resource, clientId);
+            String otherClientOrNull = resourcesToClients.putIfAbsent(resource.toString(), clientId);
 
             if (otherClientOrNull != null) {
                 continue;
@@ -98,14 +98,14 @@ public class InMemoryLockStrategy implements LockStrategy {
 
     public void releaseAll() {
         List<Object> currentlyAcquired = new ArrayList<>(acquiredResources);
-        currentlyAcquired.forEach(resourcesToClients::remove);
+        currentlyAcquired.forEach(r -> resourcesToClients.remove(r.toString()));
         acquiredResources.removeAll(currentlyAcquired);
 
     }
 
     private <T> void acquireAll(T[] resources) throws InterruptedException {
         for (T resourceId : resources) {
-            String otherClientOrNull = resourcesToClients.putIfAbsent(resourceId, clientId);
+            String otherClientOrNull = resourcesToClients.putIfAbsent(resourceId.toString(), clientId);
 
             if (otherClientOrNull != null) {
                 throw new IllegalStateException();
@@ -145,7 +145,7 @@ public class InMemoryLockStrategy implements LockStrategy {
 
         @Override
         public void close() throws IOException {
-            resources.forEach(resourcesToClients::remove);
+            resources.forEach(r -> resourcesToClients.remove(r.toString()));
             acquiredResources.removeAll(resources);
         }
 
