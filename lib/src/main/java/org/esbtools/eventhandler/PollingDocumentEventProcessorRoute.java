@@ -84,7 +84,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                     .checkExpired(eventsToDocuments.keySet())
                     .forEach(eventsToDocuments::remove);
 
-            log.info("Publishing on route {}: {}", id, eventsToDocuments.values());
+            log.debug("Publishing on route {}: {}", id, eventsToDocuments.values());
 
             // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
             // That we truly know if successfully published or not.
