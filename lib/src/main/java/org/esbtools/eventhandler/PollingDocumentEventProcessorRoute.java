@@ -38,6 +38,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final String failureEndpoint;
 
     private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private final int id = idCounter.getAndIncrement();
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
             Duration pollingInterval, int batchSize, String documentEndpoint,
@@ -51,8 +52,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForDocumentEvents?period=" + pollingInterval.toMillis())
-        .routeId("documentEventsProcessor-" + idCounter.getAndIncrement())
+        from("timer:pollForDocumentEvents" + id + "?period=" + pollingInterval.toMillis())
+        .routeId("documentEventsProcessor-" + id)
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);
@@ -82,6 +83,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
             documentEventRepository
                     .checkExpired(eventsToDocuments.keySet())
                     .forEach(eventsToDocuments::remove);
+
+            log.info("Publishing on route {}: {}", id, eventsToDocuments.values());
 
             // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
             // That we truly know if successfully published or not.
