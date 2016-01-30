@@ -515,8 +515,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    @Ignore("Behavior is different with new locking algorithm: should return with no exception and no events now")
-    public void shouldThrowLostLockExceptionIfLockLostBeforeDocumentEventStatusUpdatesPersisted() throws Exception {
+    public void shouldThrowAwayEventsWhoseLockWasLostBeforeDocumentEventStatusUpdatesPersisted() throws Exception {
         SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
         InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
 
@@ -536,15 +535,13 @@ public class LightblueDocumentEventRepositoryTest {
 
             // We will block this task with the slow client; do it in another thread to avoid blocking
             // test.
-            Future<?> futureDocEvents = executor.submit(() -> repository.retrievePriorityDocumentEventsUpTo(10));
+            Future<List<LightblueDocumentEvent>> futureDocEvents = executor.submit(() -> repository.retrievePriorityDocumentEventsUpTo(10));
 
             // This will cause processing to continue, which should notice the lock expired...
             slowClient.unpause();
 
-            // ...throwing an exception.
-            expectedException.expectCause(Matchers.instanceOf(LostLockException.class));
-
-            futureDocEvents.get();
+            // ...throwing away the events.
+            assertThat(futureDocEvents.get()).isEmpty();
         } finally {
             executor.shutdownNow();
         }
