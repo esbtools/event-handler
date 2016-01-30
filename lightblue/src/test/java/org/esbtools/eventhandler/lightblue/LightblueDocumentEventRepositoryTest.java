@@ -96,6 +96,8 @@ public class LightblueDocumentEventRepositoryTest {
             .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
             .setDocumentEventsBatchSize(DOCUMENT_EVENT_BATCH_SIZE);
 
+    private InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
+
     @Before
     public void initializeLightblueClientAndRepository() {
         LightblueClientConfiguration lbClientConfig = LightblueClientConfigurations
@@ -105,9 +107,8 @@ public class LightblueDocumentEventRepositoryTest {
         // TODO: Try and reduce places canonical types are specified
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
-        repository = new LightblueDocumentEventRepository(client,
-                new InMemoryLockStrategy(), config, documentEventFactoriesByType,
-                fixedClock);
+        repository = new LightblueDocumentEventRepository(client, lockStrategy, config,
+                documentEventFactoriesByType, fixedClock);
     }
 
     @Before
@@ -516,35 +517,14 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Test
     public void shouldThrowAwayEventsWhoseLockWasLostBeforeDocumentEventStatusUpdatesPersisted() throws Exception {
-        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
-        InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
-
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        LightblueDocumentEventRepository repository = new LightblueDocumentEventRepository(client,
-                lockStrategy, config, documentEventFactoriesByType,
-                Clock.systemUTC());
-
-        slowClient.pauseOnNextRequest();
-
         insertDocumentEventEntities(randomNewDocumentEventEntities(20));
 
-        try {
-            // Sneakily steal away any acquired locks
-            lockStrategy.allowLockButImmediateLoseIt();
+        // Sneakily steal away any acquired locks
+        lockStrategy.allowLockButImmediateLoseIt();
 
-            // We will block this task with the slow client; do it in another thread to avoid blocking
-            // test.
-            Future<List<LightblueDocumentEvent>> futureDocEvents = executor.submit(() -> repository.retrievePriorityDocumentEventsUpTo(10));
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(10);
 
-            // This will cause processing to continue, which should notice the lock expired...
-            slowClient.unpause();
-
-            // ...throwing away the events.
-            assertThat(futureDocEvents.get()).isEmpty();
-        } finally {
-            executor.shutdownNow();
-        }
+        assertThat(retrieved).isEmpty();
     }
 
     @Test
