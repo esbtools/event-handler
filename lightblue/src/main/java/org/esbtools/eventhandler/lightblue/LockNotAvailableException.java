@@ -18,23 +18,12 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
-import java.util.Set;
+public class LockNotAvailableException extends Exception {
+    public LockNotAvailableException(Object resource) {
+        super("Lock not available for resource: " + resource);
+    }
 
-/**
- * Abstracts an atomic exclusive locking mechanism which is used to coordinate concurrent work on
- * logical "resources."
- */
-public interface LockStrategy {
-    /**
-     * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
-     * together, returning an instance representing the acquired lock. Order of provided resources
-     * does not matter.
-     */
-    // TODO: Make generic or remove
-    LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
-
-    <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources);
-
-    <T> LockedResource<T> tryAcquire(T resource) throws LockNotAvailableException;
+    public LockNotAvailableException(Object resource, Exception cause) {
+        super("Lock not available for resource: " + resource, cause);
+    }
 }

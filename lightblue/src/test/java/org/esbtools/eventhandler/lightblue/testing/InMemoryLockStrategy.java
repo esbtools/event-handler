@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
+import org.esbtools.eventhandler.lightblue.LockNotAvailableException;
 import org.esbtools.eventhandler.lightblue.LockStrategy;
 import org.esbtools.eventhandler.lightblue.LockedResource;
 import org.esbtools.eventhandler.lightblue.LockedResources;
@@ -64,7 +65,7 @@ public class InMemoryLockStrategy implements LockStrategy {
                 releaseAll();
             }
 
-            return new InMemoryLockedResource<>(resourceIds);
+            return new InMemoryLockedResources<>(resourceIds);
         }
     }
 
@@ -93,7 +94,24 @@ public class InMemoryLockStrategy implements LockStrategy {
             releaseAll();
         }
 
-        return new InMemoryLockedResource<>(acquired);
+        return new InMemoryLockedResources<>(acquired);
+    }
+
+    @Override
+    public <T> LockedResource<T> tryAcquire(T resource) throws LockNotAvailableException {
+        String otherClientOrNull = resourcesToClients.putIfAbsent(resource.toString(), clientId);
+
+        if (otherClientOrNull == null) {
+            acquiredResources.add(resource);
+
+            if (allowLockButImmediateLoseIt) {
+                releaseAll();
+            }
+
+            return new InMemoryLockedResource<T>(resource);
+        }
+
+        throw new LockNotAvailableException(resource);
     }
 
     public void releaseAll() {
@@ -119,15 +137,41 @@ public class InMemoryLockStrategy implements LockStrategy {
         allowLockButImmediateLoseIt = true;
     }
 
-    private class InMemoryLockedResource<T> implements LockedResource<List<T>>, LockedResources<T> {
+    private class InMemoryLockedResource<T> implements LockedResource<T> {
+        private final T resource;
+
+        private InMemoryLockedResource(T resource) {
+            this.resource = resource;
+        }
+
+        @Override
+        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
+            if (!acquiredResources.contains(resource)) {
+                throw new LostLockException(this, lostLockMessage);
+            }
+        }
+
+        @Override
+        public T getResource() {
+            return resource;
+        }
+
+        @Override
+        public void close() throws IOException {
+            resourcesToClients.remove(resource.toString());
+            acquiredResources.remove(resource);
+        }
+    }
+
+    private class InMemoryLockedResources<T> implements LockedResource<List<T>>, LockedResources<T> {
         private final List<T> resources;
 
         @SafeVarargs
-        public InMemoryLockedResource(T... resources) {
+        public InMemoryLockedResources(T... resources) {
             this.resources = Arrays.asList(resources);
         }
 
-        public InMemoryLockedResource(List<T> resources) {
+        public InMemoryLockedResources(List<T> resources) {
             this.resources = resources;
         }
 

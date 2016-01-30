@@ -23,10 +23,12 @@ import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-public class KeyValueIdentity implements Identity {
+public class TypeKeyValueIdentity implements Identity {
+    private final Class<?> type;
     private final SortedMap<String, String> identityFieldToValue;
 
-    public KeyValueIdentity(Map<String, String> identityFieldToValue) {
+    public TypeKeyValueIdentity(Class<?> type, Map<String, String> identityFieldToValue) {
+        this.type = type;
         this.identityFieldToValue = new TreeMap<>(identityFieldToValue);
     }
 
@@ -34,7 +36,7 @@ public class KeyValueIdentity implements Identity {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        KeyValueIdentity identity = (KeyValueIdentity) o;
+        TypeKeyValueIdentity identity = (TypeKeyValueIdentity) o;
         return Objects.equals(identityFieldToValue, identity.identityFieldToValue);
     }
 
@@ -45,8 +47,9 @@ public class KeyValueIdentity implements Identity {
 
     @Override
     public String toString() {
-        return "KeyValueIdentity{" +
-                "identityFieldToValue=" + identityFieldToValue +
+        return "TypeKeyValueIdentity{" +
+                "type=" + type +
+                ", identityFieldToValue=" + identityFieldToValue +
                 '}';
     }
 }

@@ -106,6 +106,15 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
     }
 
+    public <T> LockedResource<T> tryAcquire(T resource) throws LockNotAvailableException {
+        try {
+            String callerId = UUID.randomUUID().toString();
+            return new AutoPingingLock<>(locking, callerId, resource, autoPingInterval, timeToLive);
+        } catch (LightblueException e) {
+            throw new LockNotAvailableException(resource.toString(), e);
+        }
+    }
+
     @Override
     public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
         String callerId = UUID.randomUUID().toString();
@@ -134,7 +143,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                 resourceId = URLEncoder.encode(resource.toString(), "UTF-8");
 
                 if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
-                    throw new LockNotAvailableException(callerId, resourceId);
+                    throw new LockNotAvailableException(resourceId);
                 }
 
                 this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
@@ -329,6 +338,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         @Override
         public Object getResource() {
+            // FIXME
             return null;
         }
 
@@ -361,17 +371,4 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
     }
 
-    static class LockNotAvailableException extends Exception {
-        public LockNotAvailableException(String callerId, String resourceId) {
-            super("callerId: " + callerId + ", resourceId: " + resourceId);
-        }
-    }
-
-    static class MultipleIOExceptions extends IOException {
-        MultipleIOExceptions(List<IOException> exceptions) {
-            super("Multiple IOExceptions occurred. See suppressed exceptions.");
-
-            exceptions.forEach(this::addSuppressed);
-        }
-    }
 }

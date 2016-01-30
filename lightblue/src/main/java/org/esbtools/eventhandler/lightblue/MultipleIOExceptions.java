@@ -18,16 +18,13 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
+import java.io.IOException;
+import java.util.List;
 
-public class SimpleLightblueLockStrategy implements LockStrategy {
-    @Override
-    public LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException {
-        return null;
-    }
+class MultipleIOExceptions extends IOException {
+    MultipleIOExceptions(List<IOException> exceptions) {
+        super("Multiple IOExceptions occurred. See suppressed exceptions.");
 
-    @Override
-    public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
-        return null;
+        exceptions.forEach(this::addSuppressed);
     }
 }

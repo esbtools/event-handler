@@ -21,7 +21,6 @@ package org.esbtools.eventhandler.lightblue.testing;
 import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.Identity;
-import org.esbtools.eventhandler.lightblue.KeyValueIdentity;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
 import org.esbtools.eventhandler.lightblue.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.TypeAndValueIdentity;
