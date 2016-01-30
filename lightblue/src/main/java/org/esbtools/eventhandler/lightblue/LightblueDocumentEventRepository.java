@@ -108,9 +108,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         if (typesToProcess.length == 0 || documentEventsBatchSize == null ||
                 documentEventsBatchSize == 0) {
             logger.info("Not retrieving any document events because either there are no enabled " +
-                            "or supported types to process or documentEventBatchSize is 0. Supported " +
-                            "types are {}. Of those, enabled types are {}. " +
-                            "Document event batch size is {}.",
+                    "or supported types to process or documentEventBatchSize is 0. Supported " +
+                    "types are {}. Of those, enabled types are {}. " +
+                    "Document event batch size is {}.",
                     supportedTypes, Arrays.toString(typesToProcess), documentEventsBatchSize);
             return Collections.emptyList();
         }
@@ -145,8 +145,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return saved.stream()
                     .sorted((o1, o2) -> o2.wrappedDocumentEventEntity().getPriority() -
                             o1.wrappedDocumentEventEntity().getPriority())
-                    .filter(event -> event.wrappedDocumentEventEntity().getStatus()
-                            .equals(DocumentEventEntity.Status.processing))
                     .collect(Collectors.toList());
         }
     }
@@ -246,8 +244,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 continue;
             }
 
-            for (DocumentEventUpdate insertOrUpdate : lockedEvents.updates.values()) {
-                LightblueDocumentEvent event = insertOrUpdate.event;
+            for (DocumentEventUpdate update : lockedEvents.updates.values()) {
+                LightblueDocumentEvent event = update.event;
 
                 DocumentEventEntity entity = event.wrappedDocumentEventEntity();
 
@@ -259,7 +257,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     }
                 } else {
                     insertAndUpdateEvents.add(UpdateRequests.documentEventStatusIfCurrent(
-                            entity, insertOrUpdate.originalProcessingDate));
+                            entity, update.originalProcessingDate));
 
                     savedEvents.add(event);
                 }
@@ -334,6 +332,12 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 continue;
             }
 
+            // We don't care about returning events which are done processing. We only want events
+            // which are supposed to be turned into publishable documents.
+            if (!entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
+                eventsIterator.remove();
+            }
+
             // If known entity has no id, must've been insert. Populate id in returned entity.
             if (entity.get_id() == null) {
                 DocumentEventEntity processed = response.parseProcessed(DocumentEventEntity.class);
@@ -386,13 +390,19 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     LightblueDocumentEvent newEvent =
                             eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
 
-                    SharedIdentityEvents eventBatch = docEventsByIdentity.computeIfAbsent(
-                            newEvent.identity(),
-                            i -> new SharedIdentityEvents(lockStrategy, i, clock));
+                    SharedIdentityEvents eventBatch = docEventsByIdentity.get(newEvent.identity());
+
+                    if (eventBatch == null) {
+                        eventBatch = new SharedIdentityEvents(lockStrategy, newEvent.identity(), clock);
+                        docEventsByIdentity.put(newEvent.identity(), eventBatch);
+                        if (eventBatch.lock.isPresent()) {
+                            locksAcquired++;
+                        }
+                    }
 
                     eventBatch.addEvent(newEvent);
 
-                    if (eventBatch.lock.isPresent() && ++locksAcquired == maxIdentities) {
+                    if (locksAcquired == maxIdentities) {
                         break;
                     }
                 } catch (Exception e) {
@@ -574,6 +584,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     DocumentEventEntity.Status.published.equals(currentStatus)) {
                 entity.setProcessedDate(now);
             }
+
             return new DocumentEventUpdate(originalProcessingDate, event);
         }
 
