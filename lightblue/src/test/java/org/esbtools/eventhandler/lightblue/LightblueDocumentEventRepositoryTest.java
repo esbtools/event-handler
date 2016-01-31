@@ -251,7 +251,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldRetrieveDocumentEventsInPriorityOrder() throws Exception {
+    public void shouldRetrieveTopPriorityDocumentEventsInBatch() throws Exception {
         insertDocumentEventEntities(
                 newRandomStringDocumentEventEntityWithPriorityOverride(5),
                 newRandomStringDocumentEventEntityWithPriorityOverride(100),
@@ -264,12 +264,12 @@ public class LightblueDocumentEventRepositoryTest {
                 newRandomStringDocumentEventEntityWithPriorityOverride(70),
                 newRandomStringDocumentEventEntityWithPriorityOverride(2));
 
-        List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(10).stream()
+        List<Integer> priorities = repository.retrievePriorityDocumentEventsUpTo(5).stream()
                 .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
                 .map(DocumentEventEntity::getPriority)
                 .collect(Collectors.toList());
 
-        assertEquals(Arrays.asList(100, 99, 70, 55, 50, 30, 25, 25, 5, 2), priorities);
+        assertThat(priorities).containsExactly(100, 99, 70, 55, 50);
     }
 
     @Test

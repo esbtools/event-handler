@@ -138,17 +138,18 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                              lockStrategy,
                              clock)) {
 
-            List<LightblueDocumentEvent> saved =
-                    persistNewEntitiesAndStatusUpdatesToExisting(eventLocks);
-
-            // TODO: Sort is unnecessary here, need to update test for it
-            return saved.stream()
-                    .sorted((o1, o2) -> o2.wrappedDocumentEventEntity().getPriority() -
-                            o1.wrappedDocumentEventEntity().getPriority())
-                    .collect(Collectors.toList());
+            return persistNewEntitiesAndStatusUpdatesToExisting(eventLocks);
         }
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>N.B. This implementation currently works by simply checking if the known in memory
+     * timeouts of provided events fall within some threshold. It could be updated to also timestamp
+     * the persisted events again, but to be safe we would probably want to also lock them to do
+     * this update. For now, that complexity is probably not worth it.
+     */
     @Override
     public Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events) {
         List<LightblueDocumentEvent> expired = new ArrayList<>(events.size());
@@ -202,6 +203,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return;
         }
 
+        // If any fail, not much we can do. Let exception propagate.
         lightblue.bulkData(markDocumentEvents);
     }
 
@@ -371,8 +373,22 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
          * implementations provided by {@code documentEventFactoriesByType}, grouped by their
          * {@link Identity}.
          *
-         * <p>Once parsed and grouped, a shared-identity batch of events can be optimized, producing
-         * a new collection of ready-to-process events.
+         * <p>As each entity is parsed, we attempt to lock its identity if we have not tried
+         * already. If we are successful, we check if this event can be optimized among others with
+         * the same identity (it almost certainly should be able to), and track the updates that
+         * need to be persisted as a result of these optimizations.
+         *
+         * @param maxIdentities The maximum number of identities to lock, which <em>should</em>
+         *                      also mean the maximum number of events, given all events with the
+         *                      same identity should be able to be optimized down to one event.
+         * @param entities The entities to parse.
+         * @param requester The requester that parsed events will use to build documents.
+         * @param documentEventFactoriesByType Tells us how to parse each entity into an event.
+         * @param lockStrategy We only work on events we an lock. This is how we lock them.
+         * @param clock Determines how we get timestamps. Mainly here for testing purposes.
+         * @return All of the locked and optimized event batches, wrapped in a
+         * {@link LockedResources} object which can be used to release the locks as well as to check
+         * their current status.
          */
         static LockedResources<SharedIdentityEvents> parseAndOptimizeLockableDocumentEventEntities(
                 int maxIdentities, DocumentEventEntity[] entities, LightblueRequester requester,
@@ -460,7 +476,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         /**
-         * TODO
+         * Take the provided event and checks if it can be optimized among other known events of the
+         * same identity. The results are tracked as side-effects to {@link #updates}.
          */
         private void addEvent(LightblueDocumentEvent event) {
             if (!Objects.equals(event.identity(), identity)) {
