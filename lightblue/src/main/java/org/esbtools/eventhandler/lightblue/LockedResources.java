@@ -24,5 +24,5 @@ import java.util.List;
 public interface LockedResources<T> extends Closeable {
     List<T> getResources();
 
-    List<T> checkForLostResources();
+    List<LockedResource<T>> getLocks();
 }

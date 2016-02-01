@@ -31,6 +31,7 @@ import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import java.io.IOException;
 import java.sql.Date;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 

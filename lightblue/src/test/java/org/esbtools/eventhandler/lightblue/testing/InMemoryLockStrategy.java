@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class InMemoryLockStrategy implements LockStrategy {
     private static final Map<String, String> resourcesToClients =
@@ -199,10 +200,8 @@ public class InMemoryLockStrategy implements LockStrategy {
         }
 
         @Override
-        public List<T> checkForLostResources() {
-            List<T> lost = new ArrayList<>(resources);
-            lost.removeAll(acquiredResources);
-            return lost;
+        public List<LockedResource<T>> getLocks() {
+            return resources.stream().map(InMemoryLockedResource::new).collect(Collectors.toList());
         }
     }
 }

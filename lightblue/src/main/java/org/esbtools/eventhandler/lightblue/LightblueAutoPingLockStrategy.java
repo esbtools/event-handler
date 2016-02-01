@@ -217,7 +217,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
     }
 
     static final class AutoPingingLocks<T> implements LockedResources<T> {
-        private final List<AutoPingingLock<T>> locks;
+        private final List<LockedResource<T>> locks;
         private final List<T> resourcesAcquired;
 
         static final Logger logger = LoggerFactory.getLogger(AutoPingingLocks.class);
@@ -251,18 +251,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         }
 
         @Override
-        public List<T> checkForLostResources() {
-            List<T> lost = new ArrayList<>();
-
-            for (LockedResource<T> lock : locks) {
-                try {
-                    lock.ensureAcquiredOrThrow("");
-                } catch (LostLockException e) {
-                    lost.add(lock.getResource());
-                }
-            }
-
-            return lost;
+        public List<LockedResource<T>> getLocks() {
+            return locks;
         }
 
         @Override

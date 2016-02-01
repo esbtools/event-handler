@@ -138,7 +138,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                              lockStrategy,
                              clock)) {
 
-            return persistNewEntitiesAndStatusUpdatesToExisting(eventLocks);
+            return persistNewEventsAndStatusUpdatesToExisting(eventLocks);
         }
     }
 
@@ -229,11 +229,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      *
      * <p>Checks for lost locks before persisting, dropping and logging those lost.
      */
-    private List<LightblueDocumentEvent> persistNewEntitiesAndStatusUpdatesToExisting(
+    private List<LightblueDocumentEvent> persistNewEventsAndStatusUpdatesToExisting(
             LockedResources<SharedIdentityEvents> identityLocks) throws LightblueException {
         DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
 
-        List<SharedIdentityEvents> lostLocks = identityLocks.checkForLostResources();
         List<LightblueDocumentEvent> savedEvents = new ArrayList<>();
 
         // TODO: We make single request per event here (wrapped in bulk request). Maybe could optimize.
@@ -241,8 +240,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         // Could probably change that so processing dates were more grouped.
         // See: https://github.com/esbtools/event-handler/issues/11
         for (SharedIdentityEvents lockedEvents : identityLocks.getResources()) {
-            if (lostLocks.contains(lockedEvents)) {
-                logger.warn("Lost lock for identity <{}>", lockedEvents.identity);
+            try {
+                lockedEvents.ensureAcquiredOrThrow("Won't update status or process event.");
+            } catch (LostLockException e) {
+                logger.warn("Lost lock. This is not fatal. See exception for details.", e);
                 continue;
             }
 
@@ -365,7 +366,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
         private final Optional<LockedResource<Identity>> lock;
         // TODO: Is this guaranteed to only ever be one event?
-        private final Collection<LightblueDocumentEvent> optimized = new ArrayList<>();
+        private final List<LightblueDocumentEvent> optimized = new ArrayList<>();
         private final Clock clock;
 
         /**
@@ -626,18 +627,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         @Override
-        public List<SharedIdentityEvents> checkForLostResources() {
-            List<SharedIdentityEvents> lost = new ArrayList<>();
-
-            for (LockedResource<SharedIdentityEvents> lock : lockedEventBatches) {
-                try {
-                    lock.ensureAcquiredOrThrow("");
-                } catch (LostLockException e) {
-                    lost.add(lock.getResource());
-                }
-            }
-
-            return lost;
+        public List<LockedResource<SharedIdentityEvents>> getLocks() {
+            return new ArrayList<>(lockedEventBatches);
         }
 
         @Override
