@@ -252,7 +252,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         @Override
         public List<LockedResource<T>> getLocks() {
-            return locks;
+            return Collections.unmodifiableList(locks);
         }
 
         @Override

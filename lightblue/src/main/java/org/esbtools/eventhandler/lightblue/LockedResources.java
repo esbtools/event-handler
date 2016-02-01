@@ -19,10 +19,11 @@
 package org.esbtools.eventhandler.lightblue;
 
 import java.io.Closeable;
+import java.util.Collection;
 import java.util.List;
 
 public interface LockedResources<T> extends Closeable {
-    List<T> getResources();
+    Collection<T> getResources();
 
-    List<LockedResource<T>> getLocks();
+    Collection<LockedResource<T>> getLocks();
 }

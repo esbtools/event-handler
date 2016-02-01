@@ -239,13 +239,15 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         // Right now each event may have different processing date which we are looking for.
         // Could probably change that so processing dates were more grouped.
         // See: https://github.com/esbtools/event-handler/issues/11
-        for (SharedIdentityEvents lockedEvents : identityLocks.getResources()) {
+        for (LockedResource<SharedIdentityEvents> identityLock : identityLocks.getLocks()) {
             try {
-                lockedEvents.ensureAcquiredOrThrow("Won't update status or process event.");
+                identityLock.ensureAcquiredOrThrow("Won't update status or process event.");
             } catch (LostLockException e) {
                 logger.warn("Lost lock. This is not fatal. See exception for details.", e);
                 continue;
             }
+
+            SharedIdentityEvents lockedEvents = identityLock.getResource();
 
             for (DocumentEventUpdate update : lockedEvents.updates.values()) {
                 LightblueDocumentEvent event = update.event;
@@ -360,11 +362,11 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 "supported. Event type was: " + event.getClass());
     }
 
-    static class SharedIdentityEvents implements LockedResource<SharedIdentityEvents> {
+    static class SharedIdentityEvents {
         final Identity identity;
         final Map<LightblueDocumentEvent, DocumentEventUpdate> updates = new IdentityHashMap<>();
+        final Optional<LockedResource<SharedIdentityEvents>> lock;
 
-        private final Optional<LockedResource<Identity>> lock;
         // TODO: Is this guaranteed to only ever be one event?
         private final List<LightblueDocumentEvent> optimized = new ArrayList<>();
         private final Clock clock;
@@ -396,7 +398,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType,
                 LockStrategy lockStrategy, Clock clock) {
             Map<Identity, SharedIdentityEvents> docEventsByIdentity = new HashMap<>();
-            int locksAcquired = 0;
+            List<LockedResource<SharedIdentityEvents>> locksAcquired = new ArrayList<>();
 
             for (DocumentEventEntity eventEntity : entities) {
                 String typeOfEvent = eventEntity.getCanonicalType();
@@ -413,13 +415,13 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         eventBatch = new SharedIdentityEvents(lockStrategy, newEvent.identity(), clock);
                         docEventsByIdentity.put(newEvent.identity(), eventBatch);
                         if (eventBatch.lock.isPresent()) {
-                            locksAcquired++;
+                            locksAcquired.add(eventBatch.lock.get());
                         }
                     }
 
                     eventBatch.addEvent(newEvent);
 
-                    if (locksAcquired == maxIdentities) {
+                    if (locksAcquired.size() == maxIdentities) {
                         break;
                     }
                 } catch (Exception e) {
@@ -427,47 +429,21 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 }
             }
 
-            return new SharedIdentityEventsLockedResources(docEventsByIdentity.values());
+            return new SharedIdentityEventsLockedResources(docEventsByIdentity.values(), locksAcquired);
         }
 
         SharedIdentityEvents(LockStrategy lockStrategy, Identity identity, Clock clock) {
             this.identity = identity;
             this.clock = clock;
 
-            Optional<LockedResource<Identity>> lock;
+            Optional<LockedResource<SharedIdentityEvents>> lock;
             try {
-                lock = Optional.of(lockStrategy.tryAcquire(identity));
+                lock = Optional.of(lockStrategy.tryAcquire(this));
             } catch (LockNotAvailableException e) {
                 lock = Optional.empty();
             }
 
             this.lock = lock;
-        }
-
-        @Override
-        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
-            if (!lock.isPresent()) {
-                // In this case, there are no events to lose a lock for
-                return;
-            }
-
-            try {
-                lock.get().ensureAcquiredOrThrow(lostLockMessage);
-            } catch (LostLockException e) {
-                throw new LostLockException(this, lostLockMessage, e);
-            }
-        }
-
-        @Override
-        public SharedIdentityEvents getResource() {
-            return this;
-        }
-
-        @Override
-        public void close() throws IOException {
-            if (lock.isPresent()) {
-                lock.get().close();
-            }
         }
 
         // TODO: Use different method for shared resource id
@@ -615,27 +591,30 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     static class SharedIdentityEventsLockedResources implements LockedResources<SharedIdentityEvents> {
-        private final Collection<SharedIdentityEvents> lockedEventBatches;
+        private final List<SharedIdentityEvents> eventBatches;
+        private final List<LockedResource<SharedIdentityEvents>> locks;
 
-        public SharedIdentityEventsLockedResources(Collection<SharedIdentityEvents> lockedEventBatches) {
-            this.lockedEventBatches = lockedEventBatches;
+        public SharedIdentityEventsLockedResources(Collection<SharedIdentityEvents> eventBatches,
+                List<LockedResource<SharedIdentityEvents>> locks) {
+            this.eventBatches = new ArrayList<>(eventBatches);
+            this.locks = locks;
         }
 
         @Override
         public List<SharedIdentityEvents> getResources() {
-            return new ArrayList<>(lockedEventBatches);
+            return Collections.unmodifiableList(eventBatches);
         }
 
         @Override
         public List<LockedResource<SharedIdentityEvents>> getLocks() {
-            return new ArrayList<>(lockedEventBatches);
+            return Collections.unmodifiableList(locks);
         }
 
         @Override
         public void close() throws IOException {
             List<IOException> exceptions = new ArrayList<>(0);
 
-            for (LockedResource lock : lockedEventBatches) {
+            for (LockedResource lock : locks) {
                 try {
                     lock.close();
                 } catch (IOException e) {
