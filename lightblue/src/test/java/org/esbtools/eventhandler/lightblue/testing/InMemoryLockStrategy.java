@@ -195,11 +195,6 @@ public class InMemoryLockStrategy implements LockStrategy {
         }
 
         @Override
-        public List<T> getResources() {
-            return getResource();
-        }
-
-        @Override
         public List<LockedResource<T>> getLocks() {
             return resources.stream().map(InMemoryLockedResource::new).collect(Collectors.toList());
         }

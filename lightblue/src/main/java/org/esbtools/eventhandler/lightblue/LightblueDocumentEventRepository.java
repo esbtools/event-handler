@@ -601,11 +601,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         @Override
-        public List<SharedIdentityEvents> getResources() {
-            return Collections.unmodifiableList(eventBatches);
-        }
-
-        @Override
         public List<LockedResource<SharedIdentityEvents>> getLocks() {
             return Collections.unmodifiableList(locks);
         }

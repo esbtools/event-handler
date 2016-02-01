@@ -23,7 +23,5 @@ import java.util.Collection;
 import java.util.List;
 
 public interface LockedResources<T> extends Closeable {
-    Collection<T> getResources();
-
     Collection<LockedResource<T>> getLocks();
 }
