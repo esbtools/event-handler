@@ -48,6 +48,10 @@ public class InMemoryLocking extends Locking {
         resourcesToCallers.clear();
     }
 
+    public static void releaseResource(String resourceId) {
+        resourcesToCallers.remove(resourceId);
+    }
+
     @Override
     public boolean acquire(String callerId, String resourceId, Long ttl) throws LightblueException {
         attemptedAcquisitions.incrementAndGet();

@@ -45,6 +45,9 @@ public class LightblueAutoPingLockStrategyTest {
     InMemoryLocking client1Locking = new InMemoryLocking();
     InMemoryLocking client2Locking = new InMemoryLocking();
 
+    // TODO: The multi client paradigm is not necessary actually since we use unique caller id per
+    // call.
+
     LightblueAutoPingLockStrategy client1StrategyWith2SecondPing = new LightblueAutoPingLockStrategy(
             client1Locking, Duration.ofMillis(100), Duration.ofSeconds(2));
     LightblueAutoPingLockStrategy client2StrategyWith2SecondPing = new LightblueAutoPingLockStrategy(
@@ -186,7 +189,7 @@ public class LightblueAutoPingLockStrategyTest {
 
         lockedResources.add(lock);
 
-        client1Locking.release("resource1");
+        InMemoryLocking.releaseResource("resource1");
 
         lock.ensureAcquiredOrThrow("should throw");
     }
@@ -197,7 +200,7 @@ public class LightblueAutoPingLockStrategyTest {
 
         lockedResources.add(lock);
 
-        client1Locking.release("resource1");
+        InMemoryLocking.releaseResource("resource1");
 
         // Sleep past TTL
         Thread.sleep(2000);
