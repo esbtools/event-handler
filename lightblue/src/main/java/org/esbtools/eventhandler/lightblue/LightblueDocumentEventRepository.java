@@ -365,8 +365,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     static class SharedIdentityEvents {
         final Identity identity;
         final Map<LightblueDocumentEvent, DocumentEventUpdate> updates = new IdentityHashMap<>();
-        final Optional<LockedResource<SharedIdentityEvents>> lock;
 
+        private final Optional<LockedResource<SharedIdentityEvents>> lock;
         // TODO: Is this guaranteed to only ever be one event?
         private final List<LightblueDocumentEvent> optimized = new ArrayList<>();
         private final Clock clock;
