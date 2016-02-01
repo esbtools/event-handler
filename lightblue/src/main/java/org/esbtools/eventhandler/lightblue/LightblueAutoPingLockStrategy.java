@@ -97,8 +97,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         while (true) {
             try {
-                String callerId = UUID.randomUUID().toString();
-                return new AggregateAutoPingingLock(callerId, resourceIds, locking,
+                return new AggregateAutoPingingLock(locking.getCallerId(), resourceIds, locking,
                         autoPingInterval, timeToLive);
             } catch (Exception e) {
                 Thread.sleep(tryAcquireInterval.toMillis());
@@ -108,8 +107,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
     public <T> LockedResource<T> tryAcquire(T resource) throws LockNotAvailableException {
         try {
-            String callerId = UUID.randomUUID().toString();
-            return new AutoPingingLock<>(locking, callerId, resource, autoPingInterval, timeToLive);
+            return new AutoPingingLock<>(locking, locking.getCallerId(), resource, autoPingInterval, timeToLive);
         } catch (LightblueException e) {
             throw new LockNotAvailableException(resource.toString(), e);
         }
@@ -117,8 +115,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
     @Override
     public <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources) {
-        String callerId = UUID.randomUUID().toString();
-        return new AutoPingingLocks<>(resources, maxResources, callerId, locking, timeToLive);
+        return new AutoPingingLocks<>(resources, maxResources, locking.getCallerId(), locking, timeToLive);
     }
 
     static final class AutoPingingLock<T> implements LockedResource<T> {
