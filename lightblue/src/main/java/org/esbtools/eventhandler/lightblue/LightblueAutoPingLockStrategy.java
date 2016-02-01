@@ -215,20 +215,17 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
     static final class AutoPingingLocks<T> implements LockedResources<T> {
         private final List<LockedResource<T>> locks;
-        private final List<T> resourcesAcquired;
 
         static final Logger logger = LoggerFactory.getLogger(AutoPingingLocks.class);
 
         AutoPingingLocks(Collection<T> resources, int maxResources, String callerId,
                 Locking locking, Duration ttl) {
             locks = new ArrayList<>(resources.size());
-            resourcesAcquired = new ArrayList<>(resources.size());
 
             for (T resource : resources) {
                 try {
                     locks.add(new AutoPingingLock<>(locking, callerId, resource, ttl.dividedBy(2),
                             ttl));
-                    resourcesAcquired.add(resource);
                 } catch (LightblueException e) {
                     logger.warn("LightblueException trying to acquire lock for resource: " +
                             resource + ", callerId: " + callerId, e);

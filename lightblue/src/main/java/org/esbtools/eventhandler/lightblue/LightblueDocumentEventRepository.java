@@ -429,7 +429,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 }
             }
 
-            return new SharedIdentityEventsLockedResources(docEventsByIdentity.values(), locksAcquired);
+            return new SharedIdentityEventsLockedResources(locksAcquired);
         }
 
         SharedIdentityEvents(LockStrategy lockStrategy, Identity identity, Clock clock) {
@@ -591,12 +591,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     }
 
     static class SharedIdentityEventsLockedResources implements LockedResources<SharedIdentityEvents> {
-        private final List<SharedIdentityEvents> eventBatches;
         private final List<LockedResource<SharedIdentityEvents>> locks;
 
-        public SharedIdentityEventsLockedResources(Collection<SharedIdentityEvents> eventBatches,
-                List<LockedResource<SharedIdentityEvents>> locks) {
-            this.eventBatches = new ArrayList<>(eventBatches);
+        public SharedIdentityEventsLockedResources(List<LockedResource<SharedIdentityEvents>> locks) {
             this.locks = locks;
         }
 
