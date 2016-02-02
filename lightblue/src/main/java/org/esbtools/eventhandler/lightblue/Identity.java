@@ -18,17 +18,11 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-public interface Identity {
-    /**
-     * Semantic, not reference equality.
-     */
-    @Override
-    boolean equals(Object o);
-
-    /**
-     * Strings which should also be a reflection of equality. That is, two identities which are
-     * equal, <em>must</em> have equal {@code toString()}.
-     */
-    @Override
-    String toString();
+/**
+ * Marker interface for {@link Lockable} resources which expose a resource id that encodes an
+ * entity's identity.
+ *
+ * <p>TODO: expand this doc
+ */
+public interface Identity extends Lockable {
 }

@@ -361,7 +361,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 "supported. Event type was: " + event.getClass());
     }
 
-    static class SharedIdentityEvents {
+    static class SharedIdentityEvents implements Lockable {
         final Identity identity;
         final Map<LightblueDocumentEvent, DocumentEventUpdate> updates = new IdentityHashMap<>();
 
@@ -445,10 +445,19 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             this.lock = lock;
         }
 
-        // TODO: Use different method for shared resource id
+        @Override
+        public String getResourceId() {
+            return identity.getResourceId();
+        }
+
         @Override
         public String toString() {
-            return identity.toString();
+            return "SharedIdentityEvents{" +
+                    "identity=" + identity +
+                    ", updates=" + updates +
+                    ", lock=" + lock +
+                    ", optimized=" + optimized +
+                    '}';
         }
 
         /**

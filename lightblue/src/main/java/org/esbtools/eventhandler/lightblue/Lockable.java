@@ -18,13 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-public class LockNotAvailableException extends Exception {
-    public LockNotAvailableException(String resourceId, Object resource) {
-        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource);
-    }
-
-    public LockNotAvailableException(String resourceId, Object resource, Exception cause) {
-        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource,
-                cause);
-    }
+public interface Lockable {
+    String getResourceId();
 }

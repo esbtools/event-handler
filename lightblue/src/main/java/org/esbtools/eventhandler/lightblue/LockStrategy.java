@@ -34,7 +34,9 @@ public interface LockStrategy {
     // TODO: Make generic or remove
     LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
 
-    <T> LockedResources<T> tryAcquireUpTo(int maxResources, Collection<T> resources);
+    <T> LockedResource<T> tryAcquire(String resourceId, T resource) throws LockNotAvailableException;
 
-    <T> LockedResource<T> tryAcquire(T resource) throws LockNotAvailableException;
+    default <T extends Lockable> LockedResource<T> tryAcquire(T lockable) throws LockNotAvailableException {
+        return tryAcquire(lockable.getResourceId(), lockable);
+    }
 }
