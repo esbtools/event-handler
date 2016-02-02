@@ -37,7 +37,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -429,7 +428,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 }
             }
 
-            return new SharedIdentityEventsLockedResources(locksAcquired);
+            return LockedResources.fromLocks(locksAcquired);
         }
 
         SharedIdentityEvents(LockStrategy lockStrategy, Identity identity, Clock clock) {
@@ -587,40 +586,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 LightblueDocumentEvent event) {
             this.originalProcessingDate = originalProcessingDate;
             this.event = event;
-        }
-    }
-
-    static class SharedIdentityEventsLockedResources implements LockedResources<SharedIdentityEvents> {
-        private final List<LockedResource<SharedIdentityEvents>> locks;
-
-        public SharedIdentityEventsLockedResources(List<LockedResource<SharedIdentityEvents>> locks) {
-            this.locks = locks;
-        }
-
-        @Override
-        public List<LockedResource<SharedIdentityEvents>> getLocks() {
-            return Collections.unmodifiableList(locks);
-        }
-
-        @Override
-        public void close() throws IOException {
-            List<IOException> exceptions = new ArrayList<>(0);
-
-            for (LockedResource lock : locks) {
-                try {
-                    lock.close();
-                } catch (IOException e) {
-                    exceptions.add(e);
-                }
-            }
-
-            if (!exceptions.isEmpty()) {
-                if (exceptions.size() == 1) {
-                    throw exceptions.get(0);
-                }
-
-                throw new MultipleIOExceptions(exceptions);
-            }
         }
     }
 }
