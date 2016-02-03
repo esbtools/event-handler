@@ -51,7 +51,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -98,10 +97,10 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
                 LightblueClientConfigurations.fromLightblueExternalResource(lightblueExternalResource));
 
         LightblueAutoPingLockStrategy lockStrategy1 = new LightblueAutoPingLockStrategy(
-                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(5));
 
         LightblueAutoPingLockStrategy lockStrategy2 = new LightblueAutoPingLockStrategy(
-                client.getLocking("testLockingDomain"), Duration.ofSeconds(1), Duration.ofSeconds(5));
+                client.getLocking("testLockingDomain"), Duration.ofSeconds(5));
 
         LightblueNotificationRepositoryConfig notificationConfigRepo1 =
                 new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"));

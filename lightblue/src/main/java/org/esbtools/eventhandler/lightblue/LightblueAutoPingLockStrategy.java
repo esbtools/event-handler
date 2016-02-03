@@ -27,10 +27,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -50,32 +46,28 @@ import java.util.concurrent.TimeUnit;
  */
 public class LightblueAutoPingLockStrategy implements LockStrategy {
     private final Locking locking;
-    private final Duration tryAcquireInterval;
     private final Duration autoPingInterval;
     private final Duration timeToLive;
 
     /**
-     * Same as {@link #LightblueAutoPingLockStrategy(Locking, Duration, Duration, Duration)}
+     * Same as {@link #LightblueAutoPingLockStrategy(Locking, Duration, Duration)}
      * except the {@code timeToLive} duration defaults to 5 times the {@code autoPingInterval}.
      */
-    public LightblueAutoPingLockStrategy(Locking locking, Duration tryAcquireInterval,
-            Duration autoPingInterval) {
-        this(locking, tryAcquireInterval, autoPingInterval, autoPingInterval.multipliedBy(5));
+    public LightblueAutoPingLockStrategy(Locking locking, Duration autoPingInterval) {
+        this(locking, autoPingInterval, autoPingInterval.multipliedBy(5));
     }
 
     /**
      * Validates {@code timeToLive} is greater than the {@code autoPingInterval}.
-     * @param locking
-     * @param tryAcquireInterval If the asked resources cannot be acquire, will wait this duration
-     *                           before trying again.
+     * @param locking The locking client to use which holds knowledge of the locking domain to use.
+     *                The default clientId is ignored.
      * @param autoPingInterval Amount of time in between automatic pings of acquired locks.
      * @param timeToLive Time until locks automatically expire. Should be [much] larger than the
      *                   {@code autoPingInterval} to ensure locks do not accidentally expire.
      */
-    public LightblueAutoPingLockStrategy(Locking locking, Duration tryAcquireInterval,
-            Duration autoPingInterval, Duration timeToLive) {
+    public LightblueAutoPingLockStrategy(Locking locking, Duration autoPingInterval,
+            Duration timeToLive) {
         this.locking = locking;
-        this.tryAcquireInterval = tryAcquireInterval;
         this.autoPingInterval = autoPingInterval;
         this.timeToLive = timeToLive;
 
@@ -86,27 +78,9 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
     }
 
     @Override
-    public LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException {
-        Objects.requireNonNull(resourceIds, "resourceIds");
-
-        if (resourceIds.length == 0) {
-            throw new IllegalArgumentException("Must provide one or more resourceIds.");
-        }
-
-        while (true) {
-            try {
-                String callerId = UUID.randomUUID().toString();
-                return new AggregateAutoPingingLock(callerId, resourceIds, locking,
-                        autoPingInterval, timeToLive);
-            } catch (Exception e) {
-                Thread.sleep(tryAcquireInterval.toMillis());
-            }
-        }
-    }
-
-    @Override
     public <T> LockedResource<T> tryAcquire(String resourceId, T resource) throws LockNotAvailableException {
         try {
+            // TODO: May want to include hostname and/or thread information in clientId
             String callerId = UUID.randomUUID().toString();
             return new AutoPingingLock<>(locking, callerId, resourceId, resource, autoPingInterval,
                     timeToLive);
@@ -148,8 +122,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                         /* delay */ autoPingInterval.toMillis(),
                         TimeUnit.MILLISECONDS);
             } catch (UnsupportedEncodingException e) {
-                // FIXME: What to do about this stupid exception...
-                throw new RuntimeException(e);
+                throw new RuntimeException(
+                        "Platforms which do not support UTF-8 are not supported.", e);
             }
         }
 
@@ -209,89 +183,6 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                             lock.callerId, lock.resourceId, e);
                 }
             }
-        }
-    }
-
-    static final class AggregateAutoPingingLock implements LockedResource {
-        private final List<AutoPingingLock> locks;
-
-        AggregateAutoPingingLock(String callerId, String[] resourceIds, Locking locking,
-                Duration autoPingInterval, Duration ttl) throws LightblueException, LockNotAvailableException {
-            locks = new ArrayList<>(resourceIds.length);
-
-            Arrays.sort(resourceIds, null);
-
-            try {
-                for (String resourceId : resourceIds) {
-                    locks.add(new AutoPingingLock(locking, callerId, resourceId, resourceId,
-                            autoPingInterval, ttl));
-                }
-            } catch (LockNotAvailableException e) {
-                try {
-                    close();
-                } catch (IOException io) {
-                    io.addSuppressed(e);
-
-                    throw new LightblueException("Caught IOException trying to release locks. " +
-                            "Unreleased locks should expire in " + ttl, io);
-                }
-
-                throw e;
-            }
-        }
-
-        @Override
-        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
-            List<LostLockException> lostLockExceptions = new ArrayList<>(0);
-
-            for (LockedResource lock : locks) {
-                try {
-                    lock.ensureAcquiredOrThrow(lostLockMessage);
-                } catch (LostLockException e) {
-                    lostLockExceptions.add(e);
-                }
-            }
-
-            if (!lostLockExceptions.isEmpty()) {
-                if (lostLockExceptions.size() == 1) {
-                    throw lostLockExceptions.get(0);
-                }
-
-                throw new LostLockException(lostLockExceptions);
-            }
-        }
-
-        public Object getResource() {
-            // FIXME
-            return null;
-        }
-
-        @Override
-        public void close() throws IOException {
-            List<IOException> exceptions = new ArrayList<>(0);
-
-            for (LockedResource lock : locks) {
-                try {
-                    lock.close();
-                } catch (IOException e) {
-                    exceptions.add(e);
-                }
-            }
-
-            if (!exceptions.isEmpty()) {
-                if (exceptions.size() == 1) {
-                    throw exceptions.get(0);
-                }
-
-                throw new MultipleIOExceptions(exceptions);
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "AggregateAutoPingingLock{" +
-                    "locks=" + locks +
-                    '}';
         }
     }
 

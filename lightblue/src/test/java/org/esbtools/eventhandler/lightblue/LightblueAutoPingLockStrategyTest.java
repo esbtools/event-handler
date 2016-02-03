@@ -18,16 +18,17 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.jayway.awaitility.Awaitility;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLocking;
+
 import org.hamcrest.Matchers;
 import org.junit.After;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -35,13 +36,15 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @RunWith(JUnit4.class)
 public class LightblueAutoPingLockStrategyTest {
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
+
     InMemoryLocking client1Locking = new InMemoryLocking();
     InMemoryLocking client2Locking = new InMemoryLocking();
 
@@ -49,13 +52,13 @@ public class LightblueAutoPingLockStrategyTest {
     // call.
 
     LightblueAutoPingLockStrategy client1StrategyWith2SecondPing = new LightblueAutoPingLockStrategy(
-            client1Locking, Duration.ofMillis(100), Duration.ofSeconds(2));
+            client1Locking, Duration.ofSeconds(2));
     LightblueAutoPingLockStrategy client2StrategyWith2SecondPing = new LightblueAutoPingLockStrategy(
-            client2Locking, Duration.ofMillis(100), Duration.ofSeconds(2));
+            client2Locking, Duration.ofSeconds(2));
 
     LightblueAutoPingLockStrategy client1StrategyWithHalfSecondTtl =
-            new LightblueAutoPingLockStrategy(client1Locking, Duration.ofMillis(100),
-            Duration.ofMillis(100), Duration.ofMillis(500));
+            new LightblueAutoPingLockStrategy(client1Locking,
+                    Duration.ofMillis(100), Duration.ofMillis(500));
 
     ExecutorService executor = Executors.newFixedThreadPool(5);
 
@@ -81,40 +84,52 @@ public class LightblueAutoPingLockStrategyTest {
         InMemoryLocking.releaseAll();
     }
 
-    @Test(timeout = 4000)
-    public void shouldBlockUntilLockAcquired() throws Exception {
-        client1Locking.acquire("resource1");
+    @Test(expected = LockNotAvailableException.class)
+    public void shouldNotLetTwoResourcesBeAcquiredSimultaneouslyByDifferentClients()
+            throws Exception {
+        try {
+            lockedResources.add(client1StrategyWith2SecondPing.tryAcquire("resourceAbc"));
+        } catch (LockNotAvailableException e) {
+            throw new AssertionError("Couldn't get initial lock!", e);
+        }
 
-        // In another thread, release lock after some delay...
-        executor.submit(() -> {
-            try {
-                Thread.sleep(2000);
-                InMemoryLocking.releaseAll();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
-
-        // Should unblock eventually...
-        lockedResources.add(client2StrategyWith2SecondPing.blockUntilAcquired("resource1"));
-
-        assertFalse(client1Locking.acquire("resource1"));
+        lockedResources.add(client2StrategyWith2SecondPing.tryAcquire("resourceAbc"));
     }
 
-    @Test(expected = TimeoutException.class)
-    public void shouldNotLetTwoResourcesBeAcquiredSimultaneously()
+    @Test(expected = LockNotAvailableException.class)
+    public void shouldNotLetTwoResourcesBeAcquiredSimultaneouslyByTheSameClient()
             throws Exception {
-        lockedResources.add(client1StrategyWith2SecondPing.blockUntilAcquired("resourceAbc"));
+        try {
+            lockedResources.add(client1StrategyWith2SecondPing.tryAcquire("resourceAbc"));
+        } catch (LockNotAvailableException e) {
+            throw new AssertionError("Couldn't get initial lock!", e);
+        }
 
-        executor.submit(() ->
-                lockedResources.add(client2StrategyWith2SecondPing.blockUntilAcquired("resourceAbc")))
-                .get(1, TimeUnit.SECONDS);
+        lockedResources.add(client1StrategyWith2SecondPing.tryAcquire("resourceAbc"));
+    }
+
+    @Test
+    public void shouldNotLetTwoResourcesBeAcquiredSimultaneouslyByTheSameClientOnDifferentThreads()
+            throws Exception {
+        try {
+            lockedResources.add(client1StrategyWith2SecondPing.tryAcquire("resourceAbc"));
+        } catch (LockNotAvailableException e) {
+            throw new AssertionError("Couldn't get initial lock!", e);
+        }
+
+        expectedException.expectCause(Matchers.instanceOf(LockNotAvailableException.class));
+
+        executor.submit(() -> {
+            LockedResource<String> resourceAbc = client1StrategyWith2SecondPing.tryAcquire("resourceAbc");
+            lockedResources.add(resourceAbc);
+            return resourceAbc;
+        }).get();
     }
 
     @Test
     public void shouldMaintainTheLockPastItsOriginalTtlIfItIsNotReleased()
             throws Exception {
-        lockedResources.add(client1StrategyWithHalfSecondTtl.blockUntilAcquired("resourceAbc"));
+        lockedResources.add(client1StrategyWithHalfSecondTtl.tryAcquire("resourceAbc"));
 
         // Sleep past TTL.
         Thread.sleep(2000);
@@ -124,7 +139,7 @@ public class LightblueAutoPingLockStrategyTest {
 
     @Test
     public void shouldReleaseLocks() throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resourceAbc");
+        LockedResource lock = client1StrategyWithHalfSecondTtl.tryAcquire("resourceAbc");
 
         lockedResources.add(lock);
 
@@ -135,27 +150,16 @@ public class LightblueAutoPingLockStrategyTest {
 
     @Test
     public void shouldAcquireMultipleIndependentLocks() throws Exception {
-        lockedResources.add(client1StrategyWithHalfSecondTtl.blockUntilAcquired("resource1", "resource2"));
+        lockedResources.add(client1StrategyWithHalfSecondTtl.tryAcquire("resource1"));
+        lockedResources.add(client1StrategyWithHalfSecondTtl.tryAcquire("resource2"));
 
         assertFalse(client2Locking.acquire("resource1"));
         assertFalse(client2Locking.acquire("resource2"));
     }
 
     @Test
-    public void shouldReleaseAllLocksWhenMultipleAcquiredAsOneResource() throws Exception {
-        LockedResource aggregateLock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resource1", "resource2");
-
-        lockedResources.add(aggregateLock);
-
-        aggregateLock.close();
-
-        assertTrue(client2Locking.acquire("resource1"));
-        assertTrue(client2Locking.acquire("resource2"));
-    }
-
-    @Test
     public void shouldConfirmLockIsStillAcquiredFromResource() throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resourceAbc");
+        LockedResource lock = client1StrategyWithHalfSecondTtl.tryAcquire("resourceAbc");
 
         lockedResources.add(lock);
 
@@ -168,7 +172,7 @@ public class LightblueAutoPingLockStrategyTest {
 
     @Test(expected = LostLockException.class)
     public void shouldThrowLostExceptionFromResourceCheckIfLockIsLost() throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resourceAbc");
+        LockedResource lock = client1StrategyWithHalfSecondTtl.tryAcquire("resourceAbc");
 
         lockedResources.add(lock);
 
@@ -177,66 +181,9 @@ public class LightblueAutoPingLockStrategyTest {
         lock.ensureAcquiredOrThrow("should throw");
     }
 
-    @Test(timeout = 1000)
+    @Test
     public void shouldAllowDifferentClientsToAcquireSeparateLocks() throws Exception {
-        lockedResources.add(client1StrategyWith2SecondPing.blockUntilAcquired("resource1"));
-        lockedResources.add(client2StrategyWith2SecondPing.blockUntilAcquired("resource2"));
-    }
-
-    @Test(expected = LostLockException.class)
-    public void shouldThrowLostLockExceptionFromAggregateResourceCheckIfJustOneLockIsLost() throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resource1", "resource2");
-
-        lockedResources.add(lock);
-
-        InMemoryLocking.releaseResource("resource1");
-
-        lock.ensureAcquiredOrThrow("should throw");
-    }
-
-    @Test
-    public void shouldKeepPingingOtherLocksInAggregateDespiteOneBeingLost() throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resource1", "resource2");
-
-        lockedResources.add(lock);
-
-        InMemoryLocking.releaseResource("resource1");
-
-        // Sleep past TTL
-        Thread.sleep(2000);
-
-        assertFalse(client2Locking.acquire("resource2"));
-    }
-
-    @Test
-    public void shouldThrowLostLockExceptionWithAllLostLockExceptionsFromAggregateResourceCheckIfMultipleLocksAreLost()
-        throws Exception {
-        LockedResource lock = client1StrategyWithHalfSecondTtl.blockUntilAcquired("resource1", "resource2");
-
-        lockedResources.add(lock);
-
-        InMemoryLocking.releaseAll();
-
-        try {
-            lock.ensureAcquiredOrThrow("should throw");
-        } catch (LostLockException e) {
-            assertThat(e.lostLocks()).hasSize(2);
-            assertThat(e.lostLocks()).containsNoDuplicates();
-        }
-    }
-
-    @Test(timeout = 1000)
-    public void shouldReleaseAnyAcquiredLocksIfUnableToAcquireAllLocks() throws Exception {
-        client1Locking.acquire("resource1");
-
-        // This should block forever, so perform in another thread...
-        executor.submit(() -> lockedResources.add(
-                client2StrategyWith2SecondPing.blockUntilAcquired("resource1", "resource2")));
-
-        // Wait until the locks are attempted a few times in other thread...
-        Awaitility.await().until(() -> client2Locking.attemptedAcquisitions(), Matchers.greaterThan(5));
-
-        // Client2 should not hog this lock while it's trying to get both...
-        client1StrategyWith2SecondPing.blockUntilAcquired("resource2");
+        lockedResources.add(client1StrategyWith2SecondPing.tryAcquire("resource1"));
+        lockedResources.add(client2StrategyWith2SecondPing.tryAcquire("resource2"));
     }
 }

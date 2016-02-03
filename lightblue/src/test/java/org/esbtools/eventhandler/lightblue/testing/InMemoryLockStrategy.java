@@ -51,25 +51,6 @@ public class InMemoryLockStrategy implements LockStrategy {
     }
 
     @Override
-    public LockedResource<List<String>> blockUntilAcquired(String... resourceIds) throws InterruptedException {
-        while (true) {
-            try {
-                acquireAll(resourceIds);
-            } catch (IllegalStateException e) {
-                releaseAll();
-                Thread.sleep(500);
-                continue;
-            }
-
-            if (allowLockButImmediateLoseIt) {
-                releaseAll();
-            }
-
-            return new InMemoryLockedResources(resourceIds);
-        }
-    }
-
-    @Override
     public <T> LockedResource<T> tryAcquire(String resourceId, T resource) throws LockNotAvailableException {
         String otherClientOrNull = resourcesToClients.putIfAbsent(resourceId, clientId);
 
@@ -92,17 +73,6 @@ public class InMemoryLockStrategy implements LockStrategy {
                 if (entry.getValue().equals(clientId)) {
                     entries.remove();
                 }
-            }
-        }
-    }
-
-    // TODO: remove this
-    private void acquireAll(String[] resources) throws InterruptedException {
-        for (String resourceId : resources) {
-            String otherClientOrNull = resourcesToClients.putIfAbsent(resourceId, clientId);
-
-            if (otherClientOrNull != null) {
-                throw new IllegalStateException();
             }
         }
     }
@@ -141,45 +111,6 @@ public class InMemoryLockStrategy implements LockStrategy {
             return "InMemoryLockedResource{" +
                     "resourceId='" + resourceId + '\'' +
                     ", resource=" + resource +
-                    '}';
-        }
-    }
-
-    private class InMemoryLockedResources implements LockedResource<List<String>>, LockedResources<String> {
-        private final List<InMemoryLockedResource<String>> locks;
-
-        public InMemoryLockedResources(String... resources) {
-            this.locks = Arrays.stream(resources)
-                    .map(r -> new InMemoryLockedResource<>(r, r))
-                    .collect(Collectors.toList());
-        }
-
-        @Override
-        public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
-            for (LockedResource lock : locks) {
-                lock.ensureAcquiredOrThrow(lostLockMessage);
-            }
-        }
-
-        public List<String> getResource() {
-            return locks.stream().map(LockedResource::getResource).collect(Collectors.toList());
-        }
-
-        @Override
-        public void close() throws IOException {
-            locks.forEach(InMemoryLockedResource::close);
-        }
-
-        @Override
-        public List<LockedResource<String>> getLocks() {
-            return new ArrayList<>(locks);
-        }
-
-        @Override
-        public String toString() {
-            return "InMemoryLockedResources{" +
-                    "locks=" + locks +
-                    ", resource=" + getResource() +
                     '}';
         }
     }

@@ -24,16 +24,39 @@ package org.esbtools.eventhandler.lightblue;
  */
 public interface LockStrategy {
     /**
-     * Blocks until all resources, identified by String {@code resourceIds}, can be acquired
-     * together, returning an instance representing the acquired lock. Order of provided resources
-     * does not matter.
+     * Attempts to acquire a lock by the provided {@code resourceId} for the logical resource
+     * provided by {@code resource}.
+     *
+     * <p>After a resource is locked, it is expected that nothing else can acquire it again until it
+     * is released (intentionally or not), no matter if it is the same thread, another thread, or
+     * across a network.
+     *
+     * @param resourceId A string which identifies the resource and only that resource.
+     * @param resource A logically locked resource as a result of the id being locked. Participants
+     *                 must agree on a scheme of resourceIds to resources.
+     * @param <T> The type of the resource being acquired.
+     * @return A wrapper around the locked resource with methods to manage the acquired lock.
+     * @throws LockNotAvailableException If for whatever reason the lock could not be acquired.
+     * Generally this is simply because another client has the lock, but it could also be due to
+     * network failure, etc.
      */
-    // TODO: Make generic or remove
-    LockedResource blockUntilAcquired(String... resourceIds) throws InterruptedException;
-
     <T> LockedResource<T> tryAcquire(String resourceId, T resource) throws LockNotAvailableException;
 
+    /**
+     * Equivalent to {@link #tryAcquire(String, Object)} except the resource being locked has the
+     * knowledge of its own resourceId to lock with.
+     *
+     * @see Lockable
+     */
     default <T extends Lockable> LockedResource<T> tryAcquire(T lockable) throws LockNotAvailableException {
         return tryAcquire(lockable.getResourceId(), lockable);
+    }
+
+    /**
+     * Equivalent to {@link #tryAcquire(String, Object)} in cases where the resource being locked is
+     * not applicable, or is the same as the String {@code resourceId} provided.
+     */
+    default LockedResource<String> tryAcquire(String resourceId) throws LockNotAvailableException {
+        return tryAcquire(resourceId, resourceId);
     }
 }
