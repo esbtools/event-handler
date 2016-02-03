@@ -22,7 +22,7 @@ package org.esbtools.eventhandler.lightblue;
  * Marker interface for {@link Lockable} resources which expose a resource id that encodes an
  * entity's identity.
  *
- * <p>TODO: expand this doc
+ * @see LightblueDocumentEvent#identity()
  */
 public interface Identity extends Lockable {
 }

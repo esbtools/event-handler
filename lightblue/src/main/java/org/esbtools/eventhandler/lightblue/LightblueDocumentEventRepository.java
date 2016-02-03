@@ -26,13 +26,10 @@ import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.model.DataError;
-import com.redhat.lightblue.client.model.Error;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueBulkResponseException;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
-import com.redhat.lightblue.client.response.LightblueErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -258,6 +255,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
                 DocumentEventEntity entity = event.wrappedDocumentEventEntity();
 
+                // If id is null, this is a net new event as a result of merger.
+                // See SharedIdentityEvents#addEvent(LightblueDocumentEvent)
+                // and SharedIdentityEvents#update
                 if (entity.get_id() == null) {
                     if (entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
                         insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
@@ -342,6 +342,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 "supported. Event type was: " + event.getClass());
     }
 
+    /**
+     * Manages lightblue operations to be done as part of all events retrieved which belong to the
+     * same lock (which is based on their {@link LightblueDocumentEvent#identity()}.
+     */
     static class SharedIdentityEvents implements Lockable {
         final Identity identity;
         final Map<LightblueDocumentEvent, DocumentEventUpdate> updates = new IdentityHashMap<>();

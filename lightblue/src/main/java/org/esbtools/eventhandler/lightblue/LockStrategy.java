@@ -18,9 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import java.util.Collection;
-import java.util.Set;
-
 /**
  * Abstracts an atomic exclusive locking mechanism which is used to coordinate concurrent work on
  * logical "resources."
