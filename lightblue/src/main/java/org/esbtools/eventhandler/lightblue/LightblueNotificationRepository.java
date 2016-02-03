@@ -255,7 +255,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
                             .getNotificationForEntity(entity, requester);
 
                     Date originalProcessingDate = entity.getProcessingDate();
-                    entity.setProcessedDate(Date.from(clock.instant()));
 
                     ProcessingNotification processing =
                             new ProcessingNotification(entity.get_id(), notification,
@@ -263,10 +262,12 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
                     try {
                         acquiredLocks.add(lockStrategy.tryAcquire(processing));
+                        entity.setProcessingDate(Date.from(clock.instant()));
+                        entity.setStatus(NotificationEntity.Status.processing);
                     } catch (LockNotAvailableException e) {
                         if (logger.isDebugEnabled()) {
-                            logger.debug("Lock not available, not processing notification: " +
-                                    notification, e);
+                            logger.debug("Lock not available. This is not fatal. Assuming another" +
+                                    " thread is processing notification: " + notification, e);
                         }
                     }
                 } catch (Exception e) {

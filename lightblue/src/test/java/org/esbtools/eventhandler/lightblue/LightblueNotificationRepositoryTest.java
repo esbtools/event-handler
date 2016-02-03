@@ -93,6 +93,8 @@ public class LightblueNotificationRepositoryTest {
             new MutableLightblueNotificationRepositoryConfig()
             .setEntityNamesToProcess(notificationFactoryByEntityName.keySet());
 
+    private final InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
+
     private static Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     @Before
@@ -104,7 +106,7 @@ public class LightblueNotificationRepositoryTest {
         // TODO: Try and reduce places canonical types are specified
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
-        repository = new LightblueNotificationRepository(client, new InMemoryLockStrategy(), config,
+        repository = new LightblueNotificationRepository(client, lockStrategy, config,
                 notificationFactoryByEntityName, fixedClock);
     }
 
@@ -171,7 +173,7 @@ public class LightblueNotificationRepositoryTest {
                         .wrappedNotificationEntity()
                         .getEntityDataForField("value"))
                 .collect(Collectors.toList()))
-                .containsExactly("1", "2", "3").inOrder();
+                .containsExactly("1", "2", "3");
     }
 
     @Test
@@ -220,11 +222,11 @@ public class LightblueNotificationRepositoryTest {
 
             Future<List<LightblueNotification>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread1Repository.retrieveOldestNotificationsUpTo(15);
+                return thread1Repository.retrieveOldestNotificationsUpTo(20);
             });
             Future<List<LightblueNotification>> futureThread2Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
-                return thread2Repository.retrieveOldestNotificationsUpTo(15);
+                return thread2Repository.retrieveOldestNotificationsUpTo(20);
             });
 
             bothThreadsStarted.await();
@@ -308,38 +310,16 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldThrowLostLockExceptionIfLockLostBeforeNotificationStatusUpdatesPersisted() throws Exception {
-        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
-        InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
-
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        LightblueNotificationRepository repository = new LightblueNotificationRepository(client,
-                lockStrategy, config, notificationFactoryByEntityName,
-                Clock.systemUTC());
-
-        slowClient.pauseOnNextRequest();
-
+    public void shouldNotReturnOrUpdateNotificationsWhoseLockWasLostBeforeNotificationStatusUpdatesPersisted()
+            throws Exception {
         insertNotificationEntities(randomNotificationEntities(20));
 
-        try {
-            // Sneakily steal away any acquired locks
-            lockStrategy.allowLockButImmediateLoseIt();
+        // Sneakily steal away any acquired locks
+        lockStrategy.allowLockButImmediateLoseIt();
 
-            // We will block this task with the slow client; do it in another thread to avoid blocking
-            // test.
-            Future<?> futureDocEvents = executor.submit(() -> repository.retrieveOldestNotificationsUpTo(10));
+        List<LightblueNotification> retrieved = repository.retrieveOldestNotificationsUpTo(10);
 
-            // This will cause processing to continue, which should notice the lock expired...
-            slowClient.unpause();
-
-            // ...throwing an exception.
-            expectedException.expectCause(Matchers.instanceOf(LostLockException.class));
-
-            futureDocEvents.get();
-        } finally {
-            executor.shutdownNow();
-        }
+        assertThat(retrieved).isEmpty();
     }
 
     @Test

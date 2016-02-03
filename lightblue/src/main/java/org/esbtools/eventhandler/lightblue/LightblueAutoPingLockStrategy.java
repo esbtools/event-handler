@@ -136,7 +136,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
             try {
                 // TODO: Remove url encoding once Lightblue Client 4.0.0 is released
                 // See: https://github.com/lightblue-platform/lightblue-client/pull/260
-                this.resourceId = URLEncoder.encode(resourceId, "UTF-8");
+                this.resourceId = resourceId = URLEncoder.encode(resourceId, "UTF-8");
 
                 if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
                     throw new LockNotAvailableException(resourceId, resource);

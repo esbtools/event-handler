@@ -135,6 +135,14 @@ public class InMemoryLockStrategy implements LockStrategy {
         public void close() {
             resourcesToClients.remove(resourceId);
         }
+
+        @Override
+        public String toString() {
+            return "InMemoryLockedResource{" +
+                    "resourceId='" + resourceId + '\'' +
+                    ", resource=" + resource +
+                    '}';
+        }
     }
 
     private class InMemoryLockedResources implements LockedResource<List<String>>, LockedResources<String> {
@@ -165,6 +173,14 @@ public class InMemoryLockStrategy implements LockStrategy {
         @Override
         public List<LockedResource<String>> getLocks() {
             return new ArrayList<>(locks);
+        }
+
+        @Override
+        public String toString() {
+            return "InMemoryLockedResources{" +
+                    "locks=" + locks +
+                    ", resource=" + getResource() +
+                    '}';
         }
     }
 }
