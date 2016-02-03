@@ -18,30 +18,30 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Locking;
-import com.redhat.lightblue.client.request.DataBulkRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
-import java.io.IOException;
-import java.sql.Date;
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
+import com.redhat.lightblue.client.response.LightblueBulkResponseException;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -88,50 +88,86 @@ public class LightblueNotificationRepository implements NotificationRepository {
             return Collections.emptyList();
         }
 
-        try (LockedResource lock = lockStrategy
-                .blockUntilAcquired(ResourceIds.forNotificationsForEntities(entitiesToProcess))) {
-            BulkLightblueRequester requester = new BulkLightblueRequester(lightblue);
+        NotificationEntity[] notificationEntities = lightblue
+                .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxNotifications))
+                .parseProcessed(NotificationEntity[].class);
 
-            NotificationEntity[] notificationEntities = lightblue
-                    .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxNotifications))
-                    .parseProcessed(NotificationEntity[].class);
+        try (LockedResources<ProcessingNotification> locks =
+                ProcessingNotification.parseLockableNotificationEntities(
+                        notificationEntities,
+                        new BulkLightblueRequester(lightblue),
+                        notificationFactoryByEntityName, lockStrategy, clock)) {
+            Collection<LockedResource<ProcessingNotification>> lockList = locks.getLocks();
 
-            if (notificationEntities.length == 0) {
+            if (lockList.isEmpty()) {
                 return Collections.emptyList();
             }
 
-            for (NotificationEntity entity : notificationEntities) {
-                entity.setStatus(NotificationEntity.Status.processing);
+            DataBulkRequest updateEntities = new DataBulkRequest();
+            List<LightblueNotification> updatedNotifications = new ArrayList<>(lockList.size());
+
+            for (LockedResource<ProcessingNotification> lock : lockList) {
+                try {
+                    lock.ensureAcquiredOrThrow("Won't update status or process notification.");
+                } catch (LostLockException e) {
+                    logger.warn("Lost lock. This is not fatal. See exception for details.", e);
+                    continue;
+                }
+
+                ProcessingNotification processing = lock.getResource();
+
+                updateEntities.add(UpdateRequests.notificationStatusIfCurrent(
+                        processing.notification.wrappedNotificationEntity(),
+                        processing.originalProcessingDate));
+
+                updatedNotifications.add(processing.notification);
             }
 
-            DataBulkRequest updateEntities = new DataBulkRequest();
-            updateEntities.addAll(UpdateRequests.notificationsStatusAndProcessedDate(
-                    Arrays.asList(notificationEntities)));
+            LightblueBulkDataResponse bulkResponse;
 
-            lock.ensureAcquiredOrThrow("Will not process retrieved notifications.");
+            try {
+                bulkResponse = lightblue.bulkData(updateEntities);
+            } catch (LightblueBulkResponseException e) {
+                // If some failed, that's okay. We have to iterate through responses either way.
+                // We'll check for errors then.
+                bulkResponse = e.getBulkResponse();
+            }
 
-            // If this fails, intentionally let propagate and release lock.
-            // Another thread, or another poll, will try again.
-            lightblue.bulkData(updateEntities);
+            Iterator<LightblueNotification> notificationsIterator = updatedNotifications.iterator();
+            Iterator<LightblueDataResponse> responsesIterator = bulkResponse.getResponses().iterator();
 
-            // TODO: This work should be done before status updates so we can populate failures
-            return Arrays.stream(notificationEntities)
-                    .map(entity -> {
-                        String entityName = entity.getEntityName();
+            while (notificationsIterator.hasNext()) {
+                if (!responsesIterator.hasNext()) {
+                    throw new IllegalStateException("Mismatched number of requests and responses! " +
+                            "Notifications looked like: <{}>. Responses looked like");
+                }
 
-                        NotificationFactory notificationFactory =
-                                notificationFactoryByEntityName.get(entityName);
+                LightblueDataResponse response = responsesIterator.next();
+                LightblueNotification notification = notificationsIterator.next();
 
-                        if (notificationFactory == null) {
-                            throw new NoSuchElementException("No notification factory found for " +
-                                    "notification entity name <" + entityName +">. Notification " +
-                                    "entity looks like: " + entity);
-                        }
+                if (LightblueErrors.arePresentInResponse(response)) {
+                    if (logger.isWarnEnabled()) {
+                        List<String> errorStrings = LightblueErrors.toStringsFromErrorResponse(response);
+                        logger.warn("Notification update failed. Will not process. " +
+                                "Event was: <{}>. Errors: <{}>", notification, errorStrings);
+                    }
 
-                        return notificationFactory.getNotificationForEntity(entity, requester);
-                    })
-                    .collect(Collectors.toList());
+                    notificationsIterator.remove();
+
+                    continue;
+                }
+
+                if (response.parseModifiedCount() == 0) {
+                    logger.warn("Notification updated by another thread. Will not process. " +
+                            "Event was: {}", notification);
+
+                    notificationsIterator.remove();
+                }
+            }
+
+            return updatedNotifications;
         }
+
     }
 
     @Override
@@ -192,5 +228,76 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
         throw new EventHandlerException("Unknown notification type. Only LightblueNotification " +
                 "are supported. Event type was: " + notification.getClass());
+    }
+
+    static class ProcessingNotification implements Lockable {
+        final String notificationId;
+        final Date originalProcessingDate;
+        final LightblueNotification notification;
+
+        static LockedResources<ProcessingNotification> parseLockableNotificationEntities(
+                NotificationEntity[] entities,
+                LightblueRequester requester,
+                Map<String, ? extends NotificationFactory> notificationFactoriesByEntityName,
+                LockStrategy lockStrategy, Clock clock) {
+            List<LockedResource<ProcessingNotification>> acquiredLocks =
+                    new ArrayList<>(entities.length);
+
+            // Shuffling the entities means less lock contention among nodes which get similar
+            // batches.
+            List<NotificationEntity> shuffled = Arrays.asList(entities);
+            Collections.shuffle(shuffled);
+
+            for (NotificationEntity entity : shuffled) {
+                try {
+                    LightblueNotification notification = notificationFactoriesByEntityName
+                            .get(entity.getEntityName())
+                            .getNotificationForEntity(entity, requester);
+
+                    Date originalProcessingDate = entity.getProcessingDate();
+                    entity.setProcessedDate(Date.from(clock.instant()));
+
+                    ProcessingNotification processing =
+                            new ProcessingNotification(entity.get_id(), notification,
+                                    originalProcessingDate);
+
+                    try {
+                        acquiredLocks.add(lockStrategy.tryAcquire(processing));
+                    } catch (LockNotAvailableException e) {
+                        if (logger.isDebugEnabled()) {
+                            logger.debug("Lock not available, not processing notification: " +
+                                    notification, e);
+                        }
+                    }
+                } catch (Exception e) {
+                    if (logger.isErrorEnabled()) {
+                        logger.error("Failed to parse notification entity: " + entity, e);
+                    }
+                }
+            }
+
+            return new WrappedLockedResources<>(acquiredLocks);
+        }
+
+        private ProcessingNotification(String notificationId, LightblueNotification notification,
+                Date originalProcessingDate) {
+            this.notificationId = notificationId;
+            this.notification = notification;
+            this.originalProcessingDate = originalProcessingDate;
+        }
+
+        @Override
+        public String getResourceId() {
+            return "ProcessingNotification{notificationId=" + notificationId + "}";
+        }
+
+        @Override
+        public String toString() {
+            return "ProcessingNotification{" +
+                    "originalProcessingDate=" + originalProcessingDate +
+                    ", notification=" + notification +
+                    ", notificationId='" + notificationId + '\'' +
+                    '}';
+        }
     }
 }

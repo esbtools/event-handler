@@ -74,6 +74,31 @@ public abstract class UpdateRequests {
         return requests;
     }
 
+    /** "Status" here means status and corresponding date(s) to go along with it. */
+    public static DataUpdateRequest notificationStatusIfCurrent(NotificationEntity entity,
+            @Nullable Date originalProcessingTime) {
+        DataUpdateRequest request = new DataUpdateRequest(
+                NotificationEntity.ENTITY_NAME,
+                NotificationEntity.ENTITY_VERSION);
+
+        request.where(Query.and(
+                Query.withValue("_id", BinOp.eq, entity.get_id()),
+                Query.withValue("processingDate", BinOp.eq, originalProcessingTime)
+        ));
+
+        List<Update> setStatusAndDates = new ArrayList<>(3);
+        setStatusAndDates.add(Update.set("processingDate", entity.getProcessingDate()));
+        setStatusAndDates.add(Update.set("status", entity.getStatus().toString()));
+
+        if (entity.getProcessedDate() != null){
+            setStatusAndDates.add(Update.set("processedDate", entity.getProcessedDate()));
+        }
+
+        request.updates(setStatusAndDates);
+
+        return request;
+    }
+
     public static Collection<DataUpdateRequest> documentEventsStatusAndProcessedDate(
             Collection<DocumentEventEntity> updatedEventEntities) {
         List<DataUpdateRequest> requests = new ArrayList<>(updatedEventEntities.size());
@@ -110,8 +135,9 @@ public abstract class UpdateRequests {
         return requests;
     }
 
+    /** "Status" here means status and corresponding date(s) to go along with it. */
     public static DataUpdateRequest documentEventStatusIfCurrent(DocumentEventEntity entity,
-            @Nullable ZonedDateTime currentProcessingTime) {
+            @Nullable ZonedDateTime originalProcessingTime) {
         DataUpdateRequest request = new DataUpdateRequest(
                 DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
@@ -123,10 +149,10 @@ public abstract class UpdateRequests {
 
         idStatusAndDateMatch.add(Query.withValue("_id", BinOp.eq, entity.get_id()));
 
-        if (currentProcessingTime != null) {
+        if (originalProcessingTime != null) {
             idStatusAndDateMatch.add(Query.withValue(
                     "processingDate", BinOp.eq,
-                    Date.from(currentProcessingTime.toInstant())));
+                    Date.from(originalProcessingTime.toInstant())));
             idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.processing.toString()));
         } else {
             idStatusAndDateMatch.add(Query.withValue("processingDate", BinOp.eq, Literal.value(null)));

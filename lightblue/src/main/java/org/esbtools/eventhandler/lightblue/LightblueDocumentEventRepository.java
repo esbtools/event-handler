@@ -202,6 +202,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return;
         }
 
+        // TODO: Check if only one request, then don't do bulk.
+
         // If any fail, not much we can do. Let exception propagate.
         lightblue.bulkData(markDocumentEvents);
     }
@@ -230,8 +232,11 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      */
     private List<LightblueDocumentEvent> persistNewEventsAndStatusUpdatesToExisting(
             LockedResources<SharedIdentityEvents> identityLocks) throws LightblueException {
-        DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
+        if (identityLocks.getLocks().isEmpty()) {
+            return Collections.emptyList();
+        }
 
+        DataBulkRequest insertAndUpdateEvents = new DataBulkRequest();
         List<LightblueDocumentEvent> savedEvents = new ArrayList<>();
 
         // TODO: We make single request per event here (wrapped in bulk request). Maybe could optimize.
@@ -291,41 +296,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             LightblueDocumentEvent event = eventsIterator.next();
             DocumentEventEntity entity = event.wrappedDocumentEventEntity();
 
-            if (response instanceof LightblueErrorResponse) {
-                LightblueErrorResponse errorResponse = (LightblueErrorResponse) response;
+            if (LightblueErrors.arePresentInResponse(response)) {
+                if (logger.isWarnEnabled()) {
+                    List<String> errorStrings = LightblueErrors.toStringsFromErrorResponse(response);
 
-                // Likely transient failure; leave event alone to be tried again later.
-                if (errorResponse.hasDataErrors() || errorResponse.hasLightblueErrors()) {
-                    if (logger.isWarnEnabled()) {
-                        List<Error> errors = new ArrayList<>();
-
-                        Error[] lightblueErrors = errorResponse.getLightblueErrors();
-                        DataError[] dataErrors = errorResponse.getDataErrors();
-
-                        if (lightblueErrors != null) {
-                            Collections.addAll(errors, lightblueErrors);
-                        }
-
-                        if (dataErrors != null) {
-                            Collections.addAll(errors, Arrays.stream(dataErrors)
-                                    .flatMap(dataError -> dataError.getErrors().stream())
-                                    .toArray(Error[]::new));
-                        }
-
-                        List<String> errorStrings = errors.stream()
-                                .map(e -> "Code: " + e.getErrorCode() + ", " +
-                                        "Context: " + e.getContext() + ", " +
-                                        "Message: " + e.getMsg())
-                                .collect(Collectors.toList());
-
-                        logger.warn("Event update failed. Will not process. Event was: <{}>. " +
-                                "Errors: <{}>", event, errorStrings);
-                    }
-
-                    eventsIterator.remove();
-
-                    continue;
+                    logger.warn("Event update failed. Will not process. Event was: <{}>. " +
+                            "Errors: <{}>", event, errorStrings);
                 }
+
+                eventsIterator.remove();
+
+                continue;
             }
 
             if (response.parseModifiedCount() == 0) {
