@@ -389,14 +389,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     LightblueDocumentEvent newEvent =
                             eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
 
-                    SharedIdentityEvents eventBatch = docEventsByIdentity.get(newEvent.identity());
+                    Identity identity = newEvent.identity();
+                    SharedIdentityEvents eventBatch = docEventsByIdentity.get(identity);
 
                     if (eventBatch == null) {
-                        eventBatch = new SharedIdentityEvents(lockStrategy, newEvent.identity(), clock);
-                        docEventsByIdentity.put(newEvent.identity(), eventBatch);
+                        eventBatch = new SharedIdentityEvents(lockStrategy, identity, clock);
+                        docEventsByIdentity.put(identity, eventBatch);
                         if (eventBatch.lock.isPresent()) {
                             locksAcquired.add(eventBatch.lock.get());
                         }
+
+                        logger.debug("Acquired lock for resource {}", eventBatch);
                     }
 
                     eventBatch.addEvent(newEvent);
@@ -436,7 +439,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return "SharedIdentityEvents{" +
                     "identity=" + identity +
                     ", updates=" + updates +
-                    ", lock=" + lock +
                     ", optimized=" + optimized +
                     '}';
         }

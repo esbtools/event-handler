@@ -38,6 +38,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final int batchSize;
 
     private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private final int id = idCounter.getAndIncrement();
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval,
@@ -50,8 +51,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForNotifications?period=" + pollingInterval.toMillis())
-        .routeId("notificationProcessor-" + idCounter.getAndIncrement())
+        from("timer:pollForNotifications" + id + "?period=" + pollingInterval.toMillis())
+        .routeId("notificationProcessor-" + id)
         .process(exchange -> {
             List<? extends Notification> notifications =
                     notificationRepository.retrieveOldestNotificationsUpTo(batchSize);
@@ -80,6 +81,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                     failedNotifications.add(new FailedNotification(notification, e));
                 }
             }
+
+            log.debug("Persisting document events via route {}: {}", exchange.getFromRouteId(), documentEvents);
 
             try {
                 documentEventRepository.addNewDocumentEvents(documentEvents);
