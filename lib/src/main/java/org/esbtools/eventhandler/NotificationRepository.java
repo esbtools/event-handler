@@ -49,7 +49,7 @@ public interface NotificationRepository {
      */
     List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception;
 
-    // TODO: Collection<? extends Notification> checkExpired(Collection<? extends Notification)
+    Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications);
 
     void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception;

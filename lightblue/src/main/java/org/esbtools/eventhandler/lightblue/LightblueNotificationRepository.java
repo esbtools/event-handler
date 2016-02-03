@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -175,6 +176,31 @@ public class LightblueNotificationRepository implements NotificationRepository {
             return updatedNotifications;
         }
 
+    }
+
+    @Override
+    public Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications) {
+        List<LightblueNotification> expired = new ArrayList<>(notifications.size());
+
+        for (Notification notification : notifications) {
+            if (!(notification instanceof LightblueNotification)) {
+                throw new IllegalArgumentException("Unknown event type. Only " +
+                        "LightblueDocumentEvent is supported. Event type was: " +
+                        notification.getClass());
+            }
+
+            LightblueNotification lightblueNotification = (LightblueNotification) notification;
+
+            Instant processingDate = lightblueNotification.wrappedNotificationEntity()
+                    .getProcessingDate().toInstant();
+            Instant expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
+
+            if (clock.instant().isAfter(expireDate)) {
+                expired.add(lightblueNotification);
+            }
+        }
+
+        return expired;
     }
 
     @Override

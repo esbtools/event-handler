@@ -24,6 +24,7 @@ import org.esbtools.eventhandler.NotificationRepository;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryNotificationRepository implements NotificationRepository {
@@ -49,6 +50,11 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
         List<Notification> retrieved = new ArrayList<>(notifications.subList(0, maxNotifications));
         notifications.removeAll(retrieved);
         return retrieved;
+    }
+
+    @Override
+    public Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications) {
+        return Collections.emptyList();
     }
 
     @Override
