@@ -34,6 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -51,6 +52,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
     private final LockStrategy lockStrategy;
     private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
+
+    // TODO: Parameterize these
+    private final Duration processingTimeout = Duration.ofMinutes(10);
+    private final Duration expireThreshold = Duration.ofMinutes(2);
 
     private final Set<String> supportedEntityNames;
     /** Cached to avoid extra garbage. */
@@ -89,7 +94,9 @@ public class LightblueNotificationRepository implements NotificationRepository {
         }
 
         NotificationEntity[] notificationEntities = lightblue
-                .data(FindRequests.oldestNotificationsForEntitiesUpTo(entitiesToProcess, maxNotifications))
+                .data(FindRequests.oldestNotificationsForEntitiesUpTo(
+                        entitiesToProcess, maxNotifications,
+                        clock.instant().minus(processingTimeout)))
                 .parseProcessed(NotificationEntity[].class);
 
         try (LockedResources<ProcessingNotification> locks =

@@ -121,7 +121,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         DocumentEventEntity[] documentEventEntities = lightblue
                 .data(FindRequests.priorityDocumentEventsForTypesUpTo(
                         typesToProcess, documentEventsBatchSize,
-                        ZonedDateTime.now(clock).minus(processingTimeout)))
+                        clock.instant().minus(processingTimeout)))
                 .parseProcessed(DocumentEventEntity[].class);
 
         if (documentEventEntities.length == 0) {

@@ -28,40 +28,50 @@ import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.Date;
 
 public abstract class FindRequests {
     /**
-     * You generally don't want to retrieve notifications which have already started being processed
-     * or have been processed, so this limits the request to
-     * {@link org.esbtools.lightbluenotificationhook.NotificationEntity.Status#unprocessed}
-     * notifications.
+     * Constructs a find request which retrieves up to {@code maxNotifications} notifications of the
+     * given {@code entityNames} which are either currently
+     * {@link NotificationEntity.Status#unprocessed} or expired.
+     *
+     * <p>Notifications are expired when their {@link NotificationEntity#getProcessingDate()} is at
+     * or older than the provided {@code expiredProcessingDate}.
      */
-    public static DataFindRequest oldestNotificationsForEntitiesUpTo(String[] entities,
-            int maxEvents) {
+    public static DataFindRequest oldestNotificationsForEntitiesUpTo(String[] entityNames,
+            int maxNotifications, Instant expiredProcessingDate) {
         DataFindRequest findEntities = new DataFindRequest(
                 NotificationEntity.ENTITY_NAME,
                 NotificationEntity.ENTITY_VERSION);
 
         findEntities.where(Query.and(
-                Query.withValues("entityName", Query.NaryOp.in, Literal.values(entities)),
-                Query.withValue("status", Query.BinOp.eq, NotificationEntity.Status.unprocessed)));
+                Query.withValues("entityName", Query.NaryOp.in, Literal.values(entityNames)),
+                Query.or(
+                        Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed),
+                        Query.and(
+                                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processing),
+                                Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate)))
+                )));
         findEntities.select(Projection.includeFieldRecursively("*"));
         findEntities.sort(Sort.asc("occurrenceDate"));
-        findEntities.range(0, maxEvents - 1);
+        findEntities.range(0, maxNotifications - 1);
 
         return findEntities;
     }
 
     /**
-     * You generally don't want to retrieve document events which have already started being
-     * processed or have been processed, so this limits the request to
-     * {@link org.esbtools.eventhandler.lightblue.model.DocumentEventEntity.Status#unprocessed}
-     * document events.
+     * Constructs a find request which retrieves up to {@code maxEvents} events of the given
+     * {@code types} which are either currently {@link DocumentEventEntity.Status#unprocessed} or
+     * expired.
+     *
+     * <p>Events are expired when their {@link DocumentEventEntity#getProcessingDate()} is at or
+     * older than the provided {@code expiredProcessingDate}.
      */
     public static DataFindRequest priorityDocumentEventsForTypesUpTo(String[] types,
-        int maxEvents, ZonedDateTime expiredProcessingDate) {
+        int maxEvents, Instant expiredProcessingDate) {
         DataFindRequest findEntities = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
 
@@ -71,7 +81,7 @@ public abstract class FindRequests {
                         Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed),
                         Query.and(
                                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.processing),
-                                Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate.toInstant())))
+                                Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate)))
                 )));
         findEntities.select(Projection.includeFieldRecursively("*"));
         findEntities.sort(Sort.desc("priority"));
