@@ -18,14 +18,16 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
+import org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepositoryConfig;
+import org.esbtools.eventhandler.lightblue.LightblueNotificationRepositoryConfig;
+
 import io.github.alechenninger.lightblue.Description;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.Required;
 import io.github.alechenninger.lightblue.Version;
-import org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepositoryConfig;
-import org.esbtools.eventhandler.lightblue.LightblueNotificationRepositoryConfig;
 
+import java.time.Duration;
 import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
@@ -39,6 +41,8 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     private Set<String> canonicalTypesToProcess;
     private Integer documentEventsBatchSize;
     private Set<String> entityNamesToProcess;
+    private Integer notificationProcessingTimeoutSeconds;
+    private Integer notificationExpireThresholdSeconds;
 
     public String getDomain() {
         return domain;
@@ -92,5 +96,34 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
             "entity's name.")
     public void setEntityNamesToProcess(Set<String> entityNamesToProcess) {
         this.entityNamesToProcess = entityNamesToProcess;
+    }
+
+    @Override
+    public Duration getNotificationProcessingTimeout() {
+        return Duration.ofSeconds(notificationProcessingTimeoutSeconds);
+    }
+
+    @Description("How long can a notification remain unchanged after marked as processing before " +
+            "we allow it to be retrieved again for reprocessing?")
+    public void setNotificationProcessingTimeoutSeconds(Integer notificationProcessingTimeoutSeconds) {
+        this.notificationProcessingTimeoutSeconds = notificationProcessingTimeoutSeconds;
+    }
+
+    @Override
+    public Duration getNotificationExpireThreshold() {
+        return Duration.ofSeconds(notificationExpireThresholdSeconds);
+    }
+
+    @Description("How long before a notification is available for retrieval do we drop the event " +
+            "and let it be reprocessed?\n" +
+            "In other words, this governs when we stop processing a notification in flight " +
+            "because we're too near when another retrieval may see it is past its " +
+            "getNotificationProcessingTimeout() and retrieve it for reprocessing.\n" +
+            "N.B. The existence of this configuration is a function of our current transaction " +
+            "scheme. This could go away, for instance, if we either atomically updated a " +
+            "notification's processing timestamp before adding its document events. Other " +
+            "alternative schemes are possible.")
+    public void setNotificationExpireThresholdSeconds(Integer notificationExpireThresholdSeconds) {
+        this.notificationExpireThresholdSeconds = notificationExpireThresholdSeconds;
     }
 }

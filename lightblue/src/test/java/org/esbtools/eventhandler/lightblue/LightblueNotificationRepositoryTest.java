@@ -39,7 +39,7 @@ import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringNotification;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
-import org.hamcrest.Matchers;
+
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -52,6 +52,7 @@ import javax.annotation.Nullable;
 import java.net.UnknownHostException;
 import java.sql.Date;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -91,11 +92,15 @@ public class LightblueNotificationRepositoryTest {
 
     private final MutableLightblueNotificationRepositoryConfig config =
             new MutableLightblueNotificationRepositoryConfig()
-            .setEntityNamesToProcess(notificationFactoryByEntityName.keySet());
+                    .setEntityNamesToProcess(notificationFactoryByEntityName.keySet())
+                    .setNotificationProcessingTimeout(PROCESSING_TIMEOUT)
+                    .setNotificationExpireThreshold(EXPIRE_THRESHOLD);
 
     private final InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
 
-    private static Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
+    private static final Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
+    private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
+    private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
 
     @Before
     public void initializeLightblueClientAndRepository() {
@@ -323,7 +328,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
-    public void shouldRecognizeUpdatesToProvidedConfiguration() throws Exception {
+    public void shouldRecognizeUpdatesToProvidedEntityNamesConfiguration() throws Exception {
         insertNotificationEntities(
                 notificationEntityForMultiStringInsert("1"),
                 notificationEntityForMultiStringInsert("2"),
@@ -335,6 +340,64 @@ public class LightblueNotificationRepositoryTest {
 
         assertThat(retrieved).hasSize(1);
         assertThat(retrieved.get(0).wrappedNotificationEntity().getEntityDataForField("value")).isEqualTo("3");
+    }
+
+    @Test(expected = Exception.class)
+    public void shouldTreatExpiredNotificationsTransactionsAsInactive() throws Exception {
+        // Slightly older than the expire threshold within the processing timeout.
+        // If we timeout after 60 seconds, but we drop events within 20 seconds of that,
+        // then this must be older than 40 seconds.
+        Instant expiredDate = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(EXPIRE_THRESHOLD)
+                .minus(Duration.ofMillis(1));
+
+        LightblueNotification notification = notificationThatStartedProcessingAt(expiredDate);
+
+        repository.ensureTransactionActive(notification);
+    }
+
+    @Test
+    public void shouldTreatNotExpiredNotificationsTransactionsAsActive() throws Exception {
+        // Slightly newer than the expire threshold within the processing timeout.
+        // If we timeout after 60 seconds, but we drop events within 20 seconds of that,
+        // then this must be newer than 40 seconds.
+        Instant notExpiredDate = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(EXPIRE_THRESHOLD)
+                .plus(Duration.ofMillis(1));
+
+        LightblueNotification notification = notificationThatStartedProcessingAt(notExpiredDate);
+
+        repository.ensureTransactionActive(notification);
+    }
+
+    @Test
+    public void shouldRetrieveTimedOutNotificationsEvenThoughTheyAreProcessing() throws Exception {
+        // Slightly older than the processing timeout.
+        Instant timedout = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .minus(Duration.ofMillis(1));
+
+        LightblueNotification notification = notificationThatStartedProcessingAt(timedout);
+
+        insertNotificationEntities(notification.wrappedNotificationEntity());
+
+        assertThat(repository.retrieveOldestNotificationsUpTo(1)).hasSize(1);
+    }
+
+    @Test
+    public void shouldNotRetrieveNotYetTimedOutProcessingNotifications() throws Exception {
+        // Slightly newer than the processing timeout.
+        Instant timedout = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(Duration.ofMillis(1));
+
+        LightblueNotification notification = notificationThatStartedProcessingAt(timedout);
+
+        insertNotificationEntities(notification.wrappedNotificationEntity());
+
+        assertThat(repository.retrieveOldestNotificationsUpTo(1)).isEmpty();
     }
 
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)
@@ -359,6 +422,14 @@ public class LightblueNotificationRepositoryTest {
     private static LightblueNotification notificationForStringInsert(String value) {
         return new StringNotification(
                 value, NotificationEntity.Operation.INSERT, "tester", fixedClock);
+    }
+
+    private static LightblueNotification notificationThatStartedProcessingAt(Instant processingDate) {
+        LightblueNotification notification = notificationForStringInsert("expired");
+        NotificationEntity expiredEntity = notification.wrappedNotificationEntity();
+        expiredEntity.setStatus(NotificationEntity.Status.processing);
+        expiredEntity.setProcessingDate(Date.from(processingDate));
+        return notification;
     }
 
     private static NotificationEntity notificationEntityForStringInsert(String value) {

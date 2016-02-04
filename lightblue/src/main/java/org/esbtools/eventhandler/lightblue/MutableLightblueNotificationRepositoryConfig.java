@@ -19,14 +19,18 @@
 package org.esbtools.eventhandler.lightblue;
 
 import javax.annotation.concurrent.ThreadSafe;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @ThreadSafe
 public class MutableLightblueNotificationRepositoryConfig implements LightblueNotificationRepositoryConfig {
     private final Set<String> entityNamesToProcess = Collections.synchronizedSet(new HashSet<>());
+    private volatile Duration processingTimeout = Duration.ZERO;
+    private volatile Duration expireThreshold = Duration.ZERO;
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
@@ -34,9 +38,22 @@ public class MutableLightblueNotificationRepositoryConfig implements LightblueNo
     public MutableLightblueNotificationRepositoryConfig() {}
 
     /**
+     * Uses provided as initial values. Must still configure timeouts.
+     */
+    public MutableLightblueNotificationRepositoryConfig(
+            Collection<String> initialEntityNamesToProcess) {
+        entityNamesToProcess.addAll(initialEntityNamesToProcess);
+    }
+
+    /**
      * Uses provided as initial values.
      */
-    public MutableLightblueNotificationRepositoryConfig(Collection<String> initialEntityNamesToProcess) {
+    public MutableLightblueNotificationRepositoryConfig(
+            Collection<String> initialEntityNamesToProcess, Duration processingTimeout,
+            Duration expireThreshold) {
+        this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
+        this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
+
         entityNamesToProcess.addAll(initialEntityNamesToProcess);
     }
 
@@ -54,6 +71,28 @@ public class MutableLightblueNotificationRepositoryConfig implements LightblueNo
             }
         }
 
+        return this;
+    }
+
+    @Override
+    public Duration getNotificationProcessingTimeout() {
+        return processingTimeout;
+    }
+
+    public MutableLightblueNotificationRepositoryConfig setNotificationProcessingTimeout(
+            Duration notificationProcessingTimeout) {
+        this.processingTimeout = notificationProcessingTimeout;
+        return this;
+    }
+
+    @Override
+    public Duration getNotificationExpireThreshold() {
+        return expireThreshold;
+    }
+
+    public MutableLightblueNotificationRepositoryConfig setNotificationExpireThreshold(
+            Duration notificationExpireThreshold) {
+        this.expireThreshold = notificationExpireThreshold;
         return this;
     }
 }

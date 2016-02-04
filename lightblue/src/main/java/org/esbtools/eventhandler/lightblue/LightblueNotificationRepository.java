@@ -54,10 +54,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
     private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
-    // TODO: Parameterize these
-    private final Duration processingTimeout = Duration.ofMinutes(10);
-    private final Duration expireThreshold = Duration.ofMinutes(2);
-
     private final Set<String> supportedEntityNames;
     /** Cached to avoid extra garbage. */
     private final String[] supportedEntityNamesArray;
@@ -81,6 +77,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
     public List<LightblueNotification> retrieveOldestNotificationsUpTo(int maxNotifications)
             throws Exception {
         String[] entitiesToProcess = getSupportedAndEnabledEntityNames();
+        Duration processingTimeout = config.getNotificationProcessingTimeout();
 
         if (entitiesToProcess.length == 0) {
             logger.info("Not retrieving any notifications because either there are no enabled " +
@@ -187,6 +184,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
         }
 
         LightblueNotification lightblueNotification = (LightblueNotification) notification;
+        Duration processingTimeout = config.getNotificationProcessingTimeout();
+        Duration expireThreshold = config.getNotificationExpireThreshold();
 
         Instant processingDate = lightblueNotification.wrappedNotificationEntity()
                 .getProcessingDate().toInstant();

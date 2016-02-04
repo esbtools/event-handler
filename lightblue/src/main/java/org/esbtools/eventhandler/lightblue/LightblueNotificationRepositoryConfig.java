@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue;
 
+import java.time.Duration;
 import java.util.Set;
 
 public interface LightblueNotificationRepositoryConfig {
@@ -25,4 +26,24 @@ public interface LightblueNotificationRepositoryConfig {
      * Governs whether or not notifications are processed based on their associated entity's name.
      */
     Set<String> getEntityNamesToProcess();
+
+    /**
+     * How long can a notification remain unchanged after marked as processing before we allow it
+     * to be retrieved again for reprocessing?
+     */
+    Duration getNotificationProcessingTimeout();
+
+    /**
+     * How long before a notification is available for retrieval do we drop the event and let it be
+     * reprocessed?
+     *
+     * <p>In other words, this governs when we stop processing a notification in flight because
+     * we're too near when another retrieval may see it is past its
+     * {@link #getNotificationProcessingTimeout()} and retrieve it for reprocessing.
+     *
+     * <p>N.B. The existence of this configuration is a function of our current transaction scheme.
+     * This could go away, for instance, if we either atomically updated a notification's processing
+     * timestamp before adding its document events. Other alternative schemes are possible.
+     */
+    Duration getNotificationExpireThreshold();
 }

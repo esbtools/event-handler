@@ -87,6 +87,20 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
             if (documentEventBatchSize != null) {
                 documentEventRepositoryConfig.setDocumentEventsBatchSize(documentEventBatchSize);
             }
+
+            Duration notificationProcessingTimeout = storedConfig
+                    .getNotificationProcessingTimeout();
+            if (notificationProcessingTimeout != null) {
+                notificationRepositoryConfig
+                        .setNotificationProcessingTimeout(notificationProcessingTimeout);
+            }
+
+            Duration notificationExpireThreshold = storedConfig
+                    .getNotificationExpireThreshold();
+            if (notificationExpireThreshold!= null) {
+                notificationRepositoryConfig
+                        .setNotificationExpireThreshold(notificationExpireThreshold);
+            }
         });
     }
 }
