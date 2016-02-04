@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -142,36 +143,30 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
      * {@inheritDoc}
      *
      * <p>N.B. This implementation currently works by simply checking if the known in memory
-     * timeouts of provided events fall within some threshold. It could be updated to also timestamp
-     * the persisted events again, but to be safe we would probably want to also lock them to do
+     * timeouts of provided event falls within some threshold. It could be updated to also timestamp
+     * the persisted event again, but to be safe we would probably want to also lock them to do
      * this update. For now, that complexity is probably not worth it.
      */
     @Override
-    public Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events) {
-        List<LightblueDocumentEvent> expired = new ArrayList<>(events.size());
-
-        for (DocumentEvent event : events) {
-            if (!(event instanceof LightblueDocumentEvent)) {
-                throw new IllegalArgumentException("Unknown event type. Only " +
-                        "LightblueDocumentEvent is supported. Event type was: " +
-                        event.getClass());
-            }
-
-            LightblueDocumentEvent lightblueEvent = (LightblueDocumentEvent) event;
-
-            ZonedDateTime processingDate = lightblueEvent.wrappedDocumentEventEntity().getProcessingDate();
-            ZonedDateTime expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
-
-            if (clock.instant().isAfter(expireDate.toInstant())) {
-                expired.add(lightblueEvent);
-            }
+    public void ensureTransactionActive(DocumentEvent event) throws Exception {
+        if (!(event instanceof LightblueDocumentEvent)) {
+            throw new IllegalArgumentException("Unknown event type. Only LightblueDocumentEvent " +
+                    "is supported. Event type was: " + event.getClass());
         }
 
-        return expired;
+        LightblueDocumentEvent lightblueEvent = (LightblueDocumentEvent) event;
+
+        Instant processingDate = lightblueEvent.wrappedDocumentEventEntity()
+                .getProcessingDate().toInstant();
+        Instant expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
+
+        if (clock.instant().isAfter(expireDate)) {
+            throw new ProcessingExpiredException(event, processingTimeout, expireThreshold);
+        }
     }
 
     @Override
-    public void markDocumentEventsProcessedOrFailed(
+    public void markDocumentEventsPublishedOrFailed(
             Collection<? extends DocumentEvent> documentEvents,
             Collection<FailedDocumentEvent> failures) throws LightblueException {
         List<DocumentEventEntity> processed = documentEvents.stream()
@@ -583,4 +578,5 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             this.event = event;
         }
     }
+
 }

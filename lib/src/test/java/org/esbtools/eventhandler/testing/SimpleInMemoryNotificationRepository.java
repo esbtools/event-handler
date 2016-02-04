@@ -53,8 +53,8 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
     }
 
     @Override
-    public Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications) {
-        return Collections.emptyList();
+    public void ensureTransactionActive(Notification notification) throws Exception {
+
     }
 
     @Override

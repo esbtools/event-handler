@@ -39,10 +39,9 @@ import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
-import org.hamcrest.Matchers;
+
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -499,7 +498,7 @@ public class LightblueDocumentEventRepositoryTest {
         List<LightblueDocumentEvent> successes = Arrays.asList(event1);
         List<FailedDocumentEvent> failures = Arrays.asList(new FailedDocumentEvent(event2, new RuntimeException("fake")));
 
-        repository.markDocumentEventsProcessedOrFailed(successes, failures);
+        repository.markDocumentEventsPublishedOrFailed(successes, failures);
 
         DocumentEventEntity publishedEntity = findDocumentEventEntityWhere(
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.published));

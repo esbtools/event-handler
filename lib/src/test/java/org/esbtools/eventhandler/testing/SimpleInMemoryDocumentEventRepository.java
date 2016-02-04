@@ -70,12 +70,12 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     }
 
     @Override
-    public Collection<? extends DocumentEvent> checkExpired(Collection<? extends DocumentEvent> events) {
-        return Collections.emptyList();
+    public void ensureTransactionActive(DocumentEvent event) throws Exception {
+
     }
 
     @Override
-    public void markDocumentEventsProcessedOrFailed(
+    public void markDocumentEventsPublishedOrFailed(
             Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception {
         published.addAll(events);

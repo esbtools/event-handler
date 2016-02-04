@@ -24,6 +24,7 @@ import org.apache.camel.builder.RouteBuilder;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -80,15 +81,28 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
-            documentEventRepository
-                    .checkExpired(eventsToDocuments.keySet())
-                    .forEach(eventsToDocuments::remove);
+            Iterator<Map.Entry<DocumentEvent, Object>> eventsToDocumentsIterator =
+                    eventsToDocuments.entrySet().iterator();
+            while (eventsToDocumentsIterator.hasNext()) {
+                Map.Entry<DocumentEvent, Object> eventToDocument = eventsToDocumentsIterator.next();
+                try {
+                    documentEventRepository.ensureTransactionActive(eventToDocument.getKey());
+                } catch (Exception e) {
+                    eventsToDocumentsIterator.remove();
+                    if (log.isWarnEnabled()) {
+                        log.warn("Event transaction no longer active, not processing: " +
+                                eventToDocument.getKey(), e);
+                    }
+                }
+            }
 
-            log.debug("Publishing on route {}: {}", exchange.getFromRouteId(), eventsToDocuments.values());
+            log.debug("Publishing on route {}: {}",
+                    exchange.getFromRouteId(), eventsToDocuments.values());
 
             // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
             // That we truly know if successfully published or not.
-            documentEventRepository.markDocumentEventsProcessedOrFailed(eventsToDocuments.keySet(), failedEvents);
+            documentEventRepository.markDocumentEventsPublishedOrFailed(
+                    eventsToDocuments.keySet(), failedEvents);
 
             exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
         })

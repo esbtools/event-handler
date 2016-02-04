@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -81,9 +82,21 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 }
             }
 
-            notificationRepository
-                    .checkExpired(notificationsToDocumentEvents.keySet())
-                    .forEach(notificationsToDocumentEvents::remove);
+            Iterator<Entry<Notification, Collection<DocumentEvent>>> notificationsToEventsIterator =
+                    notificationsToDocumentEvents.entrySet().iterator();
+            while (notificationsToEventsIterator.hasNext()) {
+                Entry<Notification, Collection<DocumentEvent>> notificationToEvents =
+                        notificationsToEventsIterator.next();
+                try {
+                    notificationRepository.ensureTransactionActive(notificationToEvents.getKey());
+                } catch (Exception e) {
+                    notificationsToEventsIterator.remove();
+                    if (log.isWarnEnabled()) {
+                        log.warn("Notification transaction no longer active, not processing: " +
+                                notificationToEvents.getKey(), e);
+                    }
+                }
+            }
 
             log.debug("Persisting document events via route {}: {}",
                     exchange.getFromRouteId(), notificationsToDocumentEvents.values());

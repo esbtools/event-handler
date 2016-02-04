@@ -179,28 +179,22 @@ public class LightblueNotificationRepository implements NotificationRepository {
     }
 
     @Override
-    public Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications) {
-        List<LightblueNotification> expired = new ArrayList<>(notifications.size());
-
-        for (Notification notification : notifications) {
-            if (!(notification instanceof LightblueNotification)) {
-                throw new IllegalArgumentException("Unknown event type. Only " +
-                        "LightblueDocumentEvent is supported. Event type was: " +
-                        notification.getClass());
-            }
-
-            LightblueNotification lightblueNotification = (LightblueNotification) notification;
-
-            Instant processingDate = lightblueNotification.wrappedNotificationEntity()
-                    .getProcessingDate().toInstant();
-            Instant expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
-
-            if (clock.instant().isAfter(expireDate)) {
-                expired.add(lightblueNotification);
-            }
+    public void ensureTransactionActive(Notification notification) throws Exception {
+        if (!(notification instanceof LightblueNotification)) {
+            throw new IllegalArgumentException("Unknown event type. Only " +
+                    "LightblueDocumentEvent is supported. Event type was: " +
+                    notification.getClass());
         }
 
-        return expired;
+        LightblueNotification lightblueNotification = (LightblueNotification) notification;
+
+        Instant processingDate = lightblueNotification.wrappedNotificationEntity()
+                .getProcessingDate().toInstant();
+        Instant expireDate = processingDate.plus(processingTimeout).minus(expireThreshold);
+
+        if (clock.instant().isAfter(expireDate)) {
+            throw new ProcessingExpiredException(notification, processingTimeout, expireThreshold);
+        }
     }
 
     @Override

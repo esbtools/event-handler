@@ -43,13 +43,28 @@ public interface NotificationRepository {
      * {@link #markNotificationsProcessedOrFailed(Collection, Collection)} ends this transaction
      * on the provided notifications. This transaction may end for other reasons, such as a
      * distributed lock failure or timeout, which would cause subsequent calls to retrieve these
-     * same events again. To work around this, before documents are published,
-     * {@link #checkExpired(Collection)} is called in order to determine if any transactions may
-     * have ended prematurely.
+     * same notifications again. To determine if a transaction is still active around this, before
+     * notifications' document events are added, {@link #ensureTransactionActive(Notification)}
+     * should be called in order to determine if that notification's transaction is lost or has
+     * otherwise ended prematurely.
      */
     List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception;
 
-    Collection<? extends Notification> checkExpired(Collection<? extends Notification> notifications);
+    /**
+     * Throws a descriptive exception if the provided {@code notification} is not in an active
+     * transaction, or if the current state of its transaction is unknown.
+     *
+     * <p>Transactions are started when an event is retrieved from
+     * {@link #retrieveOldestNotificationsUpTo(int)}.
+     *
+     * <p>Transactions can end before published or failure confirmation for a variety of reasons,
+     * such as network failure or timeout, depending on the implementation.
+     *
+     * @throws Exception if the event does not have an active transaction, and therefore is
+     * available for processing from {@link #retrieveOldestNotificationsUpTo(int)}.
+     */
+    // TODO: Consider moving this to Notification API
+    void ensureTransactionActive(Notification notification) throws Exception;
 
     void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception;
