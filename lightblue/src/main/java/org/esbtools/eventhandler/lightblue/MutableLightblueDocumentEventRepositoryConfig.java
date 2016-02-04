@@ -31,8 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
     private final Set<String> canonicalTypesToProcess = Collections.synchronizedSet(new HashSet<>());
     private final AtomicInteger documentEventsBatchSize = new AtomicInteger(0);
-    private volatile Duration processingTimeout = Duration.ZERO;
-    private volatile Duration expireThreshold = Duration.ZERO;
+    private volatile Duration processingTimeout = Duration.ofMinutes(10);
+    private volatile Duration expireThreshold = Duration.ofMinutes(2);
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
