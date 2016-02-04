@@ -252,7 +252,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
             for (DocumentEventUpdate update : lockedEvents.updates.values()) {
                 LightblueDocumentEvent event = update.event;
-
                 DocumentEventEntity entity = event.wrappedDocumentEventEntity();
 
                 // If id is null, this is a net new event as a result of merger.
@@ -261,13 +260,11 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 if (entity.get_id() == null) {
                     if (entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
                         insertAndUpdateEvents.add(InsertRequests.documentEventsReturningOnlyIds(entity));
-
                         savedEvents.add(event);
                     }
                 } else {
                     insertAndUpdateEvents.add(UpdateRequests.documentEventStatusIfCurrent(
                             entity, update.originalProcessingDate));
-
                     savedEvents.add(event);
                 }
             }
@@ -303,17 +300,13 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     logger.warn("Event update failed. Will not process. Event was: <{}>. " +
                             "Errors: <{}>", event, errorStrings);
                 }
-
                 eventsIterator.remove();
-
                 continue;
             }
 
             if (response.parseModifiedCount() == 0) {
                 logger.warn("Event updated by another thread. Will not process. Event was: {}", event);
-
                 eventsIterator.remove();
-
                 continue;
             }
 
@@ -321,7 +314,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             // which are supposed to be turned into publishable documents.
             if (!entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
                 eventsIterator.remove();
-
                 continue;
             }
 
