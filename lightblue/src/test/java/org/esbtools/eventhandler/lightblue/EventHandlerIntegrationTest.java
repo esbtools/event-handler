@@ -103,13 +103,13 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
                 client.getLocking("testLockingDomain"), Duration.ofSeconds(5));
 
         LightblueNotificationRepositoryConfig notificationConfigRepo1 =
-                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"))
-                        .setNotificationProcessingTimeout(Duration.ofSeconds(60))
-                        .setNotificationExpireThreshold(Duration.ofSeconds(30));
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String", "MultiString"),
+                        /* processingTimeout */ Duration.ofSeconds(60),
+                        /* expireThreshold */ Duration.ofSeconds(30));
         LightblueNotificationRepositoryConfig notificationConfigRepo2 =
-                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String"))
-                        .setNotificationProcessingTimeout(Duration.ofSeconds(60))
-                        .setNotificationExpireThreshold(Duration.ofSeconds(30));
+                new MutableLightblueNotificationRepositoryConfig(Arrays.asList("String"),
+                        /* processingTimeout */ Duration.ofSeconds(60),
+                        /* expireThreshold */ Duration.ofSeconds(30));
 
         notificationRepository1 = new LightblueNotificationRepository(client, lockStrategy1,
                 notificationConfigRepo1, notificationFactoryByEntityName, systemUtc);
