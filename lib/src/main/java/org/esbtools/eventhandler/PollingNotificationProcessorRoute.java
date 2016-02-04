@@ -110,6 +110,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
             try {
                 documentEventRepository.addNewDocumentEvents(documentEvents);
             } catch (Exception e) {
+                log.error("Failed to persist new document events from notifications.", e);
+                
                 // TODO: Handle failures more granularly
                 for (Notification notification : notificationsToDocumentEvents.keySet()) {
                     failedNotifications.add(new FailedNotification(notification, e));
