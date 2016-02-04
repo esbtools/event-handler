@@ -408,12 +408,12 @@ public class LightblueNotificationRepositoryTest {
         config.setNotificationProcessingTimeout(newProcessingTimeout);
         config.setNotificationExpireThreshold(newExpireThreshold);
 
-        Instant notExpiredDate = fixedClock.instant()
+        Instant expiredDate = fixedClock.instant()
                 .minus(newProcessingTimeout)
                 .plus(newExpireThreshold)
                 .minus(Duration.ofMillis(1));
 
-        LightblueNotification notification = notificationThatStartedProcessingAt(notExpiredDate);
+        LightblueNotification notification = notificationThatStartedProcessingAt(expiredDate);
 
         repository.ensureTransactionActive(notification);
     }
@@ -443,7 +443,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     private static LightblueNotification notificationThatStartedProcessingAt(Instant processingDate) {
-        LightblueNotification notification = notificationForStringInsert("expired");
+        LightblueNotification notification = notificationForStringInsert("processing");
         NotificationEntity expiredEntity = notification.wrappedNotificationEntity();
         expiredEntity.setStatus(NotificationEntity.Status.processing);
         expiredEntity.setProcessingDate(Date.from(processingDate));
