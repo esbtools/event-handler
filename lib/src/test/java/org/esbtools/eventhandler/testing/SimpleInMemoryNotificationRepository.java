@@ -31,6 +31,7 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
     private final List<Notification> notifications = new ArrayList<>();
     private final List<Notification> processed = new ArrayList<>();
     private final List<FailedNotification> failed = new ArrayList<>();
+    private boolean considerNoTransactionsActive = false;
 
     public void addNotifications(List<? extends Notification> notifications) {
         this.notifications.addAll(notifications);
@@ -44,6 +45,10 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
         return failed;
     }
 
+    public void considerNoTransactionsActive() {
+        considerNoTransactionsActive = true;
+    }
+
     @Override
     public List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception {
         maxNotifications = maxNotifications > notifications.size() ? notifications.size() : maxNotifications;
@@ -54,7 +59,9 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
 
     @Override
     public void ensureTransactionActive(Notification notification) throws Exception {
-
+        if (considerNoTransactionsActive) {
+            throw new Exception("Simulated transaction lost for notification: " + notification);
+        }
     }
 
     @Override

@@ -92,6 +92,18 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
                 .until(documentEventRepository::getPublishedEvents, Matchers.hasSize(6));
     }
 
+    @Test
+    public void shouldDropEventsWhoseTransactionsAreNoLongerActive() throws Exception {
+        documentEndpoint.expectedMessageCount(0);
+        failureEndpoint.expectedMessageCount(0);
+
+        documentEventRepository.considerNoTransactionsActive();
+        documentEventRepository.addNewDocumentEvents(randomSuccessfulEvents(10));
+
+        documentEndpoint.assertIsSatisfied(5000);
+        failureEndpoint.assertIsSatisfied(100);
+    }
+
     public static List<StringDocumentEvent> randomSuccessfulEvents(int amount) {
         List<StringDocumentEvent> events = new ArrayList<>(amount);
         for (int i = 0; i < amount; i++) {

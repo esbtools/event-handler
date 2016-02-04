@@ -32,6 +32,7 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     private final List<DocumentEvent> published = new ArrayList<>();
     private final List<FailedDocumentEvent> failed = new ArrayList<>();
     private boolean failOnAddingDocumentEvents;
+    private boolean considerNoTransactionsActive;
 
     public List<DocumentEvent> getDocumentEvents() {
         return documentEvents;
@@ -53,6 +54,10 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
         failOnAddingDocumentEvents = false;
     }
 
+    public void considerNoTransactionsActive() {
+        considerNoTransactionsActive = true;
+    }
+
     @Override
     public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents) throws Exception {
         if (failOnAddingDocumentEvents) {
@@ -71,7 +76,9 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
 
     @Override
     public void ensureTransactionActive(DocumentEvent event) throws Exception {
-
+        if (considerNoTransactionsActive) {
+            throw new Exception("Simulated transaction lock lost for event: " + event);
+        }
     }
 
     @Override

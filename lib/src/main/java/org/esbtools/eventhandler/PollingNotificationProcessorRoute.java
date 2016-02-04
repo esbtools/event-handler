@@ -67,14 +67,15 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 notificationsToFutureEvents.put(notification, futureEvents);
             }
 
-            Map<Notification, Collection<DocumentEvent>> notificationsToDocumentEvents = new HashMap<>();
+            Map<Notification, Collection<DocumentEvent>> notificationsToDocumentEvents =
+                    new HashMap<>();
             List<FailedNotification> failedNotifications = new ArrayList<>();
 
             for (Entry<Notification, Future<Collection<DocumentEvent>>> notificationToFutureEvents
                     : notificationsToFutureEvents.entrySet()) {
                 Notification notification = notificationToFutureEvents.getKey();
-                Future<Collection<DocumentEvent>> futureEvents = notificationToFutureEvents.getValue();
-
+                Future<Collection<DocumentEvent>> futureEvents =
+                        notificationToFutureEvents.getValue();
                 try {
                     notificationsToDocumentEvents.put(notification, futureEvents.get());
                 } catch (ExecutionException | InterruptedException e) {

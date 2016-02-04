@@ -18,16 +18,17 @@
 
 package org.esbtools.eventhandler;
 
-import com.jayway.awaitility.Awaitility;
-import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.test.junit4.CamelTestSupport;
 import org.esbtools.eventhandler.testing.FailingNotification;
 import org.esbtools.eventhandler.testing.SimpleInMemoryDocumentEventRepository;
 import org.esbtools.eventhandler.testing.SimpleInMemoryNotificationRepository;
 import org.esbtools.eventhandler.testing.StringNotification;
+
+import com.google.common.truth.Truth;
+import com.jayway.awaitility.Awaitility;
+import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.test.junit4.CamelTestSupport;
 import org.hamcrest.Matchers;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -97,6 +98,16 @@ public class PollingNotificationProcessorRouteTest extends CamelTestSupport {
 
         Awaitility.await().atMost(5, TimeUnit.SECONDS)
                 .until(notificationRepository::getFailedNotifications, Matchers.hasSize(10));
+    }
+
+    @Test
+    public void shouldDropNotificationsWhoseTransactionsAreNoLongerActive() throws Exception {
+        notificationRepository.considerNoTransactionsActive();
+        notificationRepository.addNotifications(randomNotifications(10));
+
+        Thread.sleep(5000);
+
+        Truth.assertThat(documentEventRepository.getDocumentEvents()).isEmpty();
     }
 
     static List<StringNotification> randomNotifications(int amount) {
