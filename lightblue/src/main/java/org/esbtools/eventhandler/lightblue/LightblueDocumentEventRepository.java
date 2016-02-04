@@ -321,6 +321,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             // which are supposed to be turned into publishable documents.
             if (!entity.getStatus().equals(DocumentEventEntity.Status.processing)) {
                 eventsIterator.remove();
+
+                continue;
             }
 
             // If known entity has no id, must've been insert. Populate id in returned entity.
@@ -419,6 +421,11 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return LockedResources.fromLocks(locksAcquired);
         }
 
+        /**
+         * Attempts to acquire a lock on the provided {@code identity}. If the lock cannot be
+         * acquired, the object is still created, but it will throw out any added events since we
+         * cannot process them without a lock.
+         */
         SharedIdentityEvents(LockStrategy lockStrategy, Identity identity, Clock clock) {
             this.identity = identity;
             this.clock = clock;
