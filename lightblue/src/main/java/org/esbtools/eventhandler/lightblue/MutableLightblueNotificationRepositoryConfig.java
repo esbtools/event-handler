@@ -28,9 +28,9 @@ import java.util.Set;
 
 @ThreadSafe
 public class MutableLightblueNotificationRepositoryConfig implements LightblueNotificationRepositoryConfig {
-    private final Set<String> entityNamesToProcess = Collections.synchronizedSet(new HashSet<>());
-    private volatile Duration processingTimeout = Duration.ofMinutes(10);
-    private volatile Duration expireThreshold = Duration.ofMinutes(2);
+    private Collection<String> entityNamesToProcess = Collections.emptySet();
+    private Duration processingTimeout = Duration.ofMinutes(10);
+    private Duration expireThreshold = Duration.ofMinutes(2);
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
@@ -56,13 +56,7 @@ public class MutableLightblueNotificationRepositoryConfig implements LightblueNo
 
     public MutableLightblueNotificationRepositoryConfig setEntityNamesToProcess(
             Collection<String> entityNames) {
-        if (!entityNamesToProcess.equals(entityNames)) {
-            synchronized (entityNamesToProcess) {
-                entityNamesToProcess.clear();
-                entityNamesToProcess.addAll(entityNames);
-            }
-        }
-
+        entityNamesToProcess = entityNames;
         return this;
     }
 
