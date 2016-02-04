@@ -400,6 +400,24 @@ public class LightblueNotificationRepositoryTest {
         assertThat(repository.retrieveOldestNotificationsUpTo(1)).isEmpty();
     }
 
+    @Test(expected = Exception.class)
+    public void shouldRecognizeUpdatesToProvidedTimeoutsConfiguration() throws Exception {
+        Duration newProcessingTimeout = PROCESSING_TIMEOUT.dividedBy(2);
+        Duration newExpireThreshold = EXPIRE_THRESHOLD.dividedBy(2);
+
+        config.setNotificationProcessingTimeout(newProcessingTimeout);
+        config.setNotificationExpireThreshold(newExpireThreshold);
+
+        Instant notExpiredDate = fixedClock.instant()
+                .minus(newProcessingTimeout)
+                .plus(newExpireThreshold)
+                .minus(Duration.ofMillis(1));
+
+        LightblueNotification notification = notificationThatStartedProcessingAt(notExpiredDate);
+
+        repository.ensureTransactionActive(notification);
+    }
+
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest request = new DataFindRequest(
