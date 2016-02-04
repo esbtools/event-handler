@@ -23,6 +23,7 @@ import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -81,6 +82,16 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
+            try {
+                documentEventRepository.markDocumentEventsPublishedOrFailed(
+                        Collections.emptyList(), failedEvents);
+            } catch (Exception e) {
+                if (log.isErrorEnabled()) {
+                    log.error("Failed to update failed events. They will be reprocessed. " +
+                            "Failures were: " + failedEvents, e);
+                }
+            }
+
             Iterator<Map.Entry<DocumentEvent, Object>> eventsToDocumentsIterator =
                     eventsToDocuments.entrySet().iterator();
             while (eventsToDocumentsIterator.hasNext()) {
@@ -98,11 +109,6 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
             log.debug("Publishing on route {}: {}",
                     exchange.getFromRouteId(), eventsToDocuments.values());
-
-            // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
-            // That we truly know if successfully published or not.
-            documentEventRepository.markDocumentEventsPublishedOrFailed(
-                    eventsToDocuments.keySet(), failedEvents);
 
             exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
         })
