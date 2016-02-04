@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentEventRepository;
 
+import java.time.Duration;
 import java.util.Set;
 
 public interface LightblueDocumentEventRepositoryConfig {
@@ -47,4 +48,24 @@ public interface LightblueDocumentEventRepositoryConfig {
      * @see DocumentEvent#isSupersededBy(DocumentEvent)
      */
     Integer getDocumentEventsBatchSize();
+
+    /**
+     * How long can a document event remain processing before we allow it to be retrieved again for
+     * reprocessing?
+     */
+    Duration getDocumentEventProcessingTimeout();
+
+    /**
+     * How long before a document event is available for retrieval do we drop the event and let it
+     * be reprocessed?
+     *
+     * <p>In other words, this governs when we stop processing an event in flight because we're too
+     * near when another retrieval may see it is past its
+     * {@link #getDocumentEventProcessingTimeout()} and retrieve it for reprocessing.
+     *
+     * <p>N.B. The existence of this configuration is a function of our current transaction scheme.
+     * This could go away, for instance, if we either atomically updated an event's processing
+     * timestamp before publishing its document. Other alternative schemes are possible.
+     */
+    Duration getDocumentEventExpireThreshold();
 }

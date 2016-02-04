@@ -21,15 +21,6 @@ package org.esbtools.eventhandler.lightblue;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueClientConfiguration;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Projection;
-import com.redhat.lightblue.client.Query;
-import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.request.data.DataInsertRequest;
-
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
@@ -40,6 +31,14 @@ import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueClientConfiguration;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.Projection;
+import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.data.DataFindRequest;
+import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -84,6 +83,8 @@ public class LightblueDocumentEventRepositoryTest {
     private Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
 
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
+    private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
+    private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
@@ -93,7 +94,9 @@ public class LightblueDocumentEventRepositoryTest {
 
     private MutableLightblueDocumentEventRepositoryConfig config = new MutableLightblueDocumentEventRepositoryConfig()
             .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
-            .setDocumentEventsBatchSize(DOCUMENT_EVENT_BATCH_SIZE);
+            .setDocumentEventsBatchSize(DOCUMENT_EVENT_BATCH_SIZE)
+            .setDocumentEventProcessingTimeout(PROCESSING_TIMEOUT)
+            .setDocumentEventExpireThreshold(EXPIRE_THRESHOLD);
 
     private InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
 
@@ -543,6 +546,82 @@ public class LightblueDocumentEventRepositoryTest {
         assertThat(retrieved.get(0).wrappedDocumentEventEntity().getParameterByKey("value")).isAnyOf("3", "4");
     }
 
+    @Test(expected = Exception.class)
+    public void shouldTreatExpiredDocumentEventsTransactionsAsInactive() throws Exception {
+        // Slightly older than the expire threshold within the processing timeout.
+        // If we timeout after 60 seconds, but we drop events within 20 seconds of that,
+        // then this must be older than 40 seconds.
+        Instant expiredDate = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(EXPIRE_THRESHOLD)
+                .minus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(expiredDate);
+
+        repository.ensureTransactionActive(event);
+    }
+
+    @Test
+    public void shouldTreatNotExpiredDocumentEventsTransactionsAsActive() throws Exception {
+        // Slightly newer than the expire threshold within the processing timeout.
+        // If we timeout after 60 seconds, but we drop events within 20 seconds of that,
+        // then this must be newer than 40 seconds.
+        Instant notExpiredDate = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(EXPIRE_THRESHOLD)
+                .plus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(notExpiredDate);
+
+        repository.ensureTransactionActive(event);
+    }
+
+    @Test
+    public void shouldRetrieveTimedOutDocumentEventsEvenThoughTheyAreProcessing() throws Exception {
+        // Slightly older than the processing timeout.
+        Instant timedout = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .minus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(timedout);
+
+        insertDocumentEventEntities(event.wrappedDocumentEventEntity());
+
+        assertThat(repository.retrievePriorityDocumentEventsUpTo(1)).hasSize(1);
+    }
+
+    @Test
+    public void shouldNotRetrieveNotYetTimedOutProcessingDocumentEvents() throws Exception {
+        // Slightly newer than the processing timeout.
+        Instant timedout = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(timedout);
+
+        insertDocumentEventEntities(event.wrappedDocumentEventEntity());
+
+        assertThat(repository.retrievePriorityDocumentEventsUpTo(1)).isEmpty();
+    }
+
+    @Test(expected = Exception.class)
+    public void shouldRecognizeUpdatesToProvidedTimeoutsConfiguration() throws Exception {
+        Duration newProcessingTimeout = PROCESSING_TIMEOUT.dividedBy(2);
+        Duration newExpireThreshold = EXPIRE_THRESHOLD.dividedBy(2);
+
+        config.setDocumentEventProcessingTimeout(newProcessingTimeout);
+        config.setDocumentEventExpireThreshold(newExpireThreshold);
+
+        Instant expiredDate = fixedClock.instant()
+                .minus(newProcessingTimeout)
+                .plus(newExpireThreshold)
+                .minus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(expiredDate);
+
+        repository.ensureTransactionActive(event);
+    }
+
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest find = new DataFindRequest(
@@ -586,6 +665,14 @@ public class LightblueDocumentEventRepositoryTest {
                 .wrappedDocumentEventEntity();
         entity.setPriority(priority);
         return entity;
+    }
+
+    private LightblueDocumentEvent newDocumentEventThatStartedProcessingAt(Instant processingDate) {
+        LightblueDocumentEvent event = new StringDocumentEvent("processing", fixedClock);
+        DocumentEventEntity expiredEntity = event.wrappedDocumentEventEntity();
+        expiredEntity.setStatus(DocumentEventEntity.Status.processing);
+        expiredEntity.setProcessingDate(ZonedDateTime.ofInstant(processingDate, fixedClock.getZone()));
+        return event;
     }
 
     private DocumentEventEntity[] randomNewDocumentEventEntities(int amount) {

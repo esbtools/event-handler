@@ -18,17 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
-import com.redhat.lightblue.client.request.data.DataInsertRequest;
-
-import com.jayway.awaitility.Awaitility;
-import org.apache.camel.EndpointInject;
-import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.component.mock.MockEndpoint;
-import org.apache.camel.test.junit4.CamelTestSupport;
-import org.apache.camel.util.ObjectHelper;
 import org.esbtools.eventhandler.PollingDocumentEventProcessorRoute;
 import org.esbtools.eventhandler.PollingNotificationProcessorRoute;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
@@ -40,6 +29,17 @@ import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.StringNotification;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
+
+import com.jayway.awaitility.Awaitility;
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import org.apache.camel.EndpointInject;
+import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.component.mock.MockEndpoint;
+import org.apache.camel.test.junit4.CamelTestSupport;
+import org.apache.camel.util.ObjectHelper;
 import org.hamcrest.Matchers;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -117,9 +117,13 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
                 notificationConfigRepo2, notificationFactoryByEntityName, systemUtc);
 
         LightblueDocumentEventRepositoryConfig configForRepo1 =
-                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"), 100);
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String", "MultiString"),
+                        100, /* processingTimeout */ Duration.ofSeconds(60),
+                        /* expireThreshold */ Duration.ofSeconds(30));
         LightblueDocumentEventRepositoryConfig configForRepo2 =
-                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String"), 100);
+                new MutableLightblueDocumentEventRepositoryConfig(Arrays.asList("String"),
+                        100, /* processingTimeout */ Duration.ofSeconds(60),
+                        /* expireThreshold */ Duration.ofSeconds(30));
 
         documentEventRepository1 = new LightblueDocumentEventRepository(client,
                 lockStrategy1, configForRepo1, documentEventFactoriesByType, systemUtc);

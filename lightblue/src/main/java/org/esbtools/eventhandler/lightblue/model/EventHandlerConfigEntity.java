@@ -43,6 +43,8 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     private Set<String> entityNamesToProcess;
     private Integer notificationProcessingTimeoutSeconds;
     private Integer notificationExpireThresholdSeconds;
+    private Integer documentEventProcessingTimeoutSeconds;
+    private Integer documentEventExpireThresholdSeconds;
 
     public String getDomain() {
         return domain;
@@ -83,8 +85,39 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
             "merged or superseded. Finally, among those left, we will return the 50 highest " +
             "priority events. Any remaining events past 50 will be untouched, available for " +
             "future retrievals.")
-    public void setDocumentEventsBatchSize(int documentEventsBatchSize) {
+    public void setDocumentEventsBatchSize(Integer documentEventsBatchSize) {
         this.documentEventsBatchSize = documentEventsBatchSize;
+    }
+
+    @Override
+    public Duration getDocumentEventProcessingTimeout() {
+        return Duration.ofSeconds(documentEventProcessingTimeoutSeconds);
+    }
+
+    @Description("How long can a document event remain processing before we allow it to be " +
+            "retrieved again for reprocessing?")
+    public void setDocumentEventProcessingTimeoutSeconds(
+            Integer documentEventProcessingTimeoutSeconds) {
+        this.documentEventProcessingTimeoutSeconds = documentEventProcessingTimeoutSeconds;
+    }
+
+    @Override
+    public Duration getDocumentEventExpireThreshold() {
+        return Duration.ofSeconds(documentEventExpireThresholdSeconds);
+    }
+
+    @Description("How long before a document event is available for retrieval do we drop the " +
+            "event and let it be reprocessed?\n" +
+            "In other words, this governs when we stop processing an event in flight because " +
+            "we're too near when another retrieval may see it is past its " +
+            "getDocumentEventProcessingTimeout() and retrieve it for reprocessing.\n" +
+            "N.B. The existence of this configuration is a function of our current transaction " +
+            "scheme. This could go away, for instance, if we either atomically updated an " +
+            "event's processing timestamp before publishing its document. Other alternative " +
+            "schemes are possible.")
+    public void setDocumentEventExpireThresholdSeconds(
+            Integer documentEventExpireThresholdSeconds) {
+        this.documentEventExpireThresholdSeconds = documentEventExpireThresholdSeconds;
     }
 
     @Override

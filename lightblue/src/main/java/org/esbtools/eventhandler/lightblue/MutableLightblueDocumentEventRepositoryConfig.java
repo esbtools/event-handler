@@ -19,9 +19,11 @@
 package org.esbtools.eventhandler.lightblue;
 
 import javax.annotation.concurrent.ThreadSafe;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,6 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
     private final Set<String> canonicalTypesToProcess = Collections.synchronizedSet(new HashSet<>());
     private final AtomicInteger documentEventsBatchSize = new AtomicInteger(0);
+    private volatile Duration processingTimeout = Duration.ZERO;
+    private volatile Duration expireThreshold = Duration.ZERO;
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
@@ -38,10 +42,14 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     /**
      * Uses provided as initial values.
      */
-    public MutableLightblueDocumentEventRepositoryConfig(Collection<String> initialCanonicalTypesToProcess,
-            int initialDocumentEventsBatchSize) {
+    public MutableLightblueDocumentEventRepositoryConfig(
+            Collection<String> initialCanonicalTypesToProcess,
+            int initialDocumentEventsBatchSize, Duration processingTimeout,
+            Duration expireThreshold) {
         canonicalTypesToProcess.addAll(initialCanonicalTypesToProcess);
         documentEventsBatchSize.set(initialDocumentEventsBatchSize);
+        this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
+        this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
     }
 
     /**
@@ -67,6 +75,28 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     @Override
     public Integer getDocumentEventsBatchSize() {
         return documentEventsBatchSize.get();
+    }
+
+    @Override
+    public Duration getDocumentEventProcessingTimeout() {
+        return processingTimeout;
+    }
+
+    public MutableLightblueDocumentEventRepositoryConfig setDocumentEventProcessingTimeout(
+            Duration processingTimeout) {
+        this.processingTimeout = processingTimeout;
+        return this;
+    }
+
+    @Override
+    public Duration getDocumentEventExpireThreshold() {
+        return expireThreshold;
+    }
+
+    public MutableLightblueDocumentEventRepositoryConfig setDocumentEventExpireThreshold(
+            Duration expireThreshold) {
+        this.expireThreshold = expireThreshold;
+        return this;
     }
 
     public MutableLightblueDocumentEventRepositoryConfig setDocumentEventsBatchSize(int batchSize) {

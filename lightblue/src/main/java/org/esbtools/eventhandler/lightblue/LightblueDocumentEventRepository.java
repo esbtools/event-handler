@@ -59,10 +59,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
     private final Map<String, ? extends DocumentEventFactory> documentEventFactoriesByType;
     private final Clock clock;
 
-    // TODO: Parameterize these
-    private final Duration processingTimeout = Duration.ofMinutes(10);
-    private final Duration expireThreshold = Duration.ofMinutes(2);
-
     private final Set<String> supportedTypes;
     /** Cached to avoid extra garbage. */
     private final String[] supportedTypesArray;
@@ -101,6 +97,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             throws Exception {
         String[] typesToProcess = getSupportedAndEnabledEventTypes();
         Integer documentEventsBatchSize = config.getDocumentEventsBatchSize();
+        Duration processingTimeout = config.getDocumentEventProcessingTimeout();
 
         if (typesToProcess.length == 0 || documentEventsBatchSize == null ||
                 documentEventsBatchSize == 0) {
@@ -155,6 +152,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         }
 
         LightblueDocumentEvent lightblueEvent = (LightblueDocumentEvent) event;
+        Duration processingTimeout = config.getDocumentEventProcessingTimeout();
+        Duration expireThreshold = config.getDocumentEventExpireThreshold();
 
         Instant processingDate = lightblueEvent.wrappedDocumentEventEntity()
                 .getProcessingDate().toInstant();
