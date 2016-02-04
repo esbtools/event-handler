@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -18,14 +18,13 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import com.google.common.base.Joiner;
-
-public abstract class Locks {
-    public static String forNotificationsForEntities(String[] entities) {
-        return "notification-" + Joiner.on('-').join(entities);
+public class LockNotAvailableException extends Exception {
+    public LockNotAvailableException(String resourceId, Object resource) {
+        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource);
     }
 
-    public static String forDocumentEventsForEntities(String[] entities) {
-        return "documentEvent-" + Joiner.on('-').join(entities);
+    public LockNotAvailableException(String resourceId, Object resource, Exception cause) {
+        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource,
+                cause);
     }
 }

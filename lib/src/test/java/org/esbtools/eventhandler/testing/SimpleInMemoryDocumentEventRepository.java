@@ -24,6 +24,7 @@ import org.esbtools.eventhandler.FailedDocumentEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepository {
@@ -31,6 +32,7 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     private final List<DocumentEvent> published = new ArrayList<>();
     private final List<FailedDocumentEvent> failed = new ArrayList<>();
     private boolean failOnAddingDocumentEvents;
+    private boolean considerNoTransactionsActive;
 
     public List<DocumentEvent> getDocumentEvents() {
         return documentEvents;
@@ -52,6 +54,10 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
         failOnAddingDocumentEvents = false;
     }
 
+    public void considerNoTransactionsActive() {
+        considerNoTransactionsActive = true;
+    }
+
     @Override
     public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents) throws Exception {
         if (failOnAddingDocumentEvents) {
@@ -69,7 +75,14 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
     }
 
     @Override
-    public void markDocumentEventsProcessedOrFailed(
+    public void ensureTransactionActive(DocumentEvent event) throws Exception {
+        if (considerNoTransactionsActive) {
+            throw new Exception("Simulated transaction lock lost for event: " + event);
+        }
+    }
+
+    @Override
+    public void markDocumentEventsPublishedOrFailed(
             Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception {
         published.addAll(events);

@@ -18,9 +18,8 @@
 
 package org.esbtools.eventhandler.lightblue.model;
 
-import com.redhat.lightblue.client.util.ClientConstants;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.redhat.lightblue.client.util.ClientConstants;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.MinItems;
@@ -30,6 +29,7 @@ import io.github.alechenninger.lightblue.Version;
 
 import javax.annotation.Nullable;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,6 +54,7 @@ public class DocumentEventEntity {
     private Status status;
     private Integer priority;
     private ZonedDateTime creationDate;
+    private ZonedDateTime processingDate;
     private ZonedDateTime processedDate;
     private Set<String> survivorOfIds;
 
@@ -129,6 +130,15 @@ public class DocumentEventEntity {
     }
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)
+    public ZonedDateTime getProcessingDate() {
+        return processingDate;
+    }
+
+    public void setProcessingDate(ZonedDateTime processingDate) {
+        this.processingDate = processingDate;
+    }
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = LIGHTBLUE_DATE_FORMAT)
     public ZonedDateTime getProcessedDate() {
         return processedDate;
     }
@@ -182,6 +192,7 @@ public class DocumentEventEntity {
                 ", status=" + status +
                 ", priority=" + priority +
                 ", creationDate=" + creationDate +
+                ", processingDate=" + processingDate +
                 ", processedDate=" + processedDate +
                 ", survivorOfIds=" + survivorOfIds +
                 '}';
@@ -198,6 +209,7 @@ public class DocumentEventEntity {
                 status == that.status &&
                 Objects.equals(priority, that.priority) &&
                 Objects.equals(creationDate, that.creationDate) &&
+                Objects.equals(processingDate, that.processingDate) &&
                 Objects.equals(processedDate, that.processedDate) &&
                 Objects.equals(survivorOfIds, that.survivorOfIds);
     }
@@ -205,7 +217,7 @@ public class DocumentEventEntity {
     @Override
     public int hashCode() {
         return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
-                processedDate, survivorOfIds);
+                processingDate, processedDate, survivorOfIds);
     }
 
     public enum Status {

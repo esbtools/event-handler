@@ -22,19 +22,17 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Abstracts a backing store and staging area for {@link Notification notifications} and
- * {@link DocumentEvent events}.
+ * Abstracts a transactional backing store and staging area for {@link DocumentEvent events}.
  *
- * <p>A repository is responsible for handling CRUD operations around these objects, in whatever
- * scheme necessary. All operations have some constraints around multithreading, and should perform
- * optimizations made available by the {@link DocumentEvent} API such as checking for
- * {@link DocumentEvent#isSupersededBy(DocumentEvent) redundancies} and
- * {@link DocumentEvent#merge(DocumentEvent) merging} any events that can be merged.
+ * <p>A repository is responsible for handling CRUD and data parsing operations around these
+ * objects, in whatever scheme necessary.
+ *
+ * <p>Production implementations are expected to be thread safe, even across a network.
  */
 public interface DocumentEventRepository {
 
     /**
-     * Persists new document events, updating originating notifications if applicable.
+     * Persists new document events.
      *
      * <p>The document events are retrievable from {@link #retrievePriorityDocumentEventsUpTo(int)}.
      */
@@ -49,11 +47,42 @@ public interface DocumentEventRepository {
      * priority order. Events which were superseded or made obsolete by a merge operation should not
      * be included.
      *
-     * <p>Subsequent calls should always return a unique set, even among multiple threads.
+     * <p>Subsequent calls should do their best to return unique sets, even among multiple threads.
+     *
+     * <p>Retrieved document events begin a transaction with those events. Calling
+     * {@link #markDocumentEventsPublishedOrFailed(Collection, Collection)} ends this transaction
+     * on the provided events. This transaction may end for other reasons, such as a distributed
+     * lock failure or timeout, which would cause subsequent calls to retrieve these same events
+     * again. To determine if a transaction is still active around this, before documents are
+     * published, {@link #ensureTransactionActive(DocumentEvent)} should be called in order to
+     * determine if that event's transaction is lost or has otherwise ended prematurely.
      */
     List<? extends DocumentEvent> retrievePriorityDocumentEventsUpTo(int maxEvents) throws Exception;
 
-    // TODO: Handle failed
-    void markDocumentEventsProcessedOrFailed(Collection<? extends DocumentEvent> events,
+    /**
+     * Throws a descriptive exception if the provided {@code event} is not in an active transaction,
+     * or if the current state of its transaction is unknown.
+     *
+     * <p>Transactions are started when an event is retrieved from
+     * {@link #retrievePriorityDocumentEventsUpTo(int)}.
+     *
+     * <p>Transactions can end before published or failure confirmation for a variety of reasons,
+     * such as network failure or timeout, depending on the implementation.
+     *
+     * @throws Exception if the event does not have an active transaction, and therefore is
+     * available for processing from {@link #retrievePriorityDocumentEventsUpTo(int)}.
+     */
+    // TODO: Consider moving this to DocumentEvent API
+    void ensureTransactionActive(DocumentEvent event) throws Exception;
+
+    /**
+     * Ends the active transactions with the provided events, providing failure information if any
+     * were not able to be published.
+     *
+     * <p>Events marked as published should not be retrievable ever again. Implementations can
+     * decided if failed events should be retrievable again or not.
+     */
+    // TODO: Should we make rollback from failure explicit or leave this up to impl?
+    void markDocumentEventsPublishedOrFailed(Collection<? extends DocumentEvent> events,
             Collection<FailedDocumentEvent> failures) throws Exception;
 }

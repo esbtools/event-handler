@@ -21,16 +21,50 @@ package org.esbtools.eventhandler;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Abstracts a transactional backing store and staging area for {@link Notification notifications}.
+ *
+ * <p>A repository is responsible for handling CRUD and data parsing operations around these
+ * objects, in whatever scheme necessary.
+ *
+ * <p>Production implementations are expected to be thread safe, even across a network.
+ */
 public interface NotificationRepository {
 
     /**
-     * Retrieves the oldest {@code maxEvents} {@link Notification notifications}, oldest first.
+     * Retrieves the oldest {@code maxNotifications} {@link Notification notifications}, oldest
+     * first.
      *
      * <p>Once retrieved, a notification should not be retrieved again, atomically. That is, many
-     * threads looking up notifications at the same time should all et a unique non-overlapping sample
-     * of the oldest notifications. Subsequent calls should always return a unique set.
+     * threads looking up notifications at the same time should all et a unique non-overlapping
+     * sample of the oldest notifications. Subsequent calls should always return a unique set.
+     *
+     * <p>Retrieved notifications begin a transaction with those notifications. Calling
+     * {@link #markNotificationsProcessedOrFailed(Collection, Collection)} ends this transaction
+     * on the provided notifications. This transaction may end for other reasons, such as a
+     * distributed lock failure or timeout, which would cause subsequent calls to retrieve these
+     * same notifications again. To determine if a transaction is still active around this, before
+     * notifications' document events are added, {@link #ensureTransactionActive(Notification)}
+     * should be called in order to determine if that notification's transaction is lost or has
+     * otherwise ended prematurely.
      */
-    List<? extends Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception;
+    List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception;
+
+    /**
+     * Throws a descriptive exception if the provided {@code notification} is not in an active
+     * transaction, or if the current state of its transaction is unknown.
+     *
+     * <p>Transactions are started when an event is retrieved from
+     * {@link #retrieveOldestNotificationsUpTo(int)}.
+     *
+     * <p>Transactions can end before published or failure confirmation for a variety of reasons,
+     * such as network failure or timeout, depending on the implementation.
+     *
+     * @throws Exception if the event does not have an active transaction, and therefore is
+     * available for processing from {@link #retrieveOldestNotificationsUpTo(int)}.
+     */
+    // TODO: Consider moving this to Notification API
+    void ensureTransactionActive(Notification notification) throws Exception;
 
     void markNotificationsProcessedOrFailed(Collection<? extends Notification> notification,
             Collection<FailedNotification> failures) throws Exception;

@@ -24,17 +24,23 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
     private final int batchSize;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private final int id = idCounter.getAndIncrement();
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval,
@@ -47,8 +53,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForNotifications?period=" + pollingInterval.toMillis())
-        .routeId("notificationProcessor")
+        from("timer:pollForNotifications" + id + "?period=" + pollingInterval.toMillis())
+        .routeId("notificationProcessor-" + id)
         .process(exchange -> {
             List<? extends Notification> notifications =
                     notificationRepository.retrieveOldestNotificationsUpTo(batchSize);
@@ -61,34 +67,58 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 notificationsToFutureEvents.put(notification, futureEvents);
             }
 
-            List<DocumentEvent> documentEvents = new ArrayList<>();
-            List<Notification> successfulNotifications = new ArrayList<>(notifications.size());
+            Map<Notification, Collection<DocumentEvent>> notificationsToDocumentEvents =
+                    new HashMap<>();
             List<FailedNotification> failedNotifications = new ArrayList<>();
 
             for (Entry<Notification, Future<Collection<DocumentEvent>>> notificationToFutureEvents
                     : notificationsToFutureEvents.entrySet()) {
                 Notification notification = notificationToFutureEvents.getKey();
-                Future<Collection<DocumentEvent>> futureEvents = notificationToFutureEvents.getValue();
-
+                Future<Collection<DocumentEvent>> futureEvents =
+                        notificationToFutureEvents.getValue();
                 try {
-                    documentEvents.addAll(futureEvents.get());
-                    successfulNotifications.add(notification);
+                    notificationsToDocumentEvents.put(notification, futureEvents.get());
                 } catch (ExecutionException | InterruptedException e) {
                     failedNotifications.add(new FailedNotification(notification, e));
                 }
             }
 
+            Iterator<Entry<Notification, Collection<DocumentEvent>>> notificationsToEventsIterator =
+                    notificationsToDocumentEvents.entrySet().iterator();
+            while (notificationsToEventsIterator.hasNext()) {
+                Entry<Notification, Collection<DocumentEvent>> notificationToEvents =
+                        notificationsToEventsIterator.next();
+                try {
+                    notificationRepository.ensureTransactionActive(notificationToEvents.getKey());
+                } catch (Exception e) {
+                    notificationsToEventsIterator.remove();
+                    if (log.isWarnEnabled()) {
+                        log.warn("Notification transaction no longer active, not processing: " +
+                                notificationToEvents.getKey(), e);
+                    }
+                }
+            }
+
+            log.debug("Persisting document events via route {}: {}",
+                    exchange.getFromRouteId(), notificationsToDocumentEvents.values());
+
+            List<DocumentEvent> documentEvents = notificationsToDocumentEvents.values()
+                    .stream()
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toList());
+
             try {
                 documentEventRepository.addNewDocumentEvents(documentEvents);
             } catch (Exception e) {
-                for (Notification notification : successfulNotifications) {
+                // TODO: Handle failures more granularly
+                for (Notification notification : notificationsToDocumentEvents.keySet()) {
                     failedNotifications.add(new FailedNotification(notification, e));
                 }
-                successfulNotifications.clear();
+                notificationsToDocumentEvents.clear();
             }
 
             notificationRepository.markNotificationsProcessedOrFailed(
-                    successfulNotifications, failedNotifications);
+                    notificationsToDocumentEvents.keySet(), failedNotifications);
         });
     }
 }

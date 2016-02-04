@@ -24,12 +24,14 @@ import org.esbtools.eventhandler.NotificationRepository;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryNotificationRepository implements NotificationRepository {
     private final List<Notification> notifications = new ArrayList<>();
     private final List<Notification> processed = new ArrayList<>();
     private final List<FailedNotification> failed = new ArrayList<>();
+    private boolean considerNoTransactionsActive = false;
 
     public void addNotifications(List<? extends Notification> notifications) {
         this.notifications.addAll(notifications);
@@ -43,12 +45,23 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
         return failed;
     }
 
+    public void considerNoTransactionsActive() {
+        considerNoTransactionsActive = true;
+    }
+
     @Override
-    public List<? extends Notification> retrieveOldestNotificationsUpTo(int maxEvents) throws Exception {
-        maxEvents = maxEvents > notifications.size() ? notifications.size() : maxEvents;
-        List<Notification> retrieved = new ArrayList<>(notifications.subList(0, maxEvents));
+    public List<? extends Notification> retrieveOldestNotificationsUpTo(int maxNotifications) throws Exception {
+        maxNotifications = maxNotifications > notifications.size() ? notifications.size() : maxNotifications;
+        List<Notification> retrieved = new ArrayList<>(notifications.subList(0, maxNotifications));
         notifications.removeAll(retrieved);
         return retrieved;
+    }
+
+    @Override
+    public void ensureTransactionActive(Notification notification) throws Exception {
+        if (considerNoTransactionsActive) {
+            throw new Exception("Simulated transaction lost for notification: " + notification);
+        }
     }
 
     @Override

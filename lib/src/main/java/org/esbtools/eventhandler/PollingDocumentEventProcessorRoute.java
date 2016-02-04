@@ -22,13 +22,14 @@ import com.google.common.collect.Iterables;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final DocumentEventRepository documentEventRepository;
@@ -36,6 +37,9 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final int batchSize;
     private final String documentEndpoint;
     private final String failureEndpoint;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private final int id = idCounter.getAndIncrement();
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
             Duration pollingInterval, int batchSize, String documentEndpoint,
@@ -49,8 +53,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForDocumentEvents?period=" + pollingInterval.toMillis())
-        .routeId("documentEventsProcessor")
+        from("timer:pollForDocumentEvents" + id + "?period=" + pollingInterval.toMillis())
+        .routeId("documentEventsProcessor-" + id)
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);
@@ -62,8 +66,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 eventsToFutureDocuments.put(event, event.lookupDocument());
             }
 
-            List<Object> documents = new ArrayList<>(documentEvents.size());
-            List<DocumentEvent> successfulEvents = new ArrayList<>(documentEvents.size());
+            Map<DocumentEvent, Object> eventsToDocuments = new HashMap<>(documentEvents.size());
             List<FailedDocumentEvent> failedEvents = new ArrayList<>();
 
             for (Map.Entry<DocumentEvent, Future<?>> eventToFutureDocument
@@ -72,18 +75,36 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 Future<?> futureDoc = eventToFutureDocument.getValue();
 
                 try {
-                    documents.add(futureDoc.get());
-                    successfulEvents.add(event);
+                    eventsToDocuments.put(event, futureDoc.get());
                 } catch (ExecutionException | InterruptedException e) {
                     failedEvents.add(new FailedDocumentEvent(event, e));
                 }
             }
 
-            // FIXME: If this fails, we should attempt to "rollback" these events to be
-            // available to the next retrieve events call
-            documentEventRepository.markDocumentEventsProcessedOrFailed(successfulEvents, failedEvents);
+            Iterator<Map.Entry<DocumentEvent, Object>> eventsToDocumentsIterator =
+                    eventsToDocuments.entrySet().iterator();
+            while (eventsToDocumentsIterator.hasNext()) {
+                Map.Entry<DocumentEvent, Object> eventToDocument = eventsToDocumentsIterator.next();
+                try {
+                    documentEventRepository.ensureTransactionActive(eventToDocument.getKey());
+                } catch (Exception e) {
+                    eventsToDocumentsIterator.remove();
+                    if (log.isWarnEnabled()) {
+                        log.warn("Event transaction no longer active, not processing: " +
+                                eventToDocument.getKey(), e);
+                    }
+                }
+            }
 
-            exchange.getIn().setBody(Iterables.concat(documents, failedEvents));
+            log.debug("Publishing on route {}: {}",
+                    exchange.getFromRouteId(), eventsToDocuments.values());
+
+            // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
+            // That we truly know if successfully published or not.
+            documentEventRepository.markDocumentEventsPublishedOrFailed(
+                    eventsToDocuments.keySet(), failedEvents);
+
+            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
         })
         .split(body())
         .streaming()

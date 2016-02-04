@@ -21,8 +21,11 @@ package org.esbtools.eventhandler.lightblue;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
 
+import java.util.SortedMap;
+
 /**
- * Connects event implementations to the underlying {@link LightblueDocumentEventRepository} data model.
+ * Connects event implementations to the underlying {@link LightblueDocumentEventRepository} data
+ * model.
  */
 public interface LightblueDocumentEvent extends DocumentEvent {
     /**
@@ -30,6 +33,16 @@ public interface LightblueDocumentEvent extends DocumentEvent {
      */
     @Override
     LightblueDocumentEvent merge(DocumentEvent event);
+
+    /**
+     * Identity is a set of key value pairs with the property of being equivalent to another
+     * document event's identity when this document event is able to be merged with or is superseded
+     * by that other document event.
+     *
+     * <p>We use a String representation of an identity as a resource for locking, so that one
+     * thread has ownership of all events which are able to be optimized together.
+     */
+    Identity identity();
 
     /**
      * @return Entity backing this document event. Every document event should be backed by an
