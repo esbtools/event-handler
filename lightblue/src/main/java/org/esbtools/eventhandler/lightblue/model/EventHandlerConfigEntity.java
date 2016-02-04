@@ -103,8 +103,8 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
         return Duration.ofSeconds(notificationProcessingTimeoutSeconds);
     }
 
-    @Description("How long can a notification remain unchanged after marked as processing before " +
-            "we allow it to be retrieved again for reprocessing?")
+    @Description("How long can a notification remain processing before we allow it to be " +
+            "retrieved again for reprocessing?")
     public void setNotificationProcessingTimeoutSeconds(Integer notificationProcessingTimeoutSeconds) {
         this.notificationProcessingTimeoutSeconds = notificationProcessingTimeoutSeconds;
     }

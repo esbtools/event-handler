@@ -28,14 +28,14 @@ public interface LightblueNotificationRepositoryConfig {
     Set<String> getEntityNamesToProcess();
 
     /**
-     * How long can a notification remain unchanged after marked as processing before we allow it
-     * to be retrieved again for reprocessing?
+     * How long can a notification remain processing before we allow it to be retrieved again for
+     * reprocessing?
      */
     Duration getNotificationProcessingTimeout();
 
     /**
-     * How long before a notification is available for retrieval do we drop the event and let it be
-     * reprocessed?
+     * How long before a notification is available for retrieval do we drop the notification and
+     * let it be reprocessed?
      *
      * <p>In other words, this governs when we stop processing a notification in flight because
      * we're too near when another retrieval may see it is past its
