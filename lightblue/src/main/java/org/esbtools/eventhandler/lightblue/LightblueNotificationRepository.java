@@ -156,16 +156,13 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         logger.warn("Notification update failed. Will not process. " +
                                 "Event was: <{}>. Errors: <{}>", notification, errorStrings);
                     }
-
                     notificationsIterator.remove();
-
                     continue;
                 }
 
                 if (response.parseModifiedCount() == 0) {
                     logger.warn("Notification updated by another thread. Will not process. " +
                             "Event was: {}", notification);
-
                     notificationsIterator.remove();
                 }
             }
