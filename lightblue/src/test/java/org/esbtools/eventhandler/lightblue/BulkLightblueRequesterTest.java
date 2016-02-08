@@ -11,6 +11,8 @@ import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
+import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;

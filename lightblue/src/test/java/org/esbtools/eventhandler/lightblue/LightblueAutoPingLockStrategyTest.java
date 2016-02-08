@@ -22,6 +22,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import org.esbtools.eventhandler.lightblue.locking.LightblueAutoPingLockStrategy;
+import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
+import org.esbtools.eventhandler.lightblue.locking.LockedResource;
+import org.esbtools.eventhandler.lightblue.locking.LostLockException;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLocking;
 
 import org.hamcrest.Matchers;
@@ -36,7 +40,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 

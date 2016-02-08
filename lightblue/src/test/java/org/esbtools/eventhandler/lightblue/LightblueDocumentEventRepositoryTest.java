@@ -22,7 +22,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 
 import org.esbtools.eventhandler.FailedDocumentEvent;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.config.MutableLightblueDocumentEventRepositoryConfig;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;

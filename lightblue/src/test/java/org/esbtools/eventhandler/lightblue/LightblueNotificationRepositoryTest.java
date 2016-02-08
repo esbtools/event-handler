@@ -31,6 +31,7 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import org.esbtools.eventhandler.FailedNotification;
+import org.esbtools.eventhandler.lightblue.config.MutableLightblueNotificationRepositoryConfig;
 import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;

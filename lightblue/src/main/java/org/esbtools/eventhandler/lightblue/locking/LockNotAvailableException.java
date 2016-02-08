@@ -16,16 +16,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.locking;
 
-import java.io.Closeable;
-import java.util.Collection;
-import java.util.List;
+public class LockNotAvailableException extends Exception {
+    public LockNotAvailableException(String resourceId, Object resource) {
+        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource);
+    }
 
-public interface LockedResources<T> extends Closeable {
-    Collection<LockedResource<T>> getLocks();
-
-    static <T> LockedResources<T> fromLocks(Collection<LockedResource<T>> locks) {
-        return new WrappedLockedResources<>(locks);
+    public LockNotAvailableException(String resourceId, Object resource, Exception cause) {
+        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource,
+                cause);
     }
 }

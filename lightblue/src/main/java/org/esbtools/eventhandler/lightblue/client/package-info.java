@@ -16,15 +16,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
-
-import org.esbtools.eventhandler.lightblue.locking.Lockable;
-
 /**
- * Marker interface for {@link Lockable} resources which expose a resource id that encodes an
- * entity's identity.
+ * Contains implementations of {@link org.esbtools.eventhandler.Requester} for bridging
+ * {@link java.util.concurrent.Future}-based APIs with efficient, "batch-able" requests (see
+ * {@link org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester}).
  *
- * @see LightblueDocumentEvent#identity()
+ * <p>Additionally, because constructing requets for
+ * {@link com.redhat.lightblue.client.LightblueClient} can be verbose, this provides static factory
+ * methods to construct these more readably (see
+ * {@link org.esbtools.eventhandler.lightblue.client.UpdateRequests} for example).
  */
-public interface Identity extends Lockable {
-}
+package org.esbtools.eventhandler.lightblue.client;

@@ -16,7 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.config;
+
+import org.esbtools.eventhandler.lightblue.LightblueNotificationRepositoryConfig;
 
 import javax.annotation.concurrent.ThreadSafe;
 import java.time.Duration;

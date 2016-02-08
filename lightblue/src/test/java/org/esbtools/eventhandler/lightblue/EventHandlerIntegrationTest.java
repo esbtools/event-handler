@@ -20,7 +20,9 @@ package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.PollingDocumentEventProcessorRoute;
 import org.esbtools.eventhandler.PollingNotificationProcessorRoute;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.config.MutableLightblueDocumentEventRepositoryConfig;
+import org.esbtools.eventhandler.lightblue.config.MutableLightblueNotificationRepositoryConfig;
+import org.esbtools.eventhandler.lightblue.locking.LightblueAutoPingLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;

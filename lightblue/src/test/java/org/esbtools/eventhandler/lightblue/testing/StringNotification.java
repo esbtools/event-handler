@@ -21,7 +21,7 @@ package org.esbtools.eventhandler.lightblue.testing;
 import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.LightblueNotification;
-import org.esbtools.eventhandler.lightblue.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import java.time.Clock;

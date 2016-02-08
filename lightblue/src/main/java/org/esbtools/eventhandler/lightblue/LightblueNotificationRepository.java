@@ -22,6 +22,17 @@ import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.NotificationRepository;
+import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.FindRequests;
+import org.esbtools.eventhandler.lightblue.client.LightblueErrors;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.UpdateRequests;
+import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
+import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
+import org.esbtools.eventhandler.lightblue.locking.Lockable;
+import org.esbtools.eventhandler.lightblue.locking.LockedResource;
+import org.esbtools.eventhandler.lightblue.locking.LockedResources;
+import org.esbtools.eventhandler.lightblue.locking.LostLockException;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -47,6 +58,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * A notification repository which uses lightblue as the notification store. Notifications are
+ * persisted in the form of {@link NotificationEntity} which must be configured as an entity in
+ * your lightblue instance. Notifications can be written using the
+ * <a href="https://github.com/esbtools/lightblue-notification-hook">lightblue notification hook</a>.
+ */
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
     private final LightblueNotificationRepositoryConfig config;
@@ -156,16 +173,13 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         logger.warn("Notification update failed. Will not process. " +
                                 "Event was: <{}>. Errors: <{}>", notification, errorStrings);
                     }
-
                     notificationsIterator.remove();
-
                     continue;
                 }
 
                 if (response.parseModifiedCount() == 0) {
                     logger.warn("Notification updated by another thread. Will not process. " +
                             "Event was: {}", notification);
-
                     notificationsIterator.remove();
                 }
             }
@@ -305,7 +319,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                 }
             }
 
-            return new WrappedLockedResources<>(acquiredLocks);
+            return LockedResources.fromLocks(acquiredLocks);
         }
 
         private ProcessingNotification(String notificationId, LightblueNotification notification,

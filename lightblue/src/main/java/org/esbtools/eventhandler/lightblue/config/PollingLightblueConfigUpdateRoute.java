@@ -16,9 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.config;
 
-import org.esbtools.eventhandler.lightblue.model.EventHandlerConfigEntity;
+import org.esbtools.eventhandler.lightblue.client.FindRequests;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.request.data.DataFindRequest;

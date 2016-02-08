@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -16,13 +16,10 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * An implementation of event-handler-lib interfaces which use Lightblue as a backend event and
+ * document store. These implementations are composable: you do not need to use a
+ * {@link org.esbtools.eventhandler.lightblue.LightblueNotificationRepository} with a
+ * {@link org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepository}, and so on.
+ */
 package org.esbtools.eventhandler.lightblue;
-
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-
-import org.esbtools.eventhandler.Requester;
-
-public interface LightblueRequester extends
-        Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
-}

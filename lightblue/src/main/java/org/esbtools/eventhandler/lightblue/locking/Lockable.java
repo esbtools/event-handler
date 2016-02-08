@@ -16,15 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.locking;
 
-import java.io.IOException;
-import java.util.List;
-
-class MultipleIOExceptions extends IOException {
-    MultipleIOExceptions(List<IOException> exceptions) {
-        super("Multiple IOExceptions occurred. See suppressed exceptions.");
-
-        exceptions.forEach(this::addSuppressed);
-    }
+public interface Lockable {
+    String getResourceId();
 }

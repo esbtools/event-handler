@@ -16,15 +16,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.locking;
 
-import org.esbtools.eventhandler.lightblue.locking.Lockable;
+import java.io.Closeable;
+import java.util.Collection;
 
-/**
- * Marker interface for {@link Lockable} resources which expose a resource id that encodes an
- * entity's identity.
- *
- * @see LightblueDocumentEvent#identity()
- */
-public interface Identity extends Lockable {
+public interface LockedResources<T> extends Closeable {
+    Collection<LockedResource<T>> getLocks();
+
+    static <T> LockedResources<T> fromLocks(Collection<LockedResource<T>> locks) {
+        return new WrappedLockedResources<>(locks);
+    }
 }

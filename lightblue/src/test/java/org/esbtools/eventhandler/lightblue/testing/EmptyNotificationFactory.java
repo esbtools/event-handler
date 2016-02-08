@@ -18,9 +18,8 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
-import org.esbtools.eventhandler.Notification;
 import org.esbtools.eventhandler.lightblue.LightblueNotification;
-import org.esbtools.eventhandler.lightblue.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.NotificationFactory;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 

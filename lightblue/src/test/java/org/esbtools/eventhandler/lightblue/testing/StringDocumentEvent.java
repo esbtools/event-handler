@@ -22,9 +22,9 @@ import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.lightblue.Identity;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
-import org.esbtools.eventhandler.lightblue.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.TypeAndValueIdentity;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.DocumentEventEntity;
 
 import java.time.Clock;
 import java.time.ZonedDateTime;
