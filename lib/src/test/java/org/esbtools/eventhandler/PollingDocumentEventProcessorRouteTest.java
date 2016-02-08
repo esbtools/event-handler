@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler;
 
+import com.google.common.truth.Truth;
 import com.jayway.awaitility.Awaitility;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.builder.RouteBuilder;
@@ -33,6 +34,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
@@ -79,17 +81,14 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test
-    public void shouldMarkSuccessfulEventsAsPublishedAndFailedAsFailed() throws Exception {
+    public void shouldMarkFailedEventsAsFailed() throws Exception {
         List<DocumentEvent> events = new ArrayList<>(10);
         events.addAll(randomFailingEvents(4));
-        events.addAll(randomSuccessfulEvents(6));
 
         documentEventRepository.addNewDocumentEvents(events);
 
         Awaitility.await().atMost(5, TimeUnit.SECONDS)
                 .until(documentEventRepository::getFailedEvents, Matchers.hasSize(4));
-        Awaitility.await().atMost(5, TimeUnit.SECONDS)
-                .until(documentEventRepository::getPublishedEvents, Matchers.hasSize(6));
     }
 
     @Test
@@ -102,6 +101,37 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
 
         documentEndpoint.assertIsSatisfied(5000);
         failureEndpoint.assertIsSatisfied(100);
+    }
+
+    @Test
+    public void shouldMarkEventsAsPublishedAfterPublishingSuccessfully() throws Exception {
+        documentEndpoint.expectedMessageCount(5);
+
+        List<StringDocumentEvent> events = randomSuccessfulEvents(5);
+
+        documentEventRepository.addNewDocumentEvents(events);
+
+        Awaitility.await().atMost(5, TimeUnit.SECONDS)
+                .until(documentEventRepository::getPublishedEvents, Matchers.hasSize(5));
+    }
+
+    @Test(timeout = 10000)
+    // Eventually this should be "shouldRollBackEventsWherePublishFailed"
+    // See: https://github.com/esbtools/event-handler/issues/18
+    public void shouldNotUpdateEventsAsPublishedOrFailedIfPublishFailed() throws Exception {
+        int eventCount = 5;
+        CountDownLatch latch = new CountDownLatch(eventCount);
+
+        documentEndpoint.whenAnyExchangeReceived(exchange -> {
+            latch.countDown();
+            throw new Exception("Simulated publish failure");
+        });
+
+        documentEventRepository.addNewDocumentEvents(randomSuccessfulEvents(eventCount));
+
+        latch.await();
+
+        Truth.assertThat(documentEventRepository.getPublishedEvents()).isEmpty();
     }
 
     public static List<StringDocumentEvent> randomSuccessfulEvents(int amount) {

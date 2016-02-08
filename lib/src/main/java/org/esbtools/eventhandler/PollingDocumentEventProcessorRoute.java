@@ -110,14 +110,19 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
             log.debug("Publishing on route {}: {}",
                     exchange.getFromRouteId(), eventsToDocuments.values());
 
-            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
+            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.entrySet(), failedEvents));
         })
         .split(body())
         .streaming()
         .choice()
             .when(e -> e.getIn().getBody() instanceof FailedDocumentEvent).to(failureEndpoint)
             .otherwise()
-                .setProperty("originalEvent", body())
+                .process(exchange -> {
+                    Map.Entry<DocumentEvent, Object> eventToDocument =
+                            exchange.getIn().getBody(Map.Entry.class);
+                    exchange.setProperty("originalEvent", eventToDocument.getKey());
+                    exchange.getIn().setBody(eventToDocument.getValue());
+                })
                 .to(documentEndpoint)
                 // If producing to documentEndpoint succeeded, update original event status...
                 // TODO(ahenning): This updates event status one at a time. We could consider using
