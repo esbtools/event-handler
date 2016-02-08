@@ -19,9 +19,6 @@
 package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.DocumentEvent;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-
-import java.util.SortedMap;
 
 /**
  * Connects event implementations to the underlying {@link LightblueDocumentEventRepository} data

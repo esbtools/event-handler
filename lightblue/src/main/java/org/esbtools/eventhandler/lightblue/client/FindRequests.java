@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -16,10 +16,10 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.client;
 
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
-import org.esbtools.eventhandler.lightblue.model.EventHandlerConfigEntity;
+import org.esbtools.eventhandler.lightblue.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.config.EventHandlerConfigEntity;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import com.redhat.lightblue.client.Literal;
@@ -29,7 +29,6 @@ import com.redhat.lightblue.client.Sort;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.Date;
 
 public abstract class FindRequests {

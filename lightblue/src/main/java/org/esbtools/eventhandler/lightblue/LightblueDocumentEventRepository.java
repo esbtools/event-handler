@@ -22,7 +22,18 @@ import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentEventRepository;
 import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedDocumentEvent;
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.FindRequests;
+import org.esbtools.eventhandler.lightblue.client.InsertRequests;
+import org.esbtools.eventhandler.lightblue.client.LightblueErrors;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.UpdateRequests;
+import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
+import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
+import org.esbtools.eventhandler.lightblue.locking.Lockable;
+import org.esbtools.eventhandler.lightblue.locking.LockedResource;
+import org.esbtools.eventhandler.lightblue.locking.LockedResources;
+import org.esbtools.eventhandler.lightblue.locking.LostLockException;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
@@ -52,6 +63,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * A document event repository which uses lightblue as the event store, storing events in the form
+ * of {@link DocumentEventEntity}, which must be configured as an entity in lightblue.
+ */
 public class LightblueDocumentEventRepository implements DocumentEventRepository {
     private final LightblueClient lightblue;
     private final LightblueDocumentEventRepositoryConfig config;

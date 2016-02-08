@@ -16,8 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.client;
 
-public interface Lockable {
-    String getResourceId();
+import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
+
+import org.esbtools.eventhandler.Responses;
+
+public interface LightblueResponses extends
+        Responses<AbstractLightblueDataRequest, LightblueDataResponse> {
 }

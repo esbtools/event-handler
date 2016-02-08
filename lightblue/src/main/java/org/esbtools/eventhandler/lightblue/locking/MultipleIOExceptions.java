@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -16,13 +16,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.locking;
 
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
+import java.io.IOException;
+import java.util.List;
 
-import org.esbtools.eventhandler.ResponsePromise;
+class MultipleIOExceptions extends IOException {
+    MultipleIOExceptions(List<IOException> exceptions) {
+        super("Multiple IOExceptions occurred. See suppressed exceptions.");
 
-public interface LightblueResponsePromise extends
-        ResponsePromise<AbstractLightblueDataRequest, LightblueDataResponse> {
+        exceptions.forEach(this::addSuppressed);
+    }
 }

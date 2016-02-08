@@ -16,15 +16,13 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler.lightblue.client;
 
-public class LockNotAvailableException extends Exception {
-    public LockNotAvailableException(String resourceId, Object resource) {
-        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource);
-    }
+import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
 
-    public LockNotAvailableException(String resourceId, Object resource, Exception cause) {
-        super("Lock not available for resourceId <" + resourceId + ">, for resource: " + resource,
-                cause);
-    }
+import org.esbtools.eventhandler.ResponsePromise;
+
+public interface LightblueResponsePromise extends
+        ResponsePromise<AbstractLightblueDataRequest, LightblueDataResponse> {
 }

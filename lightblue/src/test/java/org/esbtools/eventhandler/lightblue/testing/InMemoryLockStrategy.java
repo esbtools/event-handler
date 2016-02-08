@@ -18,22 +18,16 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
-import org.esbtools.eventhandler.lightblue.LockNotAvailableException;
-import org.esbtools.eventhandler.lightblue.LockStrategy;
-import org.esbtools.eventhandler.lightblue.LockedResource;
-import org.esbtools.eventhandler.lightblue.LockedResources;
-import org.esbtools.eventhandler.lightblue.LostLockException;
+import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
+import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
+import org.esbtools.eventhandler.lightblue.locking.LockedResource;
+import org.esbtools.eventhandler.lightblue.locking.LostLockException;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public class InMemoryLockStrategy implements LockStrategy {
     private static final Map<String, String> resourcesToClients =

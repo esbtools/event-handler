@@ -16,15 +16,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
-
-import org.esbtools.eventhandler.lightblue.locking.Lockable;
-
 /**
- * Marker interface for {@link Lockable} resources which expose a resource id that encodes an
- * entity's identity.
- *
- * @see LightblueDocumentEvent#identity()
+ * This package contains classes useful for storing config values in a Lightblue collection and
+ * allowing runtime updates.
  */
-public interface Identity extends Lockable {
-}
+package org.esbtools.eventhandler.lightblue.config;

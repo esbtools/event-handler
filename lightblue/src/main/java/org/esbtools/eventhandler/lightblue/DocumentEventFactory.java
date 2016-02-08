@@ -18,7 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.lightblue.model.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 
 public interface DocumentEventFactory {
     LightblueDocumentEvent getDocumentEventForEntity(DocumentEventEntity entity,

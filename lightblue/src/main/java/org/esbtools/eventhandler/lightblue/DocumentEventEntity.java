@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue.model;
+package org.esbtools.eventhandler.lightblue;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.redhat.lightblue.client.util.ClientConstants;
@@ -29,7 +29,6 @@ import io.github.alechenninger.lightblue.Version;
 
 import javax.annotation.Nullable;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
