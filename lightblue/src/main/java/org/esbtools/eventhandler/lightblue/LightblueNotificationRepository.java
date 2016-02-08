@@ -161,7 +161,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
             while (notificationsIterator.hasNext()) {
                 if (!responsesIterator.hasNext()) {
                     throw new IllegalStateException("Mismatched number of requests and responses! " +
-                            "Notifications looked like: <{}>. Responses looked like");
+                            "Notifications looked like: " + updatedNotifications +
+                            "Responses looked like: " + bulkResponse.getResponses());
                 }
 
                 LightblueDataResponse response = responsesIterator.next();
