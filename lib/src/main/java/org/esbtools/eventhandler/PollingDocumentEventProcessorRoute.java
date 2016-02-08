@@ -116,6 +116,25 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
         .streaming()
         .choice()
             .when(e -> e.getIn().getBody() instanceof FailedDocumentEvent).to(failureEndpoint)
-            .otherwise().to(documentEndpoint);
+            .otherwise()
+                .setProperty("originalEvent", body())
+                .to(documentEndpoint)
+                // If producing to documentEndpoint succeeded, update original event status...
+                // TODO(ahenning): This updates event status one at a time. We could consider using
+                // aggregation strategy with splitter to update all in bulk which would take
+                // advantage of repository implementations which can update many statuses in one
+                // call.
+                .process(exchange -> {
+                    DocumentEvent event = exchange.getProperty("originalEvent", DocumentEvent.class);
+
+                    if (event == null) {
+                        throw new IllegalStateException("Could not get original event from " +
+                                "exchange. Won't update event status as published. Exchange was: " +
+                                exchange);
+                    }
+
+                    documentEventRepository.markDocumentEventsPublishedOrFailed(
+                            Collections.singleton(event), Collections.emptyList());
+                });
     }
 }
