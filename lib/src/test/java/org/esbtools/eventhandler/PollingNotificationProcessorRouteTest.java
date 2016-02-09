@@ -86,18 +86,38 @@ public class PollingNotificationProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test
-    public void shouldMarkAllNotificationsAsFailedIfDocumentEventRepositoryFailedToPersistTheEvents()
+    public void shouldRollBackNotificationsIfDocumentEventRepositoryFailedToPersistEvents()
             throws Exception {
         documentEventRepository.failOnAddingDocumentEvents();
 
         List<Notification> notifications = new ArrayList<>(10);
-        notifications.addAll(randomFailingNotifications(5));
+        notifications.addAll(randomNotifications(5));
+
+        notificationRepository.addNotifications(notifications);
+
+        Thread.sleep(5000);
+
+        Truth.assertThat(notificationRepository.getProcessedNotifications()).isEmpty();
+    }
+
+    @Test
+    public void shouldStillFailNotificationsWhichFailedIfDocumentEventRepositoryFailedToPersistEvents()
+            throws Exception {
+        documentEventRepository.failOnAddingDocumentEvents();
+
+        List<Notification> notifications = new ArrayList<>(10);
+        List<FailingNotification> failures = randomFailingNotifications(5);
+        notifications.addAll(failures);
         notifications.addAll(randomNotifications(5));
 
         notificationRepository.addNotifications(notifications);
 
         Awaitility.await().atMost(5, TimeUnit.SECONDS)
-                .until(notificationRepository::getFailedNotifications, Matchers.hasSize(10));
+                .until(() -> notificationRepository.getFailedNotifications()
+                        .stream()
+                        .map(FailedNotification::notification)
+                        .toArray(Notification[]::new),
+                        Matchers.arrayContainingInAnyOrder(failures.toArray()));
     }
 
     @Test
