@@ -241,8 +241,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
             return;
         }
 
-        // TODO: Deal with failures
-        // Waiting on: https://github.com/lightblue-platform/lightblue-client/issues/202
+        // Let failures propagate
         lightblue.bulkData(markNotifications);
     }
 
