@@ -24,7 +24,6 @@ import org.esbtools.eventhandler.FailedDocumentEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepository {
@@ -60,9 +59,12 @@ public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepos
 
     @Override
     public void addNewDocumentEvents(Collection<? extends DocumentEvent> documentEvents) throws Exception {
+        if (documentEvents.isEmpty()) return;
+
         if (failOnAddingDocumentEvents) {
             throw new RuntimeException("Simulated failure");
         }
+
         this.documentEvents.addAll(documentEvents);
     }
 
