@@ -23,6 +23,7 @@ import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -81,6 +82,16 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
+            try {
+                documentEventRepository.markDocumentEventsPublishedOrFailed(
+                        Collections.emptyList(), failedEvents);
+            } catch (Exception e) {
+                if (log.isErrorEnabled()) {
+                    log.error("Failed to update failed events. They will be reprocessed. " +
+                            "Failures were: " + failedEvents, e);
+                }
+            }
+
             Iterator<Map.Entry<DocumentEvent, Object>> eventsToDocumentsIterator =
                     eventsToDocuments.entrySet().iterator();
             while (eventsToDocumentsIterator.hasNext()) {
@@ -99,17 +110,36 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
             log.debug("Publishing on route {}: {}",
                     exchange.getFromRouteId(), eventsToDocuments.values());
 
-            // TODO: Only update failures here. Rest should be updated in callback post-enqueue.
-            // That we truly know if successfully published or not.
-            documentEventRepository.markDocumentEventsPublishedOrFailed(
-                    eventsToDocuments.keySet(), failedEvents);
-
-            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.values(), failedEvents));
+            exchange.getIn().setBody(Iterables.concat(eventsToDocuments.entrySet(), failedEvents));
         })
         .split(body())
         .streaming()
         .choice()
             .when(e -> e.getIn().getBody() instanceof FailedDocumentEvent).to(failureEndpoint)
-            .otherwise().to(documentEndpoint);
+            .otherwise()
+                .process(exchange -> {
+                    Map.Entry<DocumentEvent, Object> eventToDocument =
+                            exchange.getIn().getBody(Map.Entry.class);
+                    exchange.setProperty("originalEvent", eventToDocument.getKey());
+                    exchange.getIn().setBody(eventToDocument.getValue());
+                })
+                .to(documentEndpoint)
+                // If producing to documentEndpoint succeeded, update original event status...
+                // TODO(ahenning): This updates event status one at a time. We could consider using
+                // aggregation strategy with splitter to update all in bulk which would take
+                // advantage of repository implementations which can update many statuses in one
+                // call.
+                .process(exchange -> {
+                    DocumentEvent event = exchange.getProperty("originalEvent", DocumentEvent.class);
+
+                    if (event == null) {
+                        throw new IllegalStateException("Could not get original event from " +
+                                "exchange. Won't update event status as published. Exchange was: " +
+                                exchange);
+                    }
+
+                    documentEventRepository.markDocumentEventsPublishedOrFailed(
+                            Collections.singleton(event), Collections.emptyList());
+                });
     }
 }
