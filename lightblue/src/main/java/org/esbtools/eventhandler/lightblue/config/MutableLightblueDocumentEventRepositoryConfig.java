@@ -38,7 +38,12 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
      */
-    public MutableLightblueDocumentEventRepositoryConfig() {}
+    public MutableLightblueDocumentEventRepositoryConfig() {
+        this.canonicalTypesToProcess = Collections.emptySet();
+        this.documentEventsBatchSize = 0;
+        this.processingTimeout = Duration.ofMinutes(10);
+        this.expireThreshold = Duration.ofMinutes(2);
+    }
 
     /**
      * Uses provided as initial values.
@@ -47,8 +52,8 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
             Collection<String> initialCanonicalTypesToProcess,
             int initialDocumentEventsBatchSize, Duration processingTimeout,
             Duration expireThreshold) {
-        canonicalTypesToProcess = initialCanonicalTypesToProcess;
-        documentEventsBatchSize = initialDocumentEventsBatchSize;
+        this.canonicalTypesToProcess = Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess");
+        this.documentEventsBatchSize = Objects.requireNonNull(initialDocumentEventsBatchSize, "initialDocumentEventsBatchSize");
         this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
         this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
     }

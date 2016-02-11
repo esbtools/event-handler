@@ -30,14 +30,17 @@ import java.util.Set;
 
 @ThreadSafe
 public class MutableLightblueNotificationRepositoryConfig implements LightblueNotificationRepositoryConfig {
-    private Collection<String> entityNamesToProcess = Collections.emptySet();
-    private Duration processingTimeout = Duration.ofMinutes(10);
-    private Duration expireThreshold = Duration.ofMinutes(2);
+    private Collection<String> entityNamesToProcess;
+    private Duration processingTimeout;
+    private Duration expireThreshold;
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
      */
-    public MutableLightblueNotificationRepositoryConfig() {}
+    public MutableLightblueNotificationRepositoryConfig() {
+        this.entityNamesToProcess = Collections.emptySet();
+        this.processingTimeout = Duration.ofMinutes(10);
+        this.expireThreshold = Duration.ofMinutes(2);}
 
     /**
      * Uses provided as initial values.
@@ -47,8 +50,8 @@ public class MutableLightblueNotificationRepositoryConfig implements LightblueNo
             Duration expireThreshold) {
         this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
         this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
-
-        entityNamesToProcess.addAll(initialEntityNamesToProcess);
+        this.entityNamesToProcess = new HashSet<>(
+                Objects.requireNonNull(initialEntityNamesToProcess, "initialEntityNamesToProcess"));
     }
 
     @Override
