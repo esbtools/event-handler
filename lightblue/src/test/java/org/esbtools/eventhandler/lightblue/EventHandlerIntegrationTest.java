@@ -162,7 +162,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
         insertNotificationEntities(stringEntities);
         insertNotificationEntities(multiStringEntities);
 
-        Awaitility.await().atMost(30, TimeUnit.SECONDS)
+        Awaitility.await().atMost(60, TimeUnit.SECONDS)
                 .pollDelay(1, TimeUnit.SECONDS)
                 .until(() -> documentsEndpoint.getExchanges()
                         .stream()
