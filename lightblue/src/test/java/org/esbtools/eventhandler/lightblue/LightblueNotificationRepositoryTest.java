@@ -129,7 +129,7 @@ public class LightblueNotificationRepositoryTest {
         notIncludedEntity.setEntityVersion("1.0.0");
         notIncludedEntity.setStatus(NotificationEntity.Status.unprocessed);
         notIncludedEntity.setOccurrenceDate(Date.from(fixedClock.instant()));
-        notIncludedEntity.setOperation(NotificationEntity.Operation.INSERT);
+        notIncludedEntity.setOperation(NotificationEntity.Operation.insert);
         notIncludedEntity.setTriggeredByUser("tester");
 
         NotificationEntity entity1 = notificationEntityForStringInsert("1", fixedClock.instant());
@@ -440,7 +440,7 @@ public class LightblueNotificationRepositoryTest {
 
     private static LightblueNotification notificationForStringInsert(String value) {
         return new StringNotification(
-                value, NotificationEntity.Operation.INSERT, "tester", fixedClock);
+                value, NotificationEntity.Operation.insert, "tester", fixedClock);
     }
 
     private static LightblueNotification notificationThatStartedProcessingAt(Instant processingDate) {
@@ -457,12 +457,12 @@ public class LightblueNotificationRepositoryTest {
 
     private static NotificationEntity notificationEntityForStringInsert(String value,
             Instant occurrenceDate) {
-        return new StringNotification(value, NotificationEntity.Operation.INSERT, "tester",
+        return new StringNotification(value, NotificationEntity.Operation.insert, "tester",
                 Clock.fixed(occurrenceDate, ZoneOffset.UTC)).wrappedNotificationEntity();
     }
 
     private static NotificationEntity notificationEntityForMultiStringInsert(String value) {
-        return new MultiStringNotification(Arrays.asList(value), NotificationEntity.Operation.INSERT,
+        return new MultiStringNotification(Arrays.asList(value), NotificationEntity.Operation.insert,
                 "tester", fixedClock).wrappedNotificationEntity();
     }
 

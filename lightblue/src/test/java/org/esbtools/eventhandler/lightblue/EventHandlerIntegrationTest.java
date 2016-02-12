@@ -183,7 +183,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     }
 
     private static LightblueNotification notificationForStringInsert(String value) {
-        return new StringNotification(value, NotificationEntity.Operation.INSERT, "tester", systemUtc);
+        return new StringNotification(value, NotificationEntity.Operation.insert, "tester", systemUtc);
     }
 
     private static NotificationEntity notificationEntityForStringInsert(String value) {
@@ -191,7 +191,7 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     }
 
     private static LightblueNotification notificationForMultiStringInsert(List<String> values) {
-        return new MultiStringNotification(values, NotificationEntity.Operation.INSERT, "tester",
+        return new MultiStringNotification(values, NotificationEntity.Operation.insert, "tester",
                 systemUtc);
     }
 
