@@ -19,18 +19,31 @@
 package org.esbtools.eventhandler;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public final class FailedMessage {
-    private final Message message;
+    private final Object originalMessage;
+    private final Optional<Message> parsedMessage;
     private final Throwable exception;
 
-    public FailedMessage(Message message, Throwable exception) {
-        this.message = message;
+    public FailedMessage(Object originalMessage, Message parsedMessage, Throwable exception) {
+        this.originalMessage = originalMessage;
+        this.parsedMessage = Optional.of(parsedMessage);
         this.exception = exception;
     }
 
-    public Message message() {
-        return message;
+    public FailedMessage(Object originalMessage, Throwable exception) {
+        this.originalMessage = originalMessage;
+        this.parsedMessage = Optional.empty();
+        this.exception = exception;
+    }
+
+    public Object originalMessage() {
+        return originalMessage;
+    }
+
+    public Optional<Message> parsedMessage() {
+        return parsedMessage;
     }
 
     public Throwable exception() {
@@ -45,7 +58,8 @@ public final class FailedMessage {
     public String toString() {
         return "FailedMessage{" +
                 "exception=" + exception +
-                ", message=" + message +
+                ", parsedMessage=" + parsedMessage +
+                ", originalMessage=" + originalMessage +
                 '}';
     }
 
@@ -54,12 +68,13 @@ public final class FailedMessage {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         FailedMessage that = (FailedMessage) o;
-        return Objects.equals(message, that.message) &&
+        return Objects.equals(originalMessage, that.originalMessage) &&
+                Objects.equals(parsedMessage, that.parsedMessage) &&
                 Objects.equals(exception, that.exception);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(message, exception);
+        return Objects.hash(originalMessage, parsedMessage, exception);
     }
 }

@@ -65,7 +65,7 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
 
             Collection messages = (Collection) exchangeBody;
 
-            List<MessageAndProcessingFuture> processingMessages = new ArrayList<>(messages.size());
+            List<ProcessingMessage> processingMessages = new ArrayList<>(messages.size());
             List<FailedMessage> failures = new ArrayList<>();
 
             // Start processing all of the messages in the batch in parallel.
@@ -73,24 +73,28 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
                 try {
                     Message parsedMessage = messageFactory.getMessageForBody(message);
                     Future<?> processingFuture = parsedMessage.process();
-                    processingMessages.add(new MessageAndProcessingFuture(parsedMessage, processingFuture));
+                    ProcessingMessage processing = new ProcessingMessage(
+                            message, parsedMessage, processingFuture);
+                    processingMessages.add(processing);
                 } catch (Exception e) {
                     log.error("Failure parsing message. Body was: " + message, e);
-                    // TODO: How to treat this failure?
-                    // We don't have a Message but FailedMessage requires one.
-                    // Type-unsafe Failure type?
+                    failures.add(new FailedMessage(message, e));
                 }
             }
 
             // Wait for processing to complete.
-            for (MessageAndProcessingFuture processingMsg : processingMessages) {
+            for (ProcessingMessage processingMsg : processingMessages) {
                 try {
                     processingMsg.future.get(processTimeout.toMillis(), TimeUnit.MILLISECONDS);
                 } catch (InterruptedException | TimeoutException e) {
                     RecoverableException recoverableException = new RecoverableException(e);
-                    failures.add(new FailedMessage(processingMsg.message, recoverableException));
+                    FailedMessage failure = new FailedMessage(processingMsg.originalMessage,
+                            processingMsg.parsedMessage, recoverableException);
+                    failures.add(failure);
                 } catch (ExecutionException e) {
-                    failures.add(new FailedMessage(processingMsg.message, e.getCause()));
+                    FailedMessage failure = new FailedMessage(processingMsg.originalMessage,
+                            processingMsg.parsedMessage, e.getCause());
+                    failures.add(failure);
                 }
             }
 
@@ -101,12 +105,14 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
     }
 
     /** Simple struct for storing a message and its future processing result. */
-    private static class MessageAndProcessingFuture {
-        final Message message;
+    private static class ProcessingMessage {
+        final Object originalMessage;
+        final Message parsedMessage;
         final Future<?> future;
 
-        MessageAndProcessingFuture(Message message, Future<?> future) {
-            this.message = message;
+        ProcessingMessage(Object originalMessage, Message parsedMessage, Future<?> future) {
+            this.originalMessage = originalMessage;
+            this.parsedMessage = parsedMessage;
             this.future = future;
         }
     }
