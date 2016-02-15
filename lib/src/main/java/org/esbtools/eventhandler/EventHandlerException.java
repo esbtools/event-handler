@@ -18,7 +18,7 @@
 
 package org.esbtools.eventhandler;
 
-public class EventHandlerException extends RuntimeException {
+public class EventHandlerException extends Exception {
     public EventHandlerException(String message) {
         super(message);
     }

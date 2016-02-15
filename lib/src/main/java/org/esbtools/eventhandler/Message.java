@@ -18,22 +18,8 @@
 
 package org.esbtools.eventhandler;
 
-import org.apache.camel.builder.RouteBuilder;
+import java.util.concurrent.Future;
 
-public class AsyncDocumentProcessorRoute extends RouteBuilder {
-    private final DocumentRepository documentRepository;
-    private final String fromUri;
-
-    public AsyncDocumentProcessorRoute(DocumentRepository documentRepository, String fromUri) {
-        this.documentRepository = documentRepository;
-        this.fromUri = fromUri;
-    }
-
-    @Override
-    public void configure() throws Exception {
-        from(fromUri)
-                .process(exchange -> {
-                   documentRepository.insertOrUpdate(exchange.getIn().getBody());
-                });
-    }
+public interface Message {
+    Future<?> process();
 }

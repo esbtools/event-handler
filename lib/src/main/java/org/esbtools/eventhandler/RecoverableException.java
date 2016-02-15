@@ -16,26 +16,14 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler.lightblue;
+package org.esbtools.eventhandler;
 
-import org.esbtools.eventhandler.DocumentRepository;
-import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
-import org.esbtools.eventhandler.lightblue.locking.LockedResource;
-import org.esbtools.eventhandler.lightblue.locking.LockedResources;
-
-import java.util.Collection;
-
-public class LightblueDocumentRepository implements DocumentRepository {
-    private final LockStrategy lockStrategy;
-
-    public LightblueDocumentRepository(LockStrategy lockStrategy) {
-        this.lockStrategy = lockStrategy;
+public class RecoverableException extends EventHandlerException {
+    public RecoverableException(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    @Override
-    public void insertOrUpdate(Collection<Object> documents) throws Exception {
-        try (LockedResources<Document> lockedDocuments = parseAndWaitForLocks(documents)) {
-
-        }
+    public RecoverableException(Throwable cause) {
+        super(cause);
     }
 }
