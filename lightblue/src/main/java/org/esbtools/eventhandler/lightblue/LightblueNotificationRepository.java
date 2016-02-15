@@ -266,8 +266,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
             return ((LightblueNotification) notification).wrappedNotificationEntity();
         }
 
-        throw new EventHandlerException("Unknown notification type. Only LightblueNotification " +
-                "are supported. Event type was: " + notification.getClass());
+        throw new IllegalArgumentException("Unknown notification type. Only " +
+                "LightblueNotification is supported. Event type was: " + notification.getClass());
     }
 
     static class ProcessingNotification implements Lockable {

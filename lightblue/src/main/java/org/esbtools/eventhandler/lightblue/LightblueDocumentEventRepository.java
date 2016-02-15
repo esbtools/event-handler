@@ -341,7 +341,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             return ((LightblueDocumentEvent) event).wrappedDocumentEventEntity();
         }
 
-        throw new EventHandlerException("Unknown event type. Only LightblueDocumentEvent is " +
+        throw new IllegalArgumentException("Unknown event type. Only LightblueDocumentEvent is " +
                 "supported. Event type was: " + event.getClass());
     }
 
