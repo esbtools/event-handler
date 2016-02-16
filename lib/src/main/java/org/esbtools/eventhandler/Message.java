@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -18,16 +18,8 @@
 
 package org.esbtools.eventhandler;
 
-public class EventHandlerException extends Exception {
-    public EventHandlerException(String message) {
-        super(message);
-    }
+import java.util.concurrent.Future;
 
-    public EventHandlerException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public EventHandlerException(Throwable cause) {
-        super(cause);
-    }
+public interface Message {
+    Future<?> process();
 }
