@@ -18,6 +18,10 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
+import org.esbtools.eventhandler.Promise;
+import org.esbtools.eventhandler.PromiseHandler;
+import org.esbtools.eventhandler.PromiseOfPromise;
+
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.model.DataError;
@@ -28,8 +32,6 @@ import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueBulkResponseException;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
-
-import org.esbtools.eventhandler.ResponsesHandler;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,7 +67,7 @@ import java.util.concurrent.TimeoutException;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final Map<LazyFuture, AbstractLightblueDataRequest[]> queuedRequests =
+    private final Map<LazyPromise, AbstractLightblueDataRequest[]> queuedRequests =
             Collections.synchronizedMap(new HashMap<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
@@ -73,12 +75,15 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     @Override
-    public LightblueResponsePromise request(AbstractLightblueDataRequest... requests) {
-        return new BulkResponsePromise(requests);
+    public Promise<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
+        LazyPromise<LightblueResponses, LightblueResponses> responsePromise =
+                new LazyPromise<>(t -> t);
+        queuedRequests.put(responsePromise, requests);
+        return responsePromise;
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
-        Map<LazyFuture, AbstractLightblueDataRequest[]> batch;
+        Map<LazyPromise, AbstractLightblueDataRequest[]> batch;
 
         synchronized (queuedRequests) {
             batch = new HashMap<>(queuedRequests);
@@ -97,10 +102,11 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
-                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
+            for (Entry<LazyPromise, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
+                LazyPromise lazyPromise = lazyFutureToRequests.getKey();
                 AbstractLightblueDataRequest[] requests = lazyFutureToRequests.getValue();
-                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
+                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
+                        new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
 
                 for (AbstractLightblueDataRequest request : requests) {
@@ -127,15 +133,14 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    lazyFuture.complete(new BulkResponses(responseMap));
+                    lazyPromise.complete(new BulkResponses(responseMap));
                 } else {
-                    lazyFuture.completeExceptionally(new BulkLightblueResponseException(errors));
+                    lazyPromise.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
-                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
-                lazyFuture.completeExceptionally(e);
+            for (LazyPromise batchedPromise : batch.keySet()) {
+                batchedPromise.completeExceptionally(e);
             }
         }
     }
@@ -152,22 +157,6 @@ public class BulkLightblueRequester implements LightblueRequester {
             return lightblue.bulkData(bulkRequest);
         } catch (LightblueBulkResponseException e) {
             return e.getBulkResponse();
-        }
-    }
-
-    class BulkResponsePromise implements LightblueResponsePromise {
-        private final AbstractLightblueDataRequest[] requests;
-
-        BulkResponsePromise(AbstractLightblueDataRequest[] requests) {
-            this.requests = requests;
-        }
-
-        @Override
-        public <T> Future<T> then(
-                ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responseHandler) {
-            LazyFuture<T> lazyFuture = new LazyFuture<>(responseHandler);
-            queuedRequests.put(lazyFuture, requests);
-            return lazyFuture;
         }
     }
 
@@ -188,27 +177,32 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    class LazyFuture<T> implements Future<T> {
-        private final ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler;
+    class LazyPromise<T, U> implements Promise<U> {
+        private final PromiseHandler<T, U> handler;
 
-        private T result;
+        private U result;
         private Exception exception;
         private boolean completed;
         private boolean cancelled = false;
 
-        LazyFuture(ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler) {
-            this.responsesHandler = responsesHandler;
+        /** Promises that we need to complete once this one is completed. */
+        final List<LazyPromise<U, ?>> next = new ArrayList<>(1);
+
+        LazyPromise(PromiseHandler<T, U> handler) {
+            this.handler = handler;
         }
 
-        void complete(LightblueResponses responses) {
+        void complete(T responses) {
             if (isDone()) return;
 
-            completed = true;
-
             try {
-                result = responsesHandler.handleResponses(responses);
+                result = handler.handle(responses);
+                completed = true;
+                for (LazyPromise<U, ?> next : this.next) {
+                    next.complete(result);
+                }
             } catch (Exception e) {
-                exception = e;
+                completeExceptionally(e);
             }
         }
 
@@ -216,6 +210,9 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
+            for (LazyPromise<U, ?> next : this.next) {
+                next.completeExceptionally(exception);
+            }
         }
 
         @Override
@@ -236,7 +233,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
-        public T get() throws InterruptedException, ExecutionException {
+        public U get() throws InterruptedException, ExecutionException {
             if (cancelled) {
                 throw new CancellationException();
             }
@@ -257,9 +254,24 @@ public class BulkLightblueRequester implements LightblueRequester {
          * introduce another thread for processing requests which I don't think is hugely necessary.
          */
         @Override
-        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
+        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
                 TimeoutException {
             return get();
         }
+
+        @Override
+        public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
+            LazyPromise<U, V> promise = new LazyPromise<>(promiseHandler);
+            next.add(promise);
+            return promise;
+        }
+
+        @Override
+        public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
+            LazyPromise<U, Promise<V>> promise = new LazyPromise<>(promiseHandler);
+            next.add(promise);
+            return new PromiseOfPromise<>(promise);
+        }
     }
+
 }

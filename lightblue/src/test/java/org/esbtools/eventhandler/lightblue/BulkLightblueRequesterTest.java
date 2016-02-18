@@ -2,6 +2,8 @@ package org.esbtools.eventhandler.lightblue;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
@@ -17,6 +19,8 @@ import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.eventhandler.lightblue.testing.TestUser;
+
+import com.redhat.lightblue.client.response.LightblueParseException;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -104,11 +108,6 @@ public class BulkLightblueRequesterTest {
     @Test
     public void shouldCacheRequestsUntilFutureIsResolvedThenPerformAllSynchronouslyInOneBulkRequest()
             throws LightblueException, ExecutionException, InterruptedException {
-        insertUser("cooltester2000");
-        insertUser("aw3som3cod3r");
-
-        List<String> requestsHandled = new ArrayList<>();
-
         DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
         findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
         findTester.select(Projection.includeFieldRecursively("*"));
@@ -118,27 +117,36 @@ public class BulkLightblueRequesterTest {
         findCoder.select(Projection.includeFieldRecursively("*"));
 
         Future<TestUser> futureTester = requester.request(findTester).then((responses -> {
-            requestsHandled.add("tester");
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
         }));
 
         Future<TestUser> futureCoder = requester.request(findCoder).then((responses -> {
-            requestsHandled.add("coder");
             return responses.forRequest(findCoder).parseProcessed(TestUser.class);
         }));
 
-        assertThat(requestsHandled).isEmpty();
+        insertUser("cooltester2000");
+        insertUser("aw3som3cod3r");
 
         TestUser shouldBeCoder = futureCoder.get();
 
-        assertThat(requestsHandled).containsExactly("tester", "coder");
+        // Insert another tester; if the request for tester is made on next .get() we will get
+        // parse exception.
+        insertUser("cooltester2000");
 
-        TestUser shouldBeTester = futureTester.get();
+        try {
+            TestUser shouldBeTester = futureTester.get();
 
-        assertThat(requestsHandled).containsExactly("tester", "coder");
+            assertNotNull("No user found: request were run eagerly instead of lazily", shouldBeCoder);
+            assertNotNull("No user found: request were run eagerly instead of lazily", shouldBeTester);
+            assertEquals("cooltester2000", shouldBeTester.getUsername());
+            assertEquals("aw3som3cod3r", shouldBeCoder.getUsername());
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof LightblueParseException) {
+                fail("Found multiple users: requests were not batched.");
+            }
 
-        assertEquals("cooltester2000", shouldBeTester.getUsername());
-        assertEquals("aw3som3cod3r", shouldBeCoder.getUsername());
+            throw e;
+        }
     }
 
     @Test
@@ -189,11 +197,59 @@ public class BulkLightblueRequesterTest {
         shouldFail.get();
     }
 
+    @Test
+    public void shouldAllowChainingMultipleRequestsAndPerformEachStagesRequestsInBulk()
+            throws Exception {
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+        DataFindRequest findAnotherTester = findUserByUsername("muchcoolertester");
+
+        DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
+        DataFindRequest findAnotherCoder = findUserByUsername("moreawesomecoder");
+
+        List<String> log = new ArrayList<>();
+
+        Future<TestUser> futureTester = requester.request(findTester).thenPromise(responses -> {
+            log.add("findTester");
+            return requester.request(findAnotherTester);
+        }).then(responses -> {
+            log.add("findAnotherTester");
+            return responses.forRequest(findAnotherTester).parseProcessed(TestUser.class);
+        });
+
+        Future<TestUser> futureCoder = requester.request(findCoder).thenPromise(responses -> {
+            log.add("findCoder");
+            return requester.request(findAnotherCoder);
+        }).then(responses -> {
+            log.add("findAnotherCoder");
+            return responses.forRequest(findAnotherCoder).parseProcessed(TestUser.class);
+        });
+
+        insertUser("cooltester2000");
+        insertUser("aw3som3cod3r");
+        insertUser("muchcoolertester");
+        insertUser("moreawesomecoder");
+
+        futureTester.get();
+        futureCoder.get();
+
+        assertThat(log.subList(0,2))
+                .containsExactly("findTester", "findCoder");
+        assertThat(log.subList(2,4))
+                .containsExactly("findAnotherTester", "findAnotherCoder");
+    }
+
     private void insertUser(String username) throws LightblueException {
         DataInsertRequest insertRequest = new DataInsertRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
         TestUser user = new TestUser();
         user.setUsername(username);
         insertRequest.create(user);
         client.data(insertRequest);
+    }
+
+    private static DataFindRequest findUserByUsername(String username) {
+        DataFindRequest findUser = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        findUser.where(Query.withValue("username", Query.BinOp.eq, username));
+        findUser.select(Projection.includeFieldRecursively("*"));
+        return findUser;
     }
 }

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -16,18 +16,9 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.esbtools.eventhandler;
+package org.esbtools.eventhandler.lightblue.client;
 
-import java.util.function.Function;
+import org.esbtools.eventhandler.Promise;
 
-/**
- * A function applied to {@link Responses} which returns some result of type {@code V}, or throws an
- * exception if unable to compute a result.
- *
- * @param <T> The type of requests
- * @param <U> The type of responses
- * @param <V> The type of result
- */
-public interface ResponsesHandler<T, U, V> {
-    V handleResponses(Responses<T, U> responses) throws Exception;
+public interface LightbluePromise extends Promise<LightblueResponses> {
 }

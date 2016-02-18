@@ -26,7 +26,7 @@ package org.esbtools.eventhandler;
  * {@link Notification#toDocumentEvents()} and {@link DocumentEvent#lookupDocument()}.
  *
  * <p>The only contract of a requester is that it perform the provided requests and call the right
- * {@link ResponsesHandler}s with the responses for the associated requests, and capture their
+ * {@link PromiseHandler}s with the responses for the associated requests, and capture their
  * results in {@code Future}s, <em>at some point in time in the future</em>. This point of time may
  * be immediately in the same thread, lazily in the same thread, after a remote call in another
  * thread, etc. Details are up to implementation.
@@ -35,5 +35,5 @@ package org.esbtools.eventhandler;
  * @param <U> The type of responses
  */
 public interface Requester<T, U> {
-    ResponsePromise<T, U> request(T... requests);
+    Promise<? extends Responses<T, U>> request(T... requests);
 }

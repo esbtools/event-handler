@@ -24,22 +24,24 @@ import java.util.concurrent.Future;
  * An asynchronous capture of potentially yet-to-come responses.
  *
  * <p>Allows code to build a {@link Future} object which will complete at some point in the future
- * with results from the {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
+ * with results from the {@link PromiseHandler} passed to {@link #then(PromiseHandler)}.
  *
  * @see Requester
  *
  * @param <T> The type of requests
- * @param <U> The type of responses
+ * @param <T> The type of responses
  */
-public interface ResponsePromise<T, U> {
+public interface Promise<T> extends Future<T> {
     /**
      * Once responses are received from some requests, the provided {@code responseHandler} function
      * will be called with those responses. This handler returns a value that is used for the
      * returned {@link Future}'s {@link Future#get() get} methods.
      *
-     * @param responseHandler Function which accepts responses and returns a result or throws an
+     * @param promiseHandler Function which accepts responses and returns a result or throws an
      *                        exception if a result cannot be computed.
-     * @param <V> The type of result.
+     * @param <U> The type of result.
      */
-    <V> Future<V> then(ResponsesHandler<T, U, V> responseHandler);
+    <U> Promise<U> then(PromiseHandler<T, U> promiseHandler);
+
+    <U> Promise<U> thenPromise(PromiseHandler<T, Promise<U>> promiseHandler);
 }
