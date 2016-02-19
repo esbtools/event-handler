@@ -67,8 +67,8 @@ import java.util.concurrent.TimeoutException;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final Map<LazyPromise, AbstractLightblueDataRequest[]> queuedRequests =
-            Collections.synchronizedMap(new HashMap<>());
+    private final List<LazyRequestPromise> queuedRequests =
+            Collections.synchronizedList(new ArrayList<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
         this.lightblue = lightblue;
@@ -76,24 +76,23 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public Promise<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
-        LazyPromise<LightblueResponses, LightblueResponses> responsePromise =
-                new LazyPromise<>(t -> t);
-        queuedRequests.put(responsePromise, requests);
+        LazyRequestPromise responsePromise = new LazyRequestPromise(requests);
+        queuedRequests.add(responsePromise);
         return responsePromise;
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
-        Map<LazyPromise, AbstractLightblueDataRequest[]> batch;
+        List<LazyRequestPromise> batch;
 
         synchronized (queuedRequests) {
-            batch = new HashMap<>(queuedRequests);
+            batch = new ArrayList<>(queuedRequests);
             queuedRequests.clear();
         }
 
         DataBulkRequest bulkRequest = new DataBulkRequest();
 
-        for (AbstractLightblueDataRequest[] allRequestBatches : batch.values()) {
-            for (AbstractLightblueDataRequest requestInBatch : allRequestBatches) {
+        for (LazyRequestPromise batchedPromise : batch) {
+            for (AbstractLightblueDataRequest requestInBatch : batchedPromise.requests) {
                 // TODO: Determine if any requests are equivalent / duplicated and filter out
                 bulkRequest.add(requestInBatch);
             }
@@ -102,9 +101,8 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
-            for (Entry<LazyPromise, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
-                LazyPromise lazyPromise = lazyFutureToRequests.getKey();
-                AbstractLightblueDataRequest[] requests = lazyFutureToRequests.getValue();
+            for (LazyRequestPromise batchedPromise : batch) {
+                AbstractLightblueDataRequest[] requests = batchedPromise.requests;
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
                         new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
@@ -133,13 +131,13 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    lazyPromise.complete(new BulkResponses(responseMap));
+                    batchedPromise.complete(new BulkResponses(responseMap));
                 } else {
-                    lazyPromise.completeExceptionally(new BulkLightblueResponseException(errors));
+                    batchedPromise.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {
-            for (LazyPromise batchedPromise : batch.keySet()) {
+            for (LazyRequestPromise batchedPromise : batch) {
                 batchedPromise.completeExceptionally(e);
             }
         }
@@ -152,7 +150,8 @@ public class BulkLightblueRequester implements LightblueRequester {
      * @throws LightblueException if something else went wrong, in which case there is no usable
      *                            response at all.
      */
-    private LightblueBulkDataResponse tryBulkRequest(DataBulkRequest bulkRequest) throws LightblueException {
+    private LightblueBulkDataResponse tryBulkRequest(DataBulkRequest bulkRequest)
+            throws LightblueException {
         try {
             return lightblue.bulkData(bulkRequest);
         } catch (LightblueBulkResponseException e) {
@@ -177,28 +176,63 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    class LazyPromise<T, U> implements Promise<U> {
-        private final PromiseHandler<T, U> handler;
+    /**
+     * A core promise implementation which accepts its result from a caller, triggering this result
+     * lazily on the first call to {@link #get()}.
+     *
+     * <p>This promise is used to back more specific cases in {@link LazyRequestPromise} and
+     * {@link HandlingPromise}.
+     *
+     * <p>Promises (and {@link Future}s) typically work asynchronously in another thread. This
+     * implementation intentionally does not. To reap the performance benefits of batching requests,
+     * we need a promise design which puts off doing <em>any</em> work as long as possible: until
+     * something calls {@code .get()}. Spinning of work in another thread is the opposite: it starts
+     * work immediately in the background. To the caller, this promise implementation feels
+     * similar: creating one returns immediately, and the caller can use it almost exactly as a
+     * "normal" asynchronous promise or future. The only difference is that with this solution,
+     * callbacks won't happen until you ask for the result with {@code .get()}. With a normal
+     * thread-based, async promise the callbacks happen at some point in the future regardless of
+     * if anything ever calls {@code .get()}.
+     *
+     * @param <U> The type of the result of the promise. See {@link Promise}.
+     */
+    static class LazyPromise<U> implements Promise<U> {
+        /**
+         * A function which should trigger the completion of this promise with a result. If it does
+         * not, this is a runtime error.
+         *
+         * <p>This is what makes the promise <em>lazy</em>: we can use this to complete the promise
+         * on demand.
+         */
+        private final Completer completer;
 
         private U result;
         private Exception exception;
-        private boolean completed;
+        private boolean completed = false;
         private boolean cancelled = false;
 
-        /** Promises that we need to complete once this one is completed. */
-        final List<LazyPromise<U, ?>> next = new ArrayList<>(1);
+        /**
+         * Queued up promises which are the result of applying this promise's value to some
+         * function aka {@link PromiseHandler}. Promises are queued up by calling
+         * {@link #then(PromiseHandler)} and {@link #thenPromise(PromiseHandler)}.
+         */
+        private final List<HandlingPromise<U, ?>> next = new ArrayList<>(1);
 
-        LazyPromise(PromiseHandler<T, U> handler) {
-            this.handler = handler;
+        /**
+         * @param completer Reference to a function which should complete this promise when called.
+         *                  See {@link #completer}.
+         */
+        LazyPromise(Completer completer) {
+            this.completer = completer;
         }
 
-        void complete(T responses) {
+        void complete(U responses) {
             if (isDone()) return;
 
             try {
-                result = handler.handle(responses);
+                result = responses;
                 completed = true;
-                for (LazyPromise<U, ?> next : this.next) {
+                for (HandlingPromise<U, ?> next : this.next) {
                     next.complete(result);
                 }
             } catch (Exception e) {
@@ -210,7 +244,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
-            for (LazyPromise<U, ?> next : this.next) {
+            for (HandlingPromise<U, ?> next : this.next) {
                 next.completeExceptionally(exception);
             }
         }
@@ -239,7 +273,13 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
 
             if (!completed) {
-                doQueuedRequestsAndCompleteFutures();
+                completer.triggerPromiseCompletion();
+
+                if (!completed) {
+                    throw new ExecutionException(new IllegalStateException("Promise attempted to " +
+                            "lazily trigger completion, but completer did not actually complete " +
+                            "the promise. Check the provided completer function for correctness."));
+                }
             }
 
             if (exception != null) {
@@ -249,10 +289,10 @@ public class BulkLightblueRequester implements LightblueRequester {
             return result;
         }
 
-        /**
-         * This future is not completed asynchronously so there is no way to "time out" unless we
-         * introduce another thread for processing requests which I don't think is hugely necessary.
-         */
+        // TODO(ahenning): This ignores the timeout because we aren't doing work in another thread
+        // I'm not sure that anyone will ever care, but if they did, we would do the same lazy
+        // stuff, but just do it in another thread which we could interrupt if it took too long.
+        // In that case we may have to build in interrupt checking during request processing.
         @Override
         public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
                 TimeoutException {
@@ -261,17 +301,156 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         @Override
         public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
-            LazyPromise<U, V> promise = new LazyPromise<>(promiseHandler);
+            HandlingPromise<U, V> promise = new HandlingPromise<>(promiseHandler, completer);
             next.add(promise);
             return promise;
         }
 
         @Override
         public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
-            LazyPromise<U, Promise<V>> promise = new LazyPromise<>(promiseHandler);
+            HandlingPromise<U, Promise<V>> promise = new HandlingPromise<>(promiseHandler, completer);
             next.add(promise);
             return new PromiseOfPromise<>(promise);
         }
     }
 
+    /**
+     * Wraps a {@link LazyPromise} and some {@link AbstractLightblueDataRequest lightblue requests}
+     * which are used to complete this in {@link #doQueuedRequestsAndCompleteFutures()}. Naturally,
+     * then, that function is used as the lazy promise's completer function. That function and this
+     * implementation are tightly coupled.
+     */
+    class LazyRequestPromise implements Promise<LightblueResponses> {
+        private final LazyPromise<LightblueResponses> backingPromise =
+                new LazyPromise<>(() -> doQueuedRequestsAndCompleteFutures());
+
+        final AbstractLightblueDataRequest[] requests;
+
+        LazyRequestPromise(AbstractLightblueDataRequest[] requests) {
+            this.requests = requests;
+        }
+
+        void complete(LightblueResponses responses) {
+            backingPromise.complete(responses);
+        }
+
+        void completeExceptionally(Exception exception) {
+            backingPromise.completeExceptionally(exception);
+        }
+
+        @Override
+        public <U> Promise<U> then(PromiseHandler<LightblueResponses, U> promiseHandler) {
+            return backingPromise.then(promiseHandler);
+        }
+
+        @Override
+        public <U> Promise<U> thenPromise(PromiseHandler<LightblueResponses, Promise<U>> promiseHandler) {
+            return backingPromise.thenPromise(promiseHandler);
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return backingPromise.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return backingPromise.isCancelled();
+        }
+
+        @Override
+        public boolean isDone() {
+            return backingPromise.isDone();
+        }
+
+        @Override
+        public LightblueResponses get() throws InterruptedException, ExecutionException {
+            return backingPromise.get();
+        }
+
+        @Override
+        public LightblueResponses get(long timeout, TimeUnit unit) throws InterruptedException,
+                ExecutionException, TimeoutException {
+            return backingPromise.get(timeout, unit);
+        }
+    }
+
+    /**
+     * A simple lazy promise implementation which applies some transformation function to the value
+     * it is completed with.
+     *
+     * <p>This is used in {@link #then(PromiseHandler)} callbacks of promise implementations.
+     *
+     * @param <T> The input type used to complete the promise.
+     * @param <U> The output type as a result of applying the handler function to the input.
+     */
+    static class HandlingPromise<T, U> implements Promise<U> {
+        private final PromiseHandler<T, U> handler;
+        private final LazyPromise<U> backingPromise;
+
+        HandlingPromise(PromiseHandler<T, U> handler, Completer completer) {
+            this.handler = handler;
+            this.backingPromise = new LazyPromise<>(completer);
+        }
+
+        void complete(T responses) {
+            if (isDone()) return;
+
+            try {
+                U handled = handler.handle(responses);
+                backingPromise.complete(handled);
+            } catch (Exception e) {
+                completeExceptionally(e);
+            }
+        }
+
+        void completeExceptionally(Exception exception) {
+            if (isDone()) return;
+            backingPromise.completeExceptionally(exception);
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return backingPromise.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return backingPromise.isCancelled();
+        }
+
+        @Override
+        public boolean isDone() {
+            return backingPromise.isDone();
+        }
+
+        @Override
+        public U get() throws InterruptedException, ExecutionException {
+            return backingPromise.get();
+        }
+
+        /**
+         * This future is not completed asynchronously so there is no way to "time out" unless we
+         * introduce another thread for processing requests which I don't think is hugely necessary.
+         */
+        @Override
+        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
+                TimeoutException {
+            return backingPromise.get(timeout, unit);
+        }
+
+        @Override
+        public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
+            return backingPromise.then(promiseHandler);
+        }
+
+        @Override
+        public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
+            return backingPromise.thenPromise(promiseHandler);
+        }
+    }
+
+    interface Completer {
+        void triggerPromiseCompletion();
+    }
 }
