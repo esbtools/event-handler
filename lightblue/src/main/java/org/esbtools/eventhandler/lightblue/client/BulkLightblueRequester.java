@@ -405,7 +405,6 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         void completeExceptionally(Exception exception) {
-            if (isDone()) return;
             backingPromise.completeExceptionally(exception);
         }
 
