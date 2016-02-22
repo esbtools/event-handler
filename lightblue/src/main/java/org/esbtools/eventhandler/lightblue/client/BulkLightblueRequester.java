@@ -253,6 +253,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (completed) return false;
             cancelled = true;
+            next.clear();
             return true;
         }
 
@@ -350,6 +351,10 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!backingPromise.isDone()) {
+                queuedRequests.remove(this);
+            }
+
             return backingPromise.cancel(mayInterruptIfRunning);
         }
 
