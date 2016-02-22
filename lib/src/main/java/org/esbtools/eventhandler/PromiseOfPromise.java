@@ -46,7 +46,8 @@ public class PromiseOfPromise<U> implements Promise<U> {
 
     @Override
     public U get() throws InterruptedException, ExecutionException {
-        return promisedPromise.get().get();
+        Promise<U> nextPromise = promisedPromise.get();
+        return nextPromise == null ? null : nextPromise.get();
     }
 
     @Override
@@ -54,7 +55,8 @@ public class PromiseOfPromise<U> implements Promise<U> {
             TimeoutException {
         // TODO: Technically, we'd need to track time on first and do delta for second timeout
         // But we don't really care that much right now
-        return promisedPromise.get(timeout, unit).get(timeout, unit);
+        Promise<U> nextPromise = promisedPromise.get(timeout, unit);
+        return nextPromise == null ? null : nextPromise.get(timeout, unit);
     }
 
     @Override
