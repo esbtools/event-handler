@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue.client;
 import org.esbtools.eventhandler.Promise;
 import org.esbtools.eventhandler.PromiseHandler;
 import org.esbtools.eventhandler.PromiseOfPromise;
+import org.esbtools.eventhandler.PromiseOfPromiseIgnoringReturn;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
@@ -313,6 +314,13 @@ public class BulkLightblueRequester implements LightblueRequester {
             next.add(promise);
             return new PromiseOfPromise<>(promise);
         }
+
+        @Override
+        public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
+            HandlingPromise<U, Promise<?>> promise = new HandlingPromise<>(promiseHandler, completer);
+            next.add(promise);
+            return new PromiseOfPromiseIgnoringReturn(promise);
+        }
     }
 
     /**
@@ -347,6 +355,12 @@ public class BulkLightblueRequester implements LightblueRequester {
         @Override
         public <U> Promise<U> thenPromise(PromiseHandler<LightblueResponses, Promise<U>> promiseHandler) {
             return backingPromise.thenPromise(promiseHandler);
+        }
+
+        @Override
+        public Promise<Void> thenPromiseIgnoringReturn(
+                PromiseHandler<LightblueResponses, Promise<?>> promiseHandler) {
+            return backingPromise.thenPromiseIgnoringReturn(promiseHandler);
         }
 
         @Override
@@ -451,6 +465,11 @@ public class BulkLightblueRequester implements LightblueRequester {
         @Override
         public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
             return backingPromise.thenPromise(promiseHandler);
+        }
+
+        @Override
+        public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
+            return backingPromise.thenPromiseIgnoringReturn(promiseHandler);
         }
     }
 

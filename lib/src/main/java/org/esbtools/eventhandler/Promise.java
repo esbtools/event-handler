@@ -44,4 +44,6 @@ public interface Promise<T> extends Future<T> {
     <U> Promise<U> then(PromiseHandler<T, U> promiseHandler);
 
     <U> Promise<U> thenPromise(PromiseHandler<T, Promise<U>> promiseHandler);
+
+    Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<T, Promise<?>> promiseHandler);
 }

@@ -68,4 +68,9 @@ public class PromiseOfPromise<U> implements Promise<U> {
     public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
         return promisedPromise.thenPromise(p -> p.thenPromise(promiseHandler));
     }
+
+    @Override
+    public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
+        return promisedPromise.thenPromise(p -> p.thenPromiseIgnoringReturn(promiseHandler));
+    }
 }

@@ -5,14 +5,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Projection;
-import com.redhat.lightblue.client.Query;
-import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.request.data.DataInsertRequest;
-
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
@@ -20,6 +12,13 @@ import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.eventhandler.lightblue.testing.TestUser;
 
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.Projection;
+import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.data.DataFindRequest;
+import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.response.LightblueParseException;
 import org.hamcrest.Matchers;
 import org.junit.Before;
