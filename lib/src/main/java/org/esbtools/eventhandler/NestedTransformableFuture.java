@@ -22,32 +22,32 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class PromiseOfPromise<U> implements Promise<U> {
-    private final Promise<Promise<U>> promisedPromise;
+public class NestedTransformableFuture<U> implements TransformableFuture<U> {
+    private final TransformableFuture<TransformableFuture<U>> nestedFuture;
 
-    public PromiseOfPromise(Promise<Promise<U>> promisedPromise) {
-        this.promisedPromise = promisedPromise;
+    public NestedTransformableFuture(TransformableFuture<TransformableFuture<U>> nestedFuture) {
+        this.nestedFuture = nestedFuture;
     }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
-        return promisedPromise.cancel(mayInterruptIfRunning);
+        return nestedFuture.cancel(mayInterruptIfRunning);
     }
 
     @Override
     public boolean isCancelled() {
-        return promisedPromise.isCancelled();
+        return nestedFuture.isCancelled();
     }
 
     @Override
     public boolean isDone() {
-        return promisedPromise.isDone();
+        return nestedFuture.isDone();
     }
 
     @Override
     public U get() throws InterruptedException, ExecutionException {
-        Promise<U> nextPromise = promisedPromise.get();
-        return nextPromise == null ? null : nextPromise.get();
+        TransformableFuture<U> nextFuture = nestedFuture.get();
+        return nextFuture == null ? null : nextFuture.get();
     }
 
     @Override
@@ -55,22 +55,22 @@ public class PromiseOfPromise<U> implements Promise<U> {
             TimeoutException {
         // TODO: Technically, we'd need to track time on first and do delta for second timeout
         // But we don't really care that much right now
-        Promise<U> nextPromise = promisedPromise.get(timeout, unit);
-        return nextPromise == null ? null : nextPromise.get(timeout, unit);
+        TransformableFuture<U> nextFuture = nestedFuture.get(timeout, unit);
+        return nextFuture == null ? null : nextFuture.get(timeout, unit);
     }
 
     @Override
-    public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
-        return promisedPromise.thenPromise(p -> p.then(promiseHandler));
+    public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
+        return nestedFuture.transformAsync(p -> p.transformSync(futureTransform));
     }
 
     @Override
-    public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
-        return promisedPromise.thenPromise(p -> p.thenPromise(promiseHandler));
+    public <V> TransformableFuture<V> transformAsync(FutureTransform<U, TransformableFuture<V>> futureTransform) {
+        return nestedFuture.transformAsync(p -> p.transformAsync(futureTransform));
     }
 
     @Override
-    public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
-        return promisedPromise.thenPromise(p -> p.thenPromiseIgnoringReturn(promiseHandler));
+    public TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<U, TransformableFuture<?>> futureTransform) {
+        return nestedFuture.transformAsync(p -> p.transformAsyncIgnoringReturn(futureTransform));
     }
 }

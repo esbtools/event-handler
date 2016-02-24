@@ -18,10 +18,10 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
-import org.esbtools.eventhandler.Promise;
-import org.esbtools.eventhandler.PromiseHandler;
-import org.esbtools.eventhandler.PromiseOfPromise;
-import org.esbtools.eventhandler.PromiseOfPromiseIgnoringReturn;
+import org.esbtools.eventhandler.FutureTransform;
+import org.esbtools.eventhandler.NestedTransformableFuture;
+import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
+import org.esbtools.eventhandler.TransformableFuture;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
@@ -39,7 +39,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -68,7 +67,7 @@ import java.util.concurrent.TimeoutException;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final List<LazyRequestPromise> queuedRequests =
+    private final List<LazyRequestTransformableFuture> queuedRequests =
             Collections.synchronizedList(new ArrayList<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
@@ -76,14 +75,14 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     @Override
-    public Promise<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
-        LazyRequestPromise responsePromise = new LazyRequestPromise(requests);
-        queuedRequests.add(responsePromise);
-        return responsePromise;
+    public TransformableFuture<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
+        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(requests);
+        queuedRequests.add(responseFuture);
+        return responseFuture;
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
-        List<LazyRequestPromise> batch;
+        List<LazyRequestTransformableFuture> batch;
 
         synchronized (queuedRequests) {
             batch = new ArrayList<>(queuedRequests);
@@ -92,8 +91,8 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         DataBulkRequest bulkRequest = new DataBulkRequest();
 
-        for (LazyRequestPromise batchedPromise : batch) {
-            for (AbstractLightblueDataRequest requestInBatch : batchedPromise.requests) {
+        for (LazyRequestTransformableFuture batchedFuture : batch) {
+            for (AbstractLightblueDataRequest requestInBatch : batchedFuture.requests) {
                 // TODO: Determine if any requests are equivalent / duplicated and filter out
                 bulkRequest.add(requestInBatch);
             }
@@ -102,8 +101,8 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
-            for (LazyRequestPromise batchedPromise : batch) {
-                AbstractLightblueDataRequest[] requests = batchedPromise.requests;
+            for (LazyRequestTransformableFuture batchedFuture : batch) {
+                AbstractLightblueDataRequest[] requests = batchedFuture.requests;
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
                         new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
@@ -132,14 +131,14 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    batchedPromise.complete(new BulkResponses(responseMap));
+                    batchedFuture.complete(new BulkResponses(responseMap));
                 } else {
-                    batchedPromise.completeExceptionally(new BulkLightblueResponseException(errors));
+                    batchedFuture.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {
-            for (LazyRequestPromise batchedPromise : batch) {
-                batchedPromise.completeExceptionally(e);
+            for (LazyRequestTransformableFuture batchedFuture : batch) {
+                batchedFuture.completeExceptionally(e);
             }
         }
     }
@@ -178,31 +177,31 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     /**
-     * A core promise implementation which accepts its result from a caller, triggering this result
+     * A core future implementation which accepts its result externally, triggering this result
      * lazily on the first call to {@link #get()}.
      *
-     * <p>This promise is used to back more specific cases in {@link LazyRequestPromise} and
-     * {@link HandlingPromise}.
+     * <p>This future is used to back more specific cases in {@link LazyRequestTransformableFuture}
+     * and {@link LazyTransformingFuture}.
      *
-     * <p>Promises (and {@link Future}s) typically work asynchronously in another thread. This
-     * implementation intentionally does not. To reap the performance benefits of batching requests,
-     * we need a promise design which puts off doing <em>any</em> work as long as possible: until
-     * something calls {@code .get()}. Spinning of work in another thread is the opposite: it starts
-     * work immediately in the background. To the caller, this promise implementation feels
-     * similar: creating one returns immediately, and the caller can use it almost exactly as a
-     * "normal" asynchronous promise or future. The only difference is that with this solution,
-     * callbacks won't happen until you ask for the result with {@code .get()}. With a normal
-     * thread-based, async promise the callbacks happen at some point in the future regardless of
-     * if anything ever calls {@code .get()}.
+     * <p>{@link Future}s typically work asynchronously in another thread. This implementation
+     * intentionally does not. To reap the performance benefits of batching requests, we need a
+     * future design which puts off doing <em>any</em> work as long as possible: until something
+     * calls {@code .get()}. Spinning of work in another thread is the opposite: it starts work
+     * immediately in the background. To the caller, this future implementation feels similar:
+     * creating one returns immediately, and the caller can use it almost exactly as a "normal"
+     * asynchronous future or future. The only difference is that with this solution, callbacks
+     * won't happen until you ask for the result with {@code .get()}. With a normal thread-based,
+     * async future the callbacks happen at some point in the future regardless of if anything ever
+     * calls {@code .get()}.
      *
-     * @param <U> The type of the result of the promise. See {@link Promise}.
+     * @param <U> The type of the result of the future. See {@link TransformableFuture}.
      */
-    static class LazyPromise<U> implements Promise<U> {
+    static class LazyTransformableFuture<U> implements TransformableFuture<U> {
         /**
-         * A function which should trigger the completion of this promise with a result. If it does
+         * A function which should trigger the completion of this future with a result. If it does
          * not, this is a runtime error.
          *
-         * <p>This is what makes the promise <em>lazy</em>: we can use this to complete the promise
+         * <p>This is what makes the future <em>lazy</em>: we can use this to complete the future
          * on demand.
          */
         private final Completer completer;
@@ -213,17 +212,17 @@ public class BulkLightblueRequester implements LightblueRequester {
         private boolean cancelled = false;
 
         /**
-         * Queued up promises which are the result of applying this promise's value to some
-         * function aka {@link PromiseHandler}. Promises are queued up by calling
-         * {@link #then(PromiseHandler)} and {@link #thenPromise(PromiseHandler)}.
+         * Queued up futures which are the result of applying this future's value to some transform
+         * function ({@link FutureTransform}). Futures are queued up by calling APIs like
+         * {@link #transformSync(FutureTransform)} and {@link #transformAsync(FutureTransform)}.
          */
-        private final List<HandlingPromise<U, ?>> next = new ArrayList<>(1);
+        private final List<LazyTransformingFuture<U, ?>> next = new ArrayList<>(1);
 
         /**
-         * @param completer Reference to a function which should complete this promise when called.
+         * @param completer Reference to a function which should complete this future when called.
          *                  See {@link #completer}.
          */
-        LazyPromise(Completer completer) {
+        LazyTransformableFuture(Completer completer) {
             this.completer = completer;
         }
 
@@ -233,7 +232,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             try {
                 result = responses;
                 completed = true;
-                for (HandlingPromise<U, ?> next : this.next) {
+                for (LazyTransformingFuture<U, ?> next : this.next) {
                     next.complete(result);
                 }
             } catch (Exception e) {
@@ -245,7 +244,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
-            for (HandlingPromise<U, ?> next : this.next) {
+            for (LazyTransformingFuture<U, ?> next : this.next) {
                 next.completeExceptionally(exception);
             }
         }
@@ -275,12 +274,12 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
 
             if (!completed) {
-                completer.triggerPromiseCompletion();
+                completer.triggerFutureCompletion();
 
                 if (!completed) {
-                    throw new ExecutionException(new IllegalStateException("Promise attempted to " +
+                    throw new ExecutionException(new IllegalStateException("Future attempted to " +
                             "lazily trigger completion, but completer did not actually complete " +
-                            "the promise. Check the provided completer function for correctness."));
+                            "the future. Check the provided completer function for correctness."));
                 }
             }
 
@@ -302,114 +301,121 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
-        public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
-            HandlingPromise<U, V> promise = new HandlingPromise<>(promiseHandler, completer);
-            next.add(promise);
-            return promise;
+        public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
+            LazyTransformingFuture<U, V> future = new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return future;
         }
 
         @Override
-        public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
-            HandlingPromise<U, Promise<V>> promise = new HandlingPromise<>(promiseHandler, completer);
-            next.add(promise);
-            return new PromiseOfPromise<>(promise);
+        public <V> TransformableFuture<V> transformAsync(
+                FutureTransform<U, TransformableFuture<V>> futureTransform) {
+            LazyTransformingFuture<U, TransformableFuture<V>> future =
+                    new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return new NestedTransformableFuture<>(future);
         }
 
         @Override
-        public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
-            HandlingPromise<U, Promise<?>> promise = new HandlingPromise<>(promiseHandler, completer);
-            next.add(promise);
-            return new PromiseOfPromiseIgnoringReturn(promise);
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<U, TransformableFuture<?>> futureTransform) {
+            LazyTransformingFuture<U, TransformableFuture<?>> future =
+                    new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return new NestedTransformableFutureIgnoringReturn(future);
         }
     }
 
     /**
-     * Wraps a {@link LazyPromise} and some {@link AbstractLightblueDataRequest lightblue requests}
-     * which are used to complete this in {@link #doQueuedRequestsAndCompleteFutures()}. Naturally,
-     * then, that function is used as the lazy promise's completer function. That function and this
-     * implementation are tightly coupled.
+     * Wraps a {@link LazyTransformableFuture} and some {@link AbstractLightblueDataRequest
+     * lightblue requests} which are used to complete this in
+     * {@link #doQueuedRequestsAndCompleteFutures()}. Naturally, then, that function is used as the
+     * lazy future's completer function. That function and this implementation are tightly coupled.
      */
-    class LazyRequestPromise implements Promise<LightblueResponses> {
-        private final LazyPromise<LightblueResponses> backingPromise =
-                new LazyPromise<>(() -> doQueuedRequestsAndCompleteFutures());
+    class LazyRequestTransformableFuture implements TransformableFuture<LightblueResponses> {
+        private final LazyTransformableFuture<LightblueResponses> backingFuture =
+                new LazyTransformableFuture<>(() -> doQueuedRequestsAndCompleteFutures());
 
         final AbstractLightblueDataRequest[] requests;
 
-        LazyRequestPromise(AbstractLightblueDataRequest[] requests) {
+        LazyRequestTransformableFuture(AbstractLightblueDataRequest[] requests) {
             this.requests = requests;
         }
 
         void complete(LightblueResponses responses) {
-            backingPromise.complete(responses);
+            backingFuture.complete(responses);
         }
 
         void completeExceptionally(Exception exception) {
-            backingPromise.completeExceptionally(exception);
+            backingFuture.completeExceptionally(exception);
         }
 
         @Override
-        public <U> Promise<U> then(PromiseHandler<LightblueResponses, U> promiseHandler) {
-            return backingPromise.then(promiseHandler);
+        public <U> TransformableFuture<U> transformSync(
+                FutureTransform<LightblueResponses, U> futureTransform) {
+            return backingFuture.transformSync(futureTransform);
         }
 
         @Override
-        public <U> Promise<U> thenPromise(PromiseHandler<LightblueResponses, Promise<U>> promiseHandler) {
-            return backingPromise.thenPromise(promiseHandler);
+        public <U> TransformableFuture<U> transformAsync(
+                FutureTransform<LightblueResponses, TransformableFuture<U>> futureTransform) {
+            return backingFuture.transformAsync(futureTransform);
         }
 
         @Override
-        public Promise<Void> thenPromiseIgnoringReturn(
-                PromiseHandler<LightblueResponses, Promise<?>> promiseHandler) {
-            return backingPromise.thenPromiseIgnoringReturn(promiseHandler);
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<LightblueResponses, TransformableFuture<?>> futureTransform) {
+            return backingFuture.transformAsyncIgnoringReturn(futureTransform);
         }
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            if (!backingPromise.isDone()) {
+            if (!backingFuture.isDone()) {
                 queuedRequests.remove(this);
             }
 
-            return backingPromise.cancel(mayInterruptIfRunning);
+            return backingFuture.cancel(mayInterruptIfRunning);
         }
 
         @Override
         public boolean isCancelled() {
-            return backingPromise.isCancelled();
+            return backingFuture.isCancelled();
         }
 
         @Override
         public boolean isDone() {
-            return backingPromise.isDone();
+            return backingFuture.isDone();
         }
 
         @Override
         public LightblueResponses get() throws InterruptedException, ExecutionException {
-            return backingPromise.get();
+            return backingFuture.get();
         }
 
         @Override
         public LightblueResponses get(long timeout, TimeUnit unit) throws InterruptedException,
                 ExecutionException, TimeoutException {
-            return backingPromise.get(timeout, unit);
+            return backingFuture.get(timeout, unit);
         }
     }
 
     /**
-     * A simple lazy promise implementation which applies some transformation function to the value
+     * A simple lazy future implementation which applies some transformation function to the value
      * it is completed with.
      *
-     * <p>This is used in {@link #then(PromiseHandler)} callbacks of promise implementations.
+     * <p>This is used in {@link #transformSync(FutureTransform)} callbacks of
+     * {@link TransformableFuture} implementations.
      *
-     * @param <T> The input type used to complete the promise.
-     * @param <U> The output type as a result of applying the handler function to the input.
+     * @param <T> The input type used to complete the Future.
+     * @param <U> The output type as a result of applying the transform function to the input.
      */
-    static class HandlingPromise<T, U> implements Promise<U> {
-        private final PromiseHandler<T, U> handler;
-        private final LazyPromise<U> backingPromise;
+    static class LazyTransformingFuture<T, U> implements TransformableFuture<U> {
+        private final FutureTransform<T, U> handler;
+        private final LazyTransformableFuture<U> backingFuture;
 
-        HandlingPromise(PromiseHandler<T, U> handler, Completer completer) {
+        LazyTransformingFuture(FutureTransform<T, U> handler, Completer completer) {
             this.handler = handler;
-            this.backingPromise = new LazyPromise<>(completer);
+            this.backingFuture = new LazyTransformableFuture<>(completer);
         }
 
         void complete(T responses) {
@@ -417,34 +423,34 @@ public class BulkLightblueRequester implements LightblueRequester {
 
             try {
                 U handled = handler.handle(responses);
-                backingPromise.complete(handled);
+                backingFuture.complete(handled);
             } catch (Exception e) {
                 completeExceptionally(e);
             }
         }
 
         void completeExceptionally(Exception exception) {
-            backingPromise.completeExceptionally(exception);
+            backingFuture.completeExceptionally(exception);
         }
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
-            return backingPromise.cancel(mayInterruptIfRunning);
+            return backingFuture.cancel(mayInterruptIfRunning);
         }
 
         @Override
         public boolean isCancelled() {
-            return backingPromise.isCancelled();
+            return backingFuture.isCancelled();
         }
 
         @Override
         public boolean isDone() {
-            return backingPromise.isDone();
+            return backingFuture.isDone();
         }
 
         @Override
         public U get() throws InterruptedException, ExecutionException {
-            return backingPromise.get();
+            return backingFuture.get();
         }
 
         /**
@@ -454,26 +460,28 @@ public class BulkLightblueRequester implements LightblueRequester {
         @Override
         public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
                 TimeoutException {
-            return backingPromise.get(timeout, unit);
+            return backingFuture.get(timeout, unit);
         }
 
         @Override
-        public <V> Promise<V> then(PromiseHandler<U, V> promiseHandler) {
-            return backingPromise.then(promiseHandler);
+        public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
+            return backingFuture.transformSync(futureTransform);
         }
 
         @Override
-        public <V> Promise<V> thenPromise(PromiseHandler<U, Promise<V>> promiseHandler) {
-            return backingPromise.thenPromise(promiseHandler);
+        public <V> TransformableFuture<V> transformAsync(
+                FutureTransform<U, TransformableFuture<V>> futureTransform) {
+            return backingFuture.transformAsync(futureTransform);
         }
 
         @Override
-        public Promise<Void> thenPromiseIgnoringReturn(PromiseHandler<U, Promise<?>> promiseHandler) {
-            return backingPromise.thenPromiseIgnoringReturn(promiseHandler);
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<U, TransformableFuture<?>> futureTransform) {
+            return backingFuture.transformAsyncIgnoringReturn(futureTransform);
         }
     }
 
     interface Completer {
-        void triggerPromiseCompletion();
+        void triggerFutureCompletion();
     }
 }

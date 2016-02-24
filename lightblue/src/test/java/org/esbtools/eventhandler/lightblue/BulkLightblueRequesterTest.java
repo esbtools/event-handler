@@ -73,7 +73,7 @@ public class BulkLightblueRequesterTest {
         findCoder.where(Query.withValue("username", Query.BinOp.eq, "aw3som3cod3r"));
         findCoder.select(Projection.includeFieldRecursively("*"));
 
-        List<TestUser> returned = requester.request(findCoder, findTester).then((responses) -> {
+        List<TestUser> returned = requester.request(findCoder, findTester).transformSync((responses) -> {
             return Arrays.asList(
                     responses.forRequest(findTester).parseProcessed(TestUser.class),
                     responses.forRequest(findCoder).parseProcessed(TestUser.class));
@@ -99,7 +99,7 @@ public class BulkLightblueRequesterTest {
 
         expectedException.expectCause(Matchers.instanceOf(NoSuchElementException.class));
 
-        requester.request(findTester).then((responses) -> {
+        requester.request(findTester).transformSync((responses) -> {
             return responses.forRequest(otherRequest).parseProcessed(TestUser.class);
         }).get();
     }
@@ -115,11 +115,11 @@ public class BulkLightblueRequesterTest {
         findCoder.where(Query.withValue("username", Query.BinOp.eq, "aw3som3cod3r"));
         findCoder.select(Projection.includeFieldRecursively("*"));
 
-        Future<TestUser> futureTester = requester.request(findTester).then((responses -> {
+        Future<TestUser> futureTester = requester.request(findTester).transformSync((responses -> {
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
         }));
 
-        Future<TestUser> futureCoder = requester.request(findCoder).then((responses -> {
+        Future<TestUser> futureCoder = requester.request(findCoder).transformSync((responses -> {
             return responses.forRequest(findCoder).parseProcessed(TestUser.class);
         }));
 
@@ -159,7 +159,7 @@ public class BulkLightblueRequesterTest {
         badFindCoder.select(Projection.includeFieldRecursively("*"));
 
         Future<String> future = requester.request(badFindCoder, badFindTester)
-                .then((responses -> "should not get here"));
+                .transformSync((responses -> "should not get here"));
 
         try {
             future.get();
@@ -184,8 +184,8 @@ public class BulkLightblueRequesterTest {
         badRequest.select(Projection.includeFieldRecursively("*"));
         badRequest.where(Query.withValue("foo", Query.BinOp.eq, "bar"));
 
-        Future<String> shouldFail = requester.request(badRequest).then(responses -> "fail");
-        Future<TestUser> shouldSucceed = requester.request(findTester).then(responses -> {
+        Future<String> shouldFail = requester.request(badRequest).transformSync(responses -> "fail");
+        Future<TestUser> shouldSucceed = requester.request(findTester).transformSync(responses -> {
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
         });
 
@@ -207,18 +207,18 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        Future<TestUser> futureTester = requester.request(findTester).thenPromise(responses -> {
+        Future<TestUser> futureTester = requester.request(findTester).transformAsync(responses -> {
             log.add("findTester");
             return requester.request(findAnotherTester);
-        }).then(responses -> {
+        }).transformSync(responses -> {
             log.add("findAnotherTester");
             return responses.forRequest(findAnotherTester).parseProcessed(TestUser.class);
         });
 
-        Future<TestUser> futureCoder = requester.request(findCoder).thenPromise(responses -> {
+        Future<TestUser> futureCoder = requester.request(findCoder).transformAsync(responses -> {
             log.add("findCoder");
             return requester.request(findAnotherCoder);
-        }).then(responses -> {
+        }).transformSync(responses -> {
             log.add("findAnotherCoder");
             return responses.forRequest(findAnotherCoder).parseProcessed(TestUser.class);
         });

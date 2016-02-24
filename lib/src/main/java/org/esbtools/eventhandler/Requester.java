@@ -26,14 +26,21 @@ package org.esbtools.eventhandler;
  * {@link Notification#toDocumentEvents()} and {@link DocumentEvent#lookupDocument()}.
  *
  * <p>The only contract of a requester is that it perform the provided requests and call the right
- * {@link PromiseHandler}s with the responses for the associated requests, and capture their
+ * {@link FutureTransform}s with the responses for the associated requests, and capture their
  * results in {@code Future}s, <em>at some point in time in the future</em>. This point of time may
  * be immediately in the same thread, lazily in the same thread, after a remote call in another
  * thread, etc. Details are up to implementation.
+ *
+ * <p><em>TODO(ahenning,khowell): Investigate moving away from Future-based APIs to something which
+ * addresses batching more explicitly. Batching is a core concern of many of the APIs since they
+ * intentionally work with Collections in their interface, and is an almost universally applicable
+ * way to increase efficiency. Additionally, implementations which do not require or want batching
+ * can effectively work with a batch size of "1." For those that do benefit from batching, an API
+ * designed around this domain should be more straightforward to implement.</em>
  *
  * @param <T> The type of requests
  * @param <U> The type of responses
  */
 public interface Requester<T, U> {
-    Promise<? extends Responses<T, U>> request(T... requests);
+    TransformableFuture<? extends Responses<T, U>> request(T... requests);
 }
