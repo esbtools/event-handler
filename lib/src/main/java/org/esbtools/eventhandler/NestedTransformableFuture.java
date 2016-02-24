@@ -22,6 +22,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+// TODO(ahenning,khowell): There is no consensus on whether this class should exist. There is
+// consensus however that we should explore moving to a more explicit expression of batchable
+// operations, which would remove the need for this class, so let's do that.
 public class NestedTransformableFuture<U> implements TransformableFuture<U> {
     private final TransformableFuture<TransformableFuture<U>> nestedFuture;
 
@@ -61,16 +64,21 @@ public class NestedTransformableFuture<U> implements TransformableFuture<U> {
 
     @Override
     public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
-        return nestedFuture.transformAsync(p -> p.transformSync(futureTransform));
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformSync(futureTransform));
     }
 
     @Override
-    public <V> TransformableFuture<V> transformAsync(FutureTransform<U, TransformableFuture<V>> futureTransform) {
-        return nestedFuture.transformAsync(p -> p.transformAsync(futureTransform));
+    public <V> TransformableFuture<V> transformAsync(
+            FutureTransform<U, TransformableFuture<V>> futureTransform) {
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformAsync(futureTransform));
     }
 
     @Override
-    public TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<U, TransformableFuture<?>> futureTransform) {
-        return nestedFuture.transformAsync(p -> p.transformAsyncIgnoringReturn(futureTransform));
+    public TransformableFuture<Void> transformAsyncIgnoringReturn(
+            FutureTransform<U, TransformableFuture<?>> futureTransform) {
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformAsyncIgnoringReturn(futureTransform));
     }
 }

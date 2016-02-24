@@ -23,30 +23,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class NestedTransformableFutureIgnoringReturn implements TransformableFuture<Void> {
-    private final TransformableFuture<TransformableFuture<?>> promisedTransformableFuture;
+    private final TransformableFuture<TransformableFuture<?>> nestedFuture;
 
-    public NestedTransformableFutureIgnoringReturn(TransformableFuture<TransformableFuture<?>> promisedTransformableFuture) {
-        this.promisedTransformableFuture = promisedTransformableFuture;
+    public NestedTransformableFutureIgnoringReturn(
+            TransformableFuture<TransformableFuture<?>> nestedFuture) {
+        this.nestedFuture = nestedFuture;
     }
 
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
-        return promisedTransformableFuture.cancel(mayInterruptIfRunning);
+        return nestedFuture.cancel(mayInterruptIfRunning);
     }
 
     @Override
     public boolean isCancelled() {
-        return promisedTransformableFuture.isCancelled();
+        return nestedFuture.isCancelled();
     }
 
     @Override
     public boolean isDone() {
-        return promisedTransformableFuture.isDone();
+        return nestedFuture.isDone();
     }
 
     @Override
     public Void get() throws InterruptedException, ExecutionException {
-        TransformableFuture<?> nextTransformableFuture = promisedTransformableFuture.get();
+        TransformableFuture<?> nextTransformableFuture = nestedFuture.get();
         if (nextTransformableFuture != null) {
             nextTransformableFuture.get();
         }
@@ -58,7 +59,7 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
             TimeoutException {
         // TODO: Technically, we'd need to track time on first and do delta for second timeout
         // But we don't really care that much right now
-        TransformableFuture<?> nextFuture = promisedTransformableFuture.get(timeout, unit);
+        TransformableFuture<?> nextFuture = nestedFuture.get(timeout, unit);
         if (nextFuture != null) {
             nextFuture.get(timeout, unit);
         }
@@ -67,21 +68,24 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
 
     @Override
     public <V> TransformableFuture<V> transformSync(FutureTransform<Void, V> futureTransform) {
-        return promisedTransformableFuture.transformAsync(p ->
-                p.transformSync(ignored -> futureTransform.handle(null)));
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformSync(
+                        ignored -> futureTransform.handle(null)));
     }
 
     @Override
     public <V> TransformableFuture<V> transformAsync(
             FutureTransform<Void, TransformableFuture<V>> futureTransform) {
-        return promisedTransformableFuture.transformAsync(p ->
-                p.transformAsync(ignored -> futureTransform.handle(null)));
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformAsync(
+                        ignored -> futureTransform.handle(null)));
     }
 
     @Override
     public TransformableFuture<Void> transformAsyncIgnoringReturn(
             FutureTransform<Void, TransformableFuture<?>> futureTransform) {
-        return promisedTransformableFuture.transformAsync(p ->
-                p.transformAsyncIgnoringReturn(ignored -> futureTransform.handle(null)));
+        return nestedFuture.transformAsync(
+                nextFuture -> nextFuture.transformAsyncIgnoringReturn(
+                        ignored -> futureTransform.handle(null)));
     }
 }
