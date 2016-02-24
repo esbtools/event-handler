@@ -73,7 +73,7 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
             for (Object message : messages) {
                 try {
                     Message parsedMessage = messageFactory.getMessageForBody(message);
-                    Future<?> processingFuture = parsedMessage.process();
+                    Future<Void> processingFuture = parsedMessage.process();
                     ProcessingMessage processing = new ProcessingMessage(
                             message, parsedMessage, processingFuture);
                     processingMessages.add(processing);
