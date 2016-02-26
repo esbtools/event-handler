@@ -30,17 +30,53 @@ import java.util.concurrent.Future;
  */
 public interface TransformableFuture<T> extends Future<T> {
     /**
-     * Once responses are received from some requests, the provided {@code responseHandler} function
-     * will be called with those responses. This handler returns a value that is used for the
-     * returned {@link Future}'s {@link Future#get() get} methods.
+     * Creates a new {@link Future} which is completed immediately when this {@code Future}
+     * completes, with a value that is the result of applying the provided {@code futureTransform}
+     * function to this {@code Future}'s result.
      *
-     * @param futureTransform Function which accepts responses and returns a result or throws an
-     *                        exception if a result cannot be computed.
-     * @param <U> The type of result.
+     * <p>Terminology inspired by Guava's
+     * <a href="https://github.com/google/guava/wiki/ListenableFutureExplained">Futures</a>
+     * extensions.
+     *
+     * @param futureTransform Function which accepts the result from this future and returns a new
+     *                        result or throws an exception if a result cannot be computed. This new
+     *                        result is what will be returned from the returned {@code Future}.
+     * @param <U> The type of new result.
      */
     <U> TransformableFuture<U> transformSync(FutureTransform<T, U> futureTransform);
 
+    /**
+     * Creates a new {@code Future} which is backed by the {@code Future} returned from the provided
+     * {@code futureTransform} function.
+     *
+     * <p>Use this when you need to add a callback on an existing {@code TransformableFuture} which
+     * returns yet another {@code Future}, chaining several asynchronous actions together into one
+     * final result {@code Future}. If you just used {@link #transformSync(FutureTransform)} you'd
+     * end up with a {@code Future<Future<U>>} (a future who's result is another future) which is
+     * difficult to work with. By using this API, the result {@code Future} is "unwrapped" and you
+     * get a more intuitive {@code Future<U>} to work with.
+     *
+     * <p>Terminology inspired by Guava's
+     * <a href="https://github.com/google/guava/wiki/ListenableFutureExplained">Futures</a>
+     * extensions such as {@code AsyncFunction}.
+     *
+     * @param futureTransform Function which accepts the result from this future and returns either
+     *                        a new {@code Future} or {@code null}.
+     * @param <U> The type of the result within the returned {@code Future} of the transform
+     *           function.
+     */
     <U> TransformableFuture<U> transformAsync(FutureTransform<T, TransformableFuture<U>> futureTransform);
 
+    /**
+     * Like {@link #transformAsync(FutureTransform)}, except useful in cases where you intentionally
+     * do not care about the result value contained in the transform functions returned
+     * {@code Future}.
+     *
+     * <p>APIs like {@link Message#process()} may intentionally require the parameterized type of
+     * {@code Future<Void>} to clearly document that both the result of the {@code Future} is unused
+     * (we only care if it succeeded or not) and to prevent an implementor from accidentally
+     * returning a {@code Future<Future>} which would never have its result {@code Future} examined
+     * because the consumer is ignoring the return value. This would definitely be a bug.
+     */
     TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<T, TransformableFuture<?>> futureTransform);
 }
