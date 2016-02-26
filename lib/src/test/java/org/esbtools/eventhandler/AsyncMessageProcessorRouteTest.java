@@ -221,7 +221,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         }
 
         @Override
-        public Future<?> process() {
+        public Future<Void> process() {
             return Futures.immediateFailedFuture(exception);
         }
 
@@ -254,7 +254,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         }
 
         @Override
-        public Future<?> process() {
+        public Future<Void> process() {
             ExecutorService executor = Executors.newSingleThreadExecutor();
             try {
                 return executor.submit(() -> {
@@ -263,6 +263,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                    return null;
                 });
             } finally {
                 executor.shutdown();
@@ -290,12 +291,15 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         }
 
         @Override
-        public Future<?> process() {
+        public Future<Void> process() {
             persistence.add("processing " + body);
 
             return Futures.lazyTransform(
                     Futures.immediateFuture(body),
-                    (e) -> persistence.add(e));
+                    (e) -> {
+                        persistence.add(e);
+                        return null;
+                    });
         }
 
         @Override

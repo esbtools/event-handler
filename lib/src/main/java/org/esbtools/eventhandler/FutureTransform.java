@@ -18,16 +18,13 @@
 
 package org.esbtools.eventhandler;
 
-import java.util.function.Function;
-
 /**
- * A function applied to {@link Responses} which returns some result of type {@code V}, or throws an
- * exception if unable to compute a result.
+ * A function applied to a {@link TransformableFuture} which returns some result of type {@code O},
+ * or throws an exception if unable to compute a result.
  *
- * @param <T> The type of requests
- * @param <U> The type of responses
- * @param <V> The type of result
+ * @param <I> The type of input
+ * @param <O> The type of output
  */
-public interface ResponsesHandler<T, U, V> {
-    V handleResponses(Responses<T, U> responses) throws Exception;
+public interface FutureTransform<I, O> {
+    O handle(I input) throws Exception;
 }

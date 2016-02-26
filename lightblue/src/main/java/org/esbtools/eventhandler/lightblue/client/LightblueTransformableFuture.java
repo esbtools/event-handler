@@ -18,11 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
+import org.esbtools.eventhandler.TransformableFuture;
 
-import org.esbtools.eventhandler.ResponsePromise;
-
-public interface LightblueResponsePromise extends
-        ResponsePromise<AbstractLightblueDataRequest, LightblueDataResponse> {
+public interface LightblueTransformableFuture extends TransformableFuture<LightblueResponses> {
 }

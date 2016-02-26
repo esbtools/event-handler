@@ -18,6 +18,11 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
+import org.esbtools.eventhandler.FutureTransform;
+import org.esbtools.eventhandler.NestedTransformableFuture;
+import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
+import org.esbtools.eventhandler.TransformableFuture;
+
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.model.DataError;
@@ -29,14 +34,11 @@ import com.redhat.lightblue.client.response.LightblueBulkResponseException;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
 
-import org.esbtools.eventhandler.ResponsesHandler;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -65,30 +67,32 @@ import java.util.concurrent.TimeoutException;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final Map<LazyFuture, AbstractLightblueDataRequest[]> queuedRequests =
-            Collections.synchronizedMap(new HashMap<>());
+    private final List<LazyRequestTransformableFuture> queuedRequests =
+            Collections.synchronizedList(new ArrayList<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
         this.lightblue = lightblue;
     }
 
     @Override
-    public LightblueResponsePromise request(AbstractLightblueDataRequest... requests) {
-        return new BulkResponsePromise(requests);
+    public TransformableFuture<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
+        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(requests);
+        queuedRequests.add(responseFuture);
+        return responseFuture;
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
-        Map<LazyFuture, AbstractLightblueDataRequest[]> batch;
+        List<LazyRequestTransformableFuture> batch;
 
         synchronized (queuedRequests) {
-            batch = new HashMap<>(queuedRequests);
+            batch = new ArrayList<>(queuedRequests);
             queuedRequests.clear();
         }
 
         DataBulkRequest bulkRequest = new DataBulkRequest();
 
-        for (AbstractLightblueDataRequest[] allRequestBatches : batch.values()) {
-            for (AbstractLightblueDataRequest requestInBatch : allRequestBatches) {
+        for (LazyRequestTransformableFuture batchedFuture : batch) {
+            for (AbstractLightblueDataRequest requestInBatch : batchedFuture.requests) {
                 // TODO: Determine if any requests are equivalent / duplicated and filter out
                 bulkRequest.add(requestInBatch);
             }
@@ -97,10 +101,10 @@ public class BulkLightblueRequester implements LightblueRequester {
         try {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
-                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
-                AbstractLightblueDataRequest[] requests = lazyFutureToRequests.getValue();
-                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap = new HashMap<>(requests.length);
+            for (LazyRequestTransformableFuture batchedFuture : batch) {
+                AbstractLightblueDataRequest[] requests = batchedFuture.requests;
+                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
+                        new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
 
                 for (AbstractLightblueDataRequest request : requests) {
@@ -127,15 +131,14 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    lazyFuture.complete(new BulkResponses(responseMap));
+                    batchedFuture.complete(new BulkResponses(responseMap));
                 } else {
-                    lazyFuture.completeExceptionally(new BulkLightblueResponseException(errors));
+                    batchedFuture.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
             }
         } catch (LightblueException e) {
-            for (Entry<LazyFuture, AbstractLightblueDataRequest[]> lazyFutureToRequests : batch.entrySet()) {
-                LazyFuture lazyFuture = lazyFutureToRequests.getKey();
-                lazyFuture.completeExceptionally(e);
+            for (LazyRequestTransformableFuture batchedFuture : batch) {
+                batchedFuture.completeExceptionally(e);
             }
         }
     }
@@ -147,27 +150,12 @@ public class BulkLightblueRequester implements LightblueRequester {
      * @throws LightblueException if something else went wrong, in which case there is no usable
      *                            response at all.
      */
-    private LightblueBulkDataResponse tryBulkRequest(DataBulkRequest bulkRequest) throws LightblueException {
+    private LightblueBulkDataResponse tryBulkRequest(DataBulkRequest bulkRequest)
+            throws LightblueException {
         try {
             return lightblue.bulkData(bulkRequest);
         } catch (LightblueBulkResponseException e) {
             return e.getBulkResponse();
-        }
-    }
-
-    class BulkResponsePromise implements LightblueResponsePromise {
-        private final AbstractLightblueDataRequest[] requests;
-
-        BulkResponsePromise(AbstractLightblueDataRequest[] requests) {
-            this.requests = requests;
-        }
-
-        @Override
-        public <T> Future<T> then(
-                ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responseHandler) {
-            LazyFuture<T> lazyFuture = new LazyFuture<>(responseHandler);
-            queuedRequests.put(lazyFuture, requests);
-            return lazyFuture;
         }
     }
 
@@ -188,27 +176,67 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    class LazyFuture<T> implements Future<T> {
-        private final ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler;
+    /**
+     * A core future implementation which accepts its result externally, triggering this result
+     * lazily on the first call to {@link #get()}.
+     *
+     * <p>This future is used to back more specific cases in {@link LazyRequestTransformableFuture}
+     * and {@link LazyTransformingFuture}.
+     *
+     * <p>{@link Future}s typically work asynchronously in another thread. This implementation
+     * intentionally does not. To reap the performance benefits of batching requests, we need a
+     * future design which puts off doing <em>any</em> work as long as possible: until something
+     * calls {@code .get()}. Spinning of work in another thread is the opposite: it starts work
+     * immediately in the background. To the caller, this future implementation feels similar:
+     * creating one returns immediately, and the caller can use it almost exactly as a "normal"
+     * asynchronous future or future. The only difference is that with this solution, callbacks
+     * won't happen until you ask for the result with {@code .get()}. With a normal thread-based,
+     * async future the callbacks happen at some point in the future regardless of if anything ever
+     * calls {@code .get()}.
+     *
+     * @param <U> The type of the result of the future. See {@link TransformableFuture}.
+     */
+    static class LazyTransformableFuture<U> implements TransformableFuture<U> {
+        /**
+         * A function which should trigger the completion of this future with a result. If it does
+         * not, this is a runtime error.
+         *
+         * <p>This is what makes the future <em>lazy</em>: we can use this to complete the future
+         * on demand.
+         */
+        private final Completer completer;
 
-        private T result;
+        private U result;
         private Exception exception;
-        private boolean completed;
+        private boolean completed = false;
         private boolean cancelled = false;
 
-        LazyFuture(ResponsesHandler<AbstractLightblueDataRequest, LightblueDataResponse, T> responsesHandler) {
-            this.responsesHandler = responsesHandler;
+        /**
+         * Queued up futures which are the result of applying this future's value to some transform
+         * function ({@link FutureTransform}). Futures are queued up by calling APIs like
+         * {@link #transformSync(FutureTransform)} and {@link #transformAsync(FutureTransform)}.
+         */
+        private final List<LazyTransformingFuture<U, ?>> next = new ArrayList<>(1);
+
+        /**
+         * @param completer Reference to a function which should complete this future when called.
+         *                  See {@link #completer}.
+         */
+        LazyTransformableFuture(Completer completer) {
+            this.completer = completer;
         }
 
-        void complete(LightblueResponses responses) {
+        void complete(U responses) {
             if (isDone()) return;
 
-            completed = true;
-
             try {
-                result = responsesHandler.handleResponses(responses);
+                result = responses;
+                completed = true;
+                for (LazyTransformingFuture<U, ?> next : this.next) {
+                    next.complete(result);
+                }
             } catch (Exception e) {
-                exception = e;
+                completeExceptionally(e);
             }
         }
 
@@ -216,12 +244,16 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
+            for (LazyTransformingFuture<U, ?> next : this.next) {
+                next.completeExceptionally(exception);
+            }
         }
 
         @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (completed) return false;
             cancelled = true;
+            next.clear();
             return true;
         }
 
@@ -236,13 +268,19 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
-        public T get() throws InterruptedException, ExecutionException {
+        public U get() throws InterruptedException, ExecutionException {
             if (cancelled) {
                 throw new CancellationException();
             }
 
             if (!completed) {
-                doQueuedRequestsAndCompleteFutures();
+                completer.triggerFutureCompletion();
+
+                if (!completed) {
+                    throw new ExecutionException(new IllegalStateException("Future attempted to " +
+                            "lazily trigger completion, but completer did not actually complete " +
+                            "the future. Check the provided completer function for correctness."));
+                }
             }
 
             if (exception != null) {
@@ -252,14 +290,198 @@ public class BulkLightblueRequester implements LightblueRequester {
             return result;
         }
 
+        // TODO(ahenning): This ignores the timeout because we aren't doing work in another thread
+        // I'm not sure that anyone will ever care, but if they did, we would do the same lazy
+        // stuff, but just do it in another thread which we could interrupt if it took too long.
+        // In that case we may have to build in interrupt checking during request processing.
+        @Override
+        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
+                TimeoutException {
+            return get();
+        }
+
+        @Override
+        public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
+            LazyTransformingFuture<U, V> future = new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return future;
+        }
+
+        @Override
+        public <V> TransformableFuture<V> transformAsync(
+                FutureTransform<U, TransformableFuture<V>> futureTransform) {
+            LazyTransformingFuture<U, TransformableFuture<V>> future =
+                    new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return new NestedTransformableFuture<>(future);
+        }
+
+        @Override
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<U, TransformableFuture<?>> futureTransform) {
+            LazyTransformingFuture<U, TransformableFuture<?>> future =
+                    new LazyTransformingFuture<>(futureTransform, completer);
+            next.add(future);
+            return new NestedTransformableFutureIgnoringReturn(future);
+        }
+    }
+
+    /**
+     * Wraps a {@link LazyTransformableFuture} and some {@link AbstractLightblueDataRequest
+     * lightblue requests} which are used to complete this in
+     * {@link #doQueuedRequestsAndCompleteFutures()}. Naturally, then, that function is used as the
+     * lazy future's completer function. That function and this implementation are tightly coupled.
+     */
+    class LazyRequestTransformableFuture implements TransformableFuture<LightblueResponses> {
+        private final LazyTransformableFuture<LightblueResponses> backingFuture =
+                new LazyTransformableFuture<>(() -> doQueuedRequestsAndCompleteFutures());
+
+        final AbstractLightblueDataRequest[] requests;
+
+        LazyRequestTransformableFuture(AbstractLightblueDataRequest[] requests) {
+            this.requests = requests;
+        }
+
+        void complete(LightblueResponses responses) {
+            backingFuture.complete(responses);
+        }
+
+        void completeExceptionally(Exception exception) {
+            backingFuture.completeExceptionally(exception);
+        }
+
+        @Override
+        public <U> TransformableFuture<U> transformSync(
+                FutureTransform<LightblueResponses, U> futureTransform) {
+            return backingFuture.transformSync(futureTransform);
+        }
+
+        @Override
+        public <U> TransformableFuture<U> transformAsync(
+                FutureTransform<LightblueResponses, TransformableFuture<U>> futureTransform) {
+            return backingFuture.transformAsync(futureTransform);
+        }
+
+        @Override
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<LightblueResponses, TransformableFuture<?>> futureTransform) {
+            return backingFuture.transformAsyncIgnoringReturn(futureTransform);
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            if (!backingFuture.isDone()) {
+                queuedRequests.remove(this);
+            }
+
+            return backingFuture.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return backingFuture.isCancelled();
+        }
+
+        @Override
+        public boolean isDone() {
+            return backingFuture.isDone();
+        }
+
+        @Override
+        public LightblueResponses get() throws InterruptedException, ExecutionException {
+            return backingFuture.get();
+        }
+
+        @Override
+        public LightblueResponses get(long timeout, TimeUnit unit) throws InterruptedException,
+                ExecutionException, TimeoutException {
+            return backingFuture.get(timeout, unit);
+        }
+    }
+
+    /**
+     * A simple lazy future implementation which applies some transformation function to the value
+     * it is completed with.
+     *
+     * <p>This is used in {@link #transformSync(FutureTransform)} callbacks of
+     * {@link TransformableFuture} implementations.
+     *
+     * @param <T> The input type used to complete the Future.
+     * @param <U> The output type as a result of applying the transform function to the input.
+     */
+    static class LazyTransformingFuture<T, U> implements TransformableFuture<U> {
+        private final FutureTransform<T, U> handler;
+        private final LazyTransformableFuture<U> backingFuture;
+
+        LazyTransformingFuture(FutureTransform<T, U> handler, Completer completer) {
+            this.handler = handler;
+            this.backingFuture = new LazyTransformableFuture<>(completer);
+        }
+
+        void complete(T responses) {
+            if (isDone()) return;
+
+            try {
+                U handled = handler.handle(responses);
+                backingFuture.complete(handled);
+            } catch (Exception e) {
+                completeExceptionally(e);
+            }
+        }
+
+        void completeExceptionally(Exception exception) {
+            backingFuture.completeExceptionally(exception);
+        }
+
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return backingFuture.cancel(mayInterruptIfRunning);
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return backingFuture.isCancelled();
+        }
+
+        @Override
+        public boolean isDone() {
+            return backingFuture.isDone();
+        }
+
+        @Override
+        public U get() throws InterruptedException, ExecutionException {
+            return backingFuture.get();
+        }
+
         /**
          * This future is not completed asynchronously so there is no way to "time out" unless we
          * introduce another thread for processing requests which I don't think is hugely necessary.
          */
         @Override
-        public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
+        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
                 TimeoutException {
-            return get();
+            return backingFuture.get(timeout, unit);
         }
+
+        @Override
+        public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
+            return backingFuture.transformSync(futureTransform);
+        }
+
+        @Override
+        public <V> TransformableFuture<V> transformAsync(
+                FutureTransform<U, TransformableFuture<V>> futureTransform) {
+            return backingFuture.transformAsync(futureTransform);
+        }
+
+        @Override
+        public TransformableFuture<Void> transformAsyncIgnoringReturn(
+                FutureTransform<U, TransformableFuture<?>> futureTransform) {
+            return backingFuture.transformAsyncIgnoringReturn(futureTransform);
+        }
+    }
+
+    interface Completer {
+        void triggerFutureCompletion();
     }
 }

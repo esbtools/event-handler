@@ -21,25 +21,26 @@ package org.esbtools.eventhandler;
 import java.util.concurrent.Future;
 
 /**
- * An asynchronous capture of potentially yet-to-come responses.
+ * An extension of {@link Future} which allows chaining {@link FutureTransform} functions onto its
+ * eventually computed result, returning new {@code TransformableFuture}s.
  *
- * <p>Allows code to build a {@link Future} object which will complete at some point in the future
- * with results from the {@link ResponsesHandler} passed to {@link #then(ResponsesHandler)}.
- *
- * @see Requester
- *
- * @param <T> The type of requests
- * @param <U> The type of responses
+ * <p>Not a general purpose interface, this is entirely meant to optionally support integrating with
+ * {@code Future}-based APIs like {@link DocumentEvent#lookupDocument()} in collaboration with a
+ * {@link Requester}.
  */
-public interface ResponsePromise<T, U> {
+public interface TransformableFuture<T> extends Future<T> {
     /**
      * Once responses are received from some requests, the provided {@code responseHandler} function
      * will be called with those responses. This handler returns a value that is used for the
      * returned {@link Future}'s {@link Future#get() get} methods.
      *
-     * @param responseHandler Function which accepts responses and returns a result or throws an
+     * @param futureTransform Function which accepts responses and returns a result or throws an
      *                        exception if a result cannot be computed.
-     * @param <V> The type of result.
+     * @param <U> The type of result.
      */
-    <V> Future<V> then(ResponsesHandler<T, U, V> responseHandler);
+    <U> TransformableFuture<U> transformSync(FutureTransform<T, U> futureTransform);
+
+    <U> TransformableFuture<U> transformAsync(FutureTransform<T, TransformableFuture<U>> futureTransform);
+
+    TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<T, TransformableFuture<?>> futureTransform);
 }

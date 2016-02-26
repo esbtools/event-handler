@@ -21,5 +21,5 @@ package org.esbtools.eventhandler;
 import java.util.concurrent.Future;
 
 public interface Message {
-    Future<?> process();
+    Future<Void> process();
 }
