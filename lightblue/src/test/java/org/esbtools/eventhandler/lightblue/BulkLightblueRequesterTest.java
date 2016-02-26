@@ -65,13 +65,8 @@ public class BulkLightblueRequesterTest {
         insertUser("cooltester2000");
         insertUser("aw3som3cod3r");
 
-        DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
-        findTester.select(Projection.includeFieldRecursively("*"));
-
-        DataFindRequest findCoder = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findCoder.where(Query.withValue("username", Query.BinOp.eq, "aw3som3cod3r"));
-        findCoder.select(Projection.includeFieldRecursively("*"));
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+        DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
 
         List<TestUser> returned = requester.request(findCoder, findTester).transformSync((responses) -> {
             return Arrays.asList(
@@ -91,10 +86,7 @@ public class BulkLightblueRequesterTest {
             InterruptedException, LightblueException {
         insertUser("cooltester2000");
 
-        DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
-        findTester.select(Projection.includeFieldRecursively("*"));
-
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
         DataFindRequest otherRequest = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
 
         expectedException.expectCause(Matchers.instanceOf(NoSuchElementException.class));
@@ -107,13 +99,8 @@ public class BulkLightblueRequesterTest {
     @Test
     public void shouldCacheRequestsUntilFutureIsResolvedThenPerformAllSynchronouslyInOneBulkRequest()
             throws LightblueException, ExecutionException, InterruptedException {
-        DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
-        findTester.select(Projection.includeFieldRecursively("*"));
-
-        DataFindRequest findCoder = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findCoder.where(Query.withValue("username", Query.BinOp.eq, "aw3som3cod3r"));
-        findCoder.select(Projection.includeFieldRecursively("*"));
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+        DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
 
         Future<TestUser> futureTester = requester.request(findTester).transformSync((responses -> {
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
@@ -176,9 +163,7 @@ public class BulkLightblueRequesterTest {
     public void shouldOnlyFailFuturesWhichHaveFailedResponses() throws Exception {
         insertUser("cooltester2000");
 
-        DataFindRequest findTester = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
-        findTester.where(Query.withValue("username", Query.BinOp.eq, "cooltester2000"));
-        findTester.select(Projection.includeFieldRecursively("*"));
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
 
         DataFindRequest badRequest = new DataFindRequest("badRequest");
         badRequest.select(Projection.includeFieldRecursively("*"));
@@ -200,33 +185,40 @@ public class BulkLightblueRequesterTest {
     public void shouldAllowChainingMultipleRequestsAndPerformEachStagesRequestsInBulk()
             throws Exception {
         DataFindRequest findTester = findUserByUsername("cooltester2000");
-        DataFindRequest findAnotherTester = findUserByUsername("muchcoolertester");
-
         DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
         DataFindRequest findAnotherCoder = findUserByUsername("moreawesomecoder");
 
         List<String> log = new ArrayList<>();
 
-        Future<TestUser> futureTester = requester.request(findTester).transformAsync(responses -> {
+        // Demonstrates both styles of chaining requests.
+        // Note that if you have both requests up front, you should just do them both at the same
+        // time.
+
+        // This style demonstrates nesting callbacks. Notice each level of "depth" becomes
+        // increasingly indented. But sometimes this is necessary.
+        Future<?> futureTester = requester.request(findTester).transformAsync(responses -> {
             log.add("findTester");
-            return requester.request(findAnotherTester);
-        }).transformSync(responses -> {
-            log.add("findAnotherTester");
-            return responses.forRequest(findAnotherTester).parseProcessed(TestUser.class);
+
+            // Here we can define a new request in the transform callback.
+            DataFindRequest findAnotherTester = findUserByUsername("muchcoolertester");
+
+            return requester.request(findAnotherTester).transformSync(moreResponses -> {
+                log.add("findAnotherTester");
+                return moreResponses.forRequest(findAnotherTester);
+            });
         });
 
-        Future<TestUser> futureCoder = requester.request(findCoder).transformAsync(responses -> {
+        // This style is more typical of modern asynchronous programming because there is no
+        // continuous nesting. However, scope doesn't allow you to define a request object within
+        // the response transform, so the request objects have to be in scope, which is generally
+        // not as intuitive or natural.
+        Future<?> futureCoder = requester.request(findCoder).transformAsync(responses -> {
             log.add("findCoder");
             return requester.request(findAnotherCoder);
         }).transformSync(responses -> {
             log.add("findAnotherCoder");
-            return responses.forRequest(findAnotherCoder).parseProcessed(TestUser.class);
+            return responses.forRequest(findAnotherCoder);
         });
-
-        insertUser("cooltester2000");
-        insertUser("aw3som3cod3r");
-        insertUser("muchcoolertester");
-        insertUser("moreawesomecoder");
 
         futureTester.get();
         futureCoder.get();
