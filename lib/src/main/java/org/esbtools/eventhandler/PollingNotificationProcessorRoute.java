@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler;
 
+import com.google.common.util.concurrent.Futures;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
@@ -63,8 +64,12 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
             // Intentionally cache all futures before waiting for any.
             for (Notification notification : notifications) {
-                Future<Collection<DocumentEvent>> futureEvents = notification.toDocumentEvents();
-                notificationsToFutureEvents.put(notification, futureEvents);
+                try {
+                    Future<Collection<DocumentEvent>> futureEvents = notification.toDocumentEvents();
+                    notificationsToFutureEvents.put(notification, futureEvents);
+                } catch (Exception e) {
+                    notificationsToFutureEvents.put(notification, Futures.immediateFailedFuture(e));
+                }
             }
 
             Map<Notification, Collection<DocumentEvent>> notificationsToDocumentEvents =

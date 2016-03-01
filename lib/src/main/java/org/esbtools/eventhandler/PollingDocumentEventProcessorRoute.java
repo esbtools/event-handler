@@ -19,6 +19,7 @@
 package org.esbtools.eventhandler;
 
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.Futures;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
@@ -64,7 +65,11 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
 
             // Intentionally cache all futures before resolving them.
             for (DocumentEvent event : documentEvents) {
-                eventsToFutureDocuments.put(event, event.lookupDocument());
+                try {
+                    eventsToFutureDocuments.put(event, event.lookupDocument());
+                } catch (Exception e) {
+                    eventsToFutureDocuments.put(event, Futures.immediateFailedFuture(e));
+                }
             }
 
             Map<DocumentEvent, Object> eventsToDocuments = new HashMap<>(documentEvents.size());
