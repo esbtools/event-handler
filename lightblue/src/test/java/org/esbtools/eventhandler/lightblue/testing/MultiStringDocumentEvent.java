@@ -30,8 +30,11 @@ import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Future;
 
 /**
@@ -42,20 +45,20 @@ import java.util.concurrent.Future;
  * merged event includes both victims' values.
  */
 public class MultiStringDocumentEvent implements LightblueDocumentEvent {
-    private final List<String> values;
+    private final Set<String> values;
     private final ZonedDateTime creationDate;
     private final DocumentEventEntity wrappedEntity;
     private final Clock clock;
 
-    public MultiStringDocumentEvent(List<String> values, Clock clock) {
-        this.values = values;
+    public MultiStringDocumentEvent(Collection<String> values, Clock clock) {
+        this.values = new HashSet<>(values);
         this.clock = clock;
 
         creationDate = ZonedDateTime.now(clock);
         wrappedEntity = toNewDocumentEventEntity();
     }
 
-    public List<String> values() {
+    public Set<String> values() {
         return values;
     }
 
@@ -63,7 +66,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
         this.wrappedEntity = wrappedEntity;
         this.clock = Clock.systemDefaultZone();
 
-        values = Arrays.asList(wrappedEntity.getParameterByKey("values").split("\\|"));
+        values = new HashSet<>(Arrays.asList(wrappedEntity.getParameterByKey("values").split("\\|")));
         creationDate = wrappedEntity.getCreationDate();
     }
 
@@ -100,7 +103,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
 
         MultiStringDocumentEvent other = (MultiStringDocumentEvent) event;
 
-        if (!Objects.equals(other.values, values)) {
+        if (!other.values.containsAll(values)) {
             return false;
         }
 
@@ -116,7 +119,8 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
 
     @Override
     public boolean couldMergeWith(DocumentEvent event) {
-        return event instanceof MultiStringDocumentEvent;
+        return event instanceof MultiStringDocumentEvent &&
+                !event.isSupersededBy(this);
     }
 
     @Override
@@ -127,7 +131,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
 
         MultiStringDocumentEvent other = (MultiStringDocumentEvent) event;
 
-        List<String> mergedValues = new ArrayList<>();
+        Set<String> mergedValues = new HashSet<>();
         mergedValues.addAll(other.values);
         mergedValues.addAll(this.values);
 
