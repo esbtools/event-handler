@@ -494,6 +494,21 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
                     newOrMergerEvent = null;
                     break;
+                } else if (previouslyOptimizedEvent.isSupersededBy(newOrMergerEvent)) {
+                    // Previous entity was processing; now it is superseded and removed from
+                    // optimized result list.
+                    DocumentEventEntity previousEntity = previouslyOptimizedEvent.wrappedDocumentEventEntity();
+                    if (previousEntity.get_id() == null) {
+                        // Was net-new event from merger, but we aren't going to process, so ignore.
+                        updates.remove(previouslyOptimizedEvent);
+                    } else {
+                        previousEntity.setStatus(DocumentEventEntity.Status.superseded);
+                        previousEntity.setProcessedDate(ZonedDateTime.now(clock));
+                    }
+                    optimizedIterator.remove();
+
+                    newOrMergerEventEntity.addSurvivorOfIds(previousEntity.get_id());
+                    newOrMergerEventEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
                 } else if (newOrMergerEvent.couldMergeWith(previouslyOptimizedEvent)) {
                     // Previous entity was processing; now it is merged and removed from optimized
                     // result list.

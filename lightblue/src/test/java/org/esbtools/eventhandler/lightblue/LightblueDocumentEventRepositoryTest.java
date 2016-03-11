@@ -312,6 +312,45 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
+    public void shouldCheckIfLowerPriorityEventsSupersedeHigherPriorityEventsAndMarkAsSupersededAndTrackVictimsIds()
+            throws Exception {
+        Instant expectedProcessedDate = ZonedDateTime.now(fixedClock).toInstant();
+
+        insertDocumentEventEntitiesInOrder(
+                newMultiStringDocumentEventEntity("1"),
+                newMultiStringDocumentEventEntity("1", "2"),
+                newMultiStringDocumentEventEntity("1", "2", "3"),
+                newMultiStringDocumentEventEntity("1", "2", "3", "4"),
+                newMultiStringDocumentEventEntity("1", "2", "3", "4", "5"));
+
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+
+        DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        findSuperseded.select(Projection.includeFieldRecursively("*"));
+        findSuperseded.where(Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
+
+        DocumentEventEntity[] supersededEntities = client.data(findSuperseded, DocumentEventEntity[].class);
+
+        assertEquals(1, retrieved.size());
+        assertEquals(
+                Arrays.asList(expectedProcessedDate, expectedProcessedDate, expectedProcessedDate, expectedProcessedDate),
+                Arrays.stream(supersededEntities)
+                        .map(DocumentEventEntity::getProcessedDate)
+                        .map(ZonedDateTime::toInstant)
+                        .collect(Collectors.toList()));
+
+        MultiStringDocumentEvent event = (MultiStringDocumentEvent) retrieved.get(0);
+        DocumentEventEntity survivorEntity = event.wrappedDocumentEventEntity();
+
+        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
+                Arrays.stream(supersededEntities)
+                        .map(DocumentEventEntity::get_id)
+                        .collect(Collectors.toList()));
+        assertThat(event.values()).containsExactly("1", "2", "3", "4", "5");
+    }
+
+    @Test
     public void shouldMergeEventsInBatchAndMarkAsMergedAndTrackVictims() throws Exception {
         insertDocumentEventEntities(
                 newMultiStringDocumentEventEntity("1"),
@@ -647,8 +686,8 @@ public class LightblueDocumentEventRepositoryTest {
         return found[0];
     }
 
-    private DocumentEventEntity newMultiStringDocumentEventEntity(String value) {
-        return new MultiStringDocumentEvent(Collections.singletonList(value), fixedClock)
+    private DocumentEventEntity newMultiStringDocumentEventEntity(String... values) {
+        return new MultiStringDocumentEvent(Arrays.asList(values), fixedClock)
                 .wrappedDocumentEventEntity();
     }
 
