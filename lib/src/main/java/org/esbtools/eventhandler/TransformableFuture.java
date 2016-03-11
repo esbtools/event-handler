@@ -29,6 +29,14 @@ import java.util.concurrent.Future;
  * {@link Requester}.
  */
 public interface TransformableFuture<T> extends Future<T> {
+    static <T> TransformableFuture<T> immediate(T result) {
+        return new ImmediateTransformableFuture<>(result);
+    }
+
+    static <T> TransformableFuture<T> immediateFailed(Exception exception) {
+        return new FailedTransformableFuture<>(exception);
+    }
+
     /**
      * Creates a new {@link Future} which is completed immediately when this {@code Future}
      * completes, with a value that is the result of applying the provided {@code futureTransform}
