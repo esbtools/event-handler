@@ -32,4 +32,11 @@ public interface Responses<T, U> {
      * @throws java.util.NoSuchElementException If no response for that request exists.
      */
     U forRequest(T request);
+
+    /**
+     * @return The received response for the request at the provided index.
+     * @throws IndexOutOfBoundsException If the provided index is negative or greater than the
+     * number of requests.
+     */
+    U forRequest(int indexOfRequest);
 }

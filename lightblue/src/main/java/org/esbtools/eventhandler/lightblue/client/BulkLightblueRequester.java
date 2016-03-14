@@ -131,7 +131,7 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    batchedFuture.complete(new BulkResponses(responseMap));
+                    batchedFuture.complete(new BulkResponses(responseMap, requests));
                 } else {
                     batchedFuture.completeExceptionally(new BulkLightblueResponseException(errors));
                 }
@@ -161,9 +161,12 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     static class BulkResponses implements LightblueResponses {
         private final Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap;
+        private final AbstractLightblueDataRequest[] requests;
 
-        BulkResponses(Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap) {
+        BulkResponses(Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap,
+                AbstractLightblueDataRequest[] requests) {
             this.responseMap = responseMap;
+            this.requests = requests;
         }
 
         @Override
@@ -173,6 +176,11 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
 
             throw new NoSuchElementException("No response for request: " + request);
+        }
+
+        @Override
+        public LightblueDataResponse forRequest(int indexOfRequest) {
+            return forRequest(requests[indexOfRequest]);
         }
     }
 

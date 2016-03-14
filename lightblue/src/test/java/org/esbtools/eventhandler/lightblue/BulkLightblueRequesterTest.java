@@ -82,6 +82,28 @@ public class BulkLightblueRequesterTest {
     }
 
     @Test
+    public void shouldMakeRequestsAndProvideResponsesForSpecificRequestsByIndex()
+            throws LightblueException, ExecutionException, InterruptedException {
+        insertUser("cooltester2000");
+        insertUser("aw3som3cod3r");
+
+        DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        List<TestUser> returned = requester.request(findCoder, findTester).transformSync((responses) -> {
+            return Arrays.asList(
+                    responses.forRequest(0).parseProcessed(TestUser.class),
+                    responses.forRequest(1).parseProcessed(TestUser.class));
+        }).get();
+
+        TestUser shouldBeCoder = returned.get(0);
+        TestUser shouldBeTester = returned.get(1);
+
+        assertEquals("cooltester2000", shouldBeTester.getUsername());
+        assertEquals("aw3som3cod3r", shouldBeCoder.getUsername());
+    }
+
+    @Test
     public void shouldThrowNoSuchElementExceptionIfResponseNotFound() throws ExecutionException,
             InterruptedException, LightblueException {
         insertUser("cooltester2000");
