@@ -119,6 +119,20 @@ public class BulkLightblueRequesterTest {
     }
 
     @Test
+    public void shouldThrowIndexOutOfBoundsExceptionIfResponseNotFoundByIndex() throws ExecutionException,
+            InterruptedException, LightblueException {
+        insertUser("cooltester2000");
+
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        expectedException.expectCause(Matchers.instanceOf(IndexOutOfBoundsException.class));
+
+        requester.request(findTester).transformSync((responses) -> {
+            return responses.forRequest(1).parseProcessed(TestUser.class);
+        }).get();
+    }
+
+    @Test
     public void shouldCacheRequestsUntilFutureIsResolvedThenPerformAllSynchronouslyInOneBulkRequest()
             throws LightblueException, ExecutionException, InterruptedException {
         DataFindRequest findTester = findUserByUsername("cooltester2000");
