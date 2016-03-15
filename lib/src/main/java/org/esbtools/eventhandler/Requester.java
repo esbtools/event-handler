@@ -18,6 +18,8 @@
 
 package org.esbtools.eventhandler;
 
+import java.util.Collection;
+
 /**
  * Optional interface for implementing some abstraction around asynchronous retrieval of results for
  * given requests.
@@ -43,4 +45,6 @@ package org.esbtools.eventhandler;
  */
 public interface Requester<T, U> {
     TransformableFuture<? extends Responses<T, U>> request(T... requests);
+
+    TransformableFuture<? extends Responses<T, U>> request(Collection<? extends T> requests);
 }
