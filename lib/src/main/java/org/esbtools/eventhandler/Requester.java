@@ -46,5 +46,5 @@ import java.util.Collection;
 public interface Requester<T, U> {
     TransformableFuture<? extends Responses<T, U>> request(T... requests);
 
-    TransformableFuture<? extends Responses<T, U>> request(Collection<T> requests);
+    TransformableFuture<? extends Responses<T, U>> request(Collection<? extends T> requests);
 }

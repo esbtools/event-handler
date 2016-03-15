@@ -84,7 +84,7 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public TransformableFuture<LightblueResponses> request(
-            Collection<AbstractLightblueDataRequest> requests) {
+            Collection<? extends AbstractLightblueDataRequest> requests) {
         return request(requests.toArray(new AbstractLightblueDataRequest[requests.size()]));
     }
 
