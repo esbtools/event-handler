@@ -35,6 +35,7 @@ import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -79,6 +80,12 @@ public class BulkLightblueRequester implements LightblueRequester {
         LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(requests);
         queuedRequests.add(responseFuture);
         return responseFuture;
+    }
+
+    @Override
+    public TransformableFuture<LightblueResponses> request(
+            Collection<AbstractLightblueDataRequest> requests) {
+        return request(requests.toArray(new AbstractLightblueDataRequest[requests.size()]));
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
