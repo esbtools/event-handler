@@ -36,8 +36,8 @@ public interface Responses<T, U> {
     /**
      * @param indexOfRequest Zero-based index of the request based on the original order.
      * @return The received response for the request at the provided index.
-     * @throws IndexOutOfBoundsException If the provided index is negative or greater than the
-     * number of requests.
+     * @throws IndexOutOfBoundsException If the provided index is negative or greater than or
+     * equal to the number of requests.
      */
     U forRequest(int indexOfRequest);
 }
