@@ -52,6 +52,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -661,6 +662,27 @@ public class LightblueDocumentEventRepositoryTest {
         repository.ensureTransactionActive(event);
     }
 
+    @Test
+    public void shouldRetrieveOldestEventsOfSamePriorityFirst() throws Exception {
+        ZonedDateTime now = ZonedDateTime.now(fixedClock);
+
+        insertDocumentEventEntities(
+                newDocumentEventEntityCreatedAt("-1", now.minus(1, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-9", now.minus(9, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-5", now.minus(5, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-3", now.minus(3, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-8", now.minus(8, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-12", now.minus(12, ChronoUnit.MINUTES)),
+                newDocumentEventEntityCreatedAt("-2", now.minus(2, ChronoUnit.MINUTES)));
+
+        List<String> values = repository.retrievePriorityDocumentEventsUpTo(5).stream()
+                .map(LightblueDocumentEvent::wrappedDocumentEventEntity)
+                .map(e -> e.getParameterByKey("value"))
+                .collect(Collectors.toList());
+
+        assertThat(values).containsExactly("-12", "-8", "-9", "-5", "-3");
+    }
+
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
             throws LightblueException {
         DataFindRequest find = new DataFindRequest(
@@ -703,6 +725,12 @@ public class LightblueDocumentEventRepositoryTest {
         DocumentEventEntity entity = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
                 .wrappedDocumentEventEntity();
         entity.setPriority(priority);
+        return entity;
+    }
+
+    private DocumentEventEntity newDocumentEventEntityCreatedAt(String value, ZonedDateTime creationDate) {
+        DocumentEventEntity entity = newStringDocumentEventEntity(value);
+        entity.setCreationDate(creationDate);
         return entity;
     }
 

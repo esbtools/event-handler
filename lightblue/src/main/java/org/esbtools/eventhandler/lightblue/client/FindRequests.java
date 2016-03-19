@@ -83,7 +83,7 @@ public abstract class FindRequests {
                                 Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate)))
                 )));
         findEntities.select(Projection.includeFieldRecursively("*"));
-        findEntities.sort(Sort.desc("priority"));
+        findEntities.sort(Sort.desc("priority"), Sort.asc("creationDate"));
         findEntities.range(0, maxEvents - 1);
 
         return findEntities;
