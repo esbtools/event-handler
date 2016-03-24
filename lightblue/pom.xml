@@ -37,7 +37,73 @@
         <version.lightblue-java-generator>0.1.0-SNAPSHOT</version.lightblue-java-generator>
         <version.lightblue-client>4.0.0</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
+
+        <version.lightblue-java-generator-bin>0.1.0-SNAPSHOT</version.lightblue-java-generator-bin>
+
+        <version.exec-maven-plugin>1.4.0</version.exec-maven-plugin>
+
+        <!-- Override with -Dmetadata.outputDirectory= -->
+        <metadata.outputDirectory>${project.build.outputDirectory}</metadata.outputDirectory>
     </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${version.exec-maven-plugin}</version>
+                <executions>
+                    <execution>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <includeProjectDependencies>true</includeProjectDependencies>
+                    <includePluginDependencies>true</includePluginDependencies>
+                    <executableDependency>
+                        <groupId>io.github.alechenninger.lightblue</groupId>
+                        <artifactId>lightblue-java-generator-bin</artifactId>
+                    </executableDependency>
+                    <mainClass>io.github.alechenninger.lightblue.Main</mainClass>
+                    <arguments>
+                        <argument>-o ${metadata.outputDirectory}</argument>
+                        <argument>org.esbtools.eventhandler.lightblue.DocumentEventEntity</argument>
+                        <argument>org.esbtools.eventhandler.lightblue.config.EventHandlerConfigEntity</argument>
+                    </arguments>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>io.github.alechenninger.lightblue</groupId>
+                        <artifactId>lightblue-java-generator-bin</artifactId>
+                        <version>${version.lightblue-java-generator-bin}</version>
+                        <type>jar</type>
+                        <exclusions>
+                            <exclusion>
+                                <!--
+                                It doesn't appear that this is respected, and I don't know why.
+                                Not a huge deal though.
+                                -->
+                                <groupId>org.slf4j</groupId>
+                                <artifactId>slf4j-nop</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <!-- Yes, this is redundant. But it silences an IntelliJ bug :(. -->
+                <version>${version.maven-surefire-plugin}</version>
+                <configuration>
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencyManagement>
         <dependencies>
@@ -170,19 +236,5 @@
             <artifactId>awaitility</artifactId>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <!-- Yes, this is redundant. But it silences an IntelliJ bug :(. -->
-                <version>${version.maven-surefire-plugin}</version>
-                <configuration>
-                    <reuseForks>false</reuseForks>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 
 </project>
