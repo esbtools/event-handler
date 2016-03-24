@@ -45,7 +45,7 @@ import java.util.Set;
 @Version(value = DocumentEventEntity.VERSION, changelog = "Initial prototype")
 public class DocumentEventEntity {
     public static final String ENTITY_NAME = "documentEvent";
-    public static final String VERSION = "0.1.0";
+    public static final String VERSION = "0.0.1-SNAPSHOT";
 
     private String _id;
     private String canonicalType;
