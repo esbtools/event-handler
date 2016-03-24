@@ -31,11 +31,11 @@ import java.time.Duration;
 import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
-@Version(value = EventHandlerConfigEntity.ENTITY_VERSION, changelog = "Simple, string value only")
+@Version(value = EventHandlerConfigEntity.ENTITY_VERSION, changelog = "Initial domain-specific config")
 public class EventHandlerConfigEntity implements LightblueNotificationRepositoryConfig,
         LightblueDocumentEventRepositoryConfig {
     public static final String ENTITY_NAME = "eventHandlerConfig";
-    public static final String ENTITY_VERSION = "1.0.0";
+    public static final String ENTITY_VERSION = "0.0.1-SNAPSHOT";
 
     private String domain;
     private Set<String> canonicalTypesToProcess;
