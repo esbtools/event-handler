@@ -24,8 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -106,25 +104,17 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
             this.callerId = callerId;
             this.resource = resource;
             this.locking = locking;
+            this.resourceId = resourceId;
 
-            try {
-                // TODO: Remove url encoding once Lightblue Client 4.0.0 is released
-                // See: https://github.com/lightblue-platform/lightblue-client/pull/260
-                this.resourceId = resourceId = URLEncoder.encode(resourceId, "UTF-8");
-
-                if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
-                    throw new LockNotAvailableException(resourceId, resource);
-                }
-
-                this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
-                        new PingTask(this),
-                        /* initial delay*/ autoPingInterval.toMillis(),
-                        /* delay */ autoPingInterval.toMillis(),
-                        TimeUnit.MILLISECONDS);
-            } catch (UnsupportedEncodingException e) {
-                throw new RuntimeException(
-                        "Platforms which do not support UTF-8 are not supported.", e);
+            if (!locking.acquire(callerId, resourceId, ttl.toMillis())) {
+                throw new LockNotAvailableException(resourceId, resource);
             }
+
+            this.autoPinger = autoPingScheduler.scheduleWithFixedDelay(
+                    new PingTask(this),
+                    /* initial delay*/ autoPingInterval.toMillis(),
+                    /* delay */ autoPingInterval.toMillis(),
+                    TimeUnit.MILLISECONDS);
         }
 
         @Override
