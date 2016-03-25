@@ -24,12 +24,13 @@ import org.esbtools.eventhandler.FailedDocumentEvent;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryDocumentEventRepository implements DocumentEventRepository {
-    private final List<DocumentEvent> documentEvents = new ArrayList<>();
-    private final List<DocumentEvent> published = new ArrayList<>();
-    private final List<FailedDocumentEvent> failed = new ArrayList<>();
+    private final List<DocumentEvent> documentEvents = Collections.synchronizedList(new ArrayList<>());
+    private final List<DocumentEvent> published = Collections.synchronizedList(new ArrayList<>());
+    private final List<FailedDocumentEvent> failed = Collections.synchronizedList(new ArrayList<>());
     private boolean failOnAddingDocumentEvents;
     private boolean considerNoTransactionsActive;
 

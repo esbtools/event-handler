@@ -28,9 +28,9 @@ import java.util.Collections;
 import java.util.List;
 
 public class SimpleInMemoryNotificationRepository implements NotificationRepository {
-    private final List<Notification> notifications = new ArrayList<>();
-    private final List<Notification> processed = new ArrayList<>();
-    private final List<FailedNotification> failed = new ArrayList<>();
+    private final List<Notification> notifications = Collections.synchronizedList(new ArrayList<>());
+    private final List<Notification> processed = Collections.synchronizedList(new ArrayList<>());
+    private final List<FailedNotification> failed = Collections.synchronizedList(new ArrayList<>());
     private boolean considerNoTransactionsActive = false;
 
     public void addNotifications(List<? extends Notification> notifications) {
