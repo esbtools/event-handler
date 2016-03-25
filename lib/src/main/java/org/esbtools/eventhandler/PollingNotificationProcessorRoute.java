@@ -68,6 +68,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                     Future<Collection<DocumentEvent>> futureEvents = notification.toDocumentEvents();
                     notificationsToFutureEvents.put(notification, futureEvents);
                 } catch (Exception e) {
+                    log.error("Failed to get future document events for notification: " +
+                            notification, e);
                     notificationsToFutureEvents.put(notification, Futures.immediateFailedFuture(e));
                 }
             }
@@ -84,6 +86,8 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 try {
                     notificationsToDocumentEvents.put(notification, futureEvents.get());
                 } catch (ExecutionException | InterruptedException e) {
+                    log.error("Failed to get future document events for notification: " +
+                            notification, e);
                     failedNotifications.add(new FailedNotification(notification, e));
                 }
             }
