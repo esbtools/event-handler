@@ -25,17 +25,18 @@ import io.github.alechenninger.lightblue.Description;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.Required;
+import io.github.alechenninger.lightblue.Transient;
 import io.github.alechenninger.lightblue.Version;
 
 import java.time.Duration;
 import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
-@Version(value = EventHandlerConfigEntity.ENTITY_VERSION, changelog = "Simple, string value only")
+@Version(value = EventHandlerConfigEntity.ENTITY_VERSION, changelog = "Initial domain-specific config")
 public class EventHandlerConfigEntity implements LightblueNotificationRepositoryConfig,
         LightblueDocumentEventRepositoryConfig {
     public static final String ENTITY_NAME = "eventHandlerConfig";
-    public static final String ENTITY_VERSION = "1.0.0";
+    public static final String ENTITY_VERSION = "0.0.1-SNAPSHOT";
 
     private String domain;
     private Set<String> canonicalTypesToProcess;
@@ -90,8 +91,13 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     }
 
     @Override
+    @Transient
     public Duration getDocumentEventProcessingTimeout() {
         return Duration.ofSeconds(documentEventProcessingTimeoutSeconds);
+    }
+
+    public Integer getDocumentEventProcessingTimeoutSeconds() {
+        return documentEventProcessingTimeoutSeconds;
     }
 
     @Description("How long can a document event remain processing before we allow it to be " +
@@ -102,8 +108,13 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     }
 
     @Override
+    @Transient
     public Duration getDocumentEventExpireThreshold() {
         return Duration.ofSeconds(documentEventExpireThresholdSeconds);
+    }
+
+    public Integer getDocumentEventExpireThresholdSeconds() {
+        return documentEventExpireThresholdSeconds;
     }
 
     @Description("How long before a document event is available for retrieval do we drop the " +
@@ -132,8 +143,13 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     }
 
     @Override
+    @Transient
     public Duration getNotificationProcessingTimeout() {
         return Duration.ofSeconds(notificationProcessingTimeoutSeconds);
+    }
+
+    public Integer getNotificationProcessingTimeoutSeconds() {
+        return notificationProcessingTimeoutSeconds;
     }
 
     @Description("How long can a notification remain processing before we allow it to be " +
@@ -143,8 +159,13 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     }
 
     @Override
+    @Transient
     public Duration getNotificationExpireThreshold() {
         return Duration.ofSeconds(notificationExpireThresholdSeconds);
+    }
+
+    public Integer getNotificationExpireThresholdSeconds() {
+        return notificationExpireThresholdSeconds;
     }
 
     @Description("How long before a notification is available for retrieval do we drop the event " +
