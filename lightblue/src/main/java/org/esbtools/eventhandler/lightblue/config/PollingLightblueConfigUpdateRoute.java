@@ -26,6 +26,7 @@ import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Updates configuration from stored values in a lightblue instance.
@@ -38,6 +39,9 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
     private final MutableLightblueDocumentEventRepositoryConfig documentEventRepositoryConfig;
 
     private final DataFindRequest findConfig;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private final int id = idCounter.getAndIncrement();
 
     /**
      * @param configDomain See {@link EventHandlerConfigEntity#setDomain(String)}}. This is whatever
@@ -62,7 +66,7 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("timer:pollForNotifications?period=" + pollingInterval.toMillis())
+        from("timer:pollForEventHandlerConfigUpdates" + id + "?period=" + pollingInterval.toMillis())
         .routeId("lightblue-repository-config-update")
         .process(exchange -> {
             EventHandlerConfigEntity storedConfig =
