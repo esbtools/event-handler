@@ -93,7 +93,9 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     @Override
     @Transient
     public Duration getDocumentEventProcessingTimeout() {
-        return Duration.ofSeconds(documentEventProcessingTimeoutSeconds);
+        return documentEventProcessingTimeoutSeconds == null
+                ? null
+                : Duration.ofSeconds(documentEventProcessingTimeoutSeconds);
     }
 
     public Integer getDocumentEventProcessingTimeoutSeconds() {
@@ -110,7 +112,9 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     @Override
     @Transient
     public Duration getDocumentEventExpireThreshold() {
-        return Duration.ofSeconds(documentEventExpireThresholdSeconds);
+        return documentEventExpireThresholdSeconds == null
+                ? null
+                : Duration.ofSeconds(documentEventExpireThresholdSeconds);
     }
 
     public Integer getDocumentEventExpireThresholdSeconds() {
@@ -145,7 +149,9 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     @Override
     @Transient
     public Duration getNotificationProcessingTimeout() {
-        return Duration.ofSeconds(notificationProcessingTimeoutSeconds);
+        return notificationProcessingTimeoutSeconds == null
+                ? null
+                : Duration.ofSeconds(notificationProcessingTimeoutSeconds);
     }
 
     public Integer getNotificationProcessingTimeoutSeconds() {
@@ -161,7 +167,9 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     @Override
     @Transient
     public Duration getNotificationExpireThreshold() {
-        return Duration.ofSeconds(notificationExpireThresholdSeconds);
+        return notificationExpireThresholdSeconds == null
+                ? null
+                : Duration.ofSeconds(notificationExpireThresholdSeconds);
     }
 
     public Integer getNotificationExpireThresholdSeconds() {
