@@ -54,6 +54,7 @@
                 <version>${version.exec-maven-plugin}</version>
                 <executions>
                     <execution>
+                        <id>generate-lightblue-entity-metadata</id>
                         <phase>process-classes</phase>
                         <goals>
                             <goal>java</goal>
