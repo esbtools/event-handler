@@ -67,7 +67,7 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from("timer:pollForEventHandlerConfigUpdates" + id + "?period=" + pollingInterval.toMillis())
-        .routeId("lightblue-repository-config-update")
+        .routeId("lightblue-repository-config-update-" + id)
         .process(exchange -> {
             EventHandlerConfigEntity storedConfig =
                     lightblue.data(findConfig, EventHandlerConfigEntity.class);
