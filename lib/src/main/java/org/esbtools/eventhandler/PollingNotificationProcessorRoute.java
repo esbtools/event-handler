@@ -84,7 +84,13 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 Future<Collection<DocumentEvent>> futureEvents =
                         notificationToFutureEvents.getValue();
                 try {
-                    notificationsToDocumentEvents.put(notification, futureEvents.get());
+                    Collection<DocumentEvent> events = futureEvents.get();
+
+                    if (events.isEmpty()) {
+                        log.debug("Notification produced empty events collection: {}", notification);
+                    }
+
+                    notificationsToDocumentEvents.put(notification, events);
                 } catch (ExecutionException | InterruptedException e) {
                     log.error("Failed to get future document events for notification: " +
                             notification, e);
