@@ -113,9 +113,9 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
     private static class ProcessingMessage {
         final Object originalMessage;
         final Message parsedMessage;
-        final Future<?> future;
+        final Future<Void> future;
 
-        ProcessingMessage(Object originalMessage, Message parsedMessage, Future<?> future) {
+        ProcessingMessage(Object originalMessage, Message parsedMessage, Future<Void> future) {
             this.originalMessage = originalMessage;
             this.parsedMessage = parsedMessage;
             this.future = future;
