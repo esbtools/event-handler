@@ -56,7 +56,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from("timer:pollForDocumentEvents" + id + "?period=" + pollingInterval.toMillis())
-        .routeId("documentEventsProcessor-" + id)
+        .routeId("documentEventProcessor-" + id)
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);

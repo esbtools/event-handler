@@ -38,7 +38,7 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
     private final MessageFactory messageFactory;
 
     private final int idCount = idCounter.getAndIncrement();
-    private final String routeId = "async-message-repository-" + idCount;
+    private final String routeId = "messageProcessor-" + idCount;
 
     private static final AtomicInteger idCounter = new AtomicInteger(0);
 
