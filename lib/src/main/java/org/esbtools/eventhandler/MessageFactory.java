@@ -19,5 +19,5 @@
 package org.esbtools.eventhandler;
 
 public interface MessageFactory {
-    Message getMessageForBody(Object body);
+    Message getMessageForBody(Object body) throws Exception;
 }
