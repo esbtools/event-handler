@@ -22,6 +22,7 @@ import com.google.common.truth.Truth;
 import com.google.common.util.concurrent.Futures;
 import com.jayway.awaitility.Awaitility;
 import org.apache.camel.EndpointInject;
+import org.apache.camel.InvalidPayloadException;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
@@ -34,12 +35,14 @@ import org.junit.runners.JUnit4;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
 public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
@@ -131,7 +134,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test
-    public void shouldWrapFailuresAndSendToFailureUri() {
+    public void shouldWrapFailuresAndSendToFailureUriAsCollection() throws InvalidPayloadException {
         toFailures.expectedMessageCount(1);
 
         Exception exception = new Exception("Simulated failure");
@@ -142,7 +145,12 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
 
         toFailures.expectedMessageCount(1);
 
-        Object failure = toFailures.getExchanges().get(0).getIn().getBody();
+        Collection<?> failures = toFailures.getExchanges().get(0).getIn()
+                .getMandatoryBody(Collection.class);
+
+        Truth.assertThat(failures).named("failed messages").hasSize(1);
+
+        Object failure = failures.iterator().next();
 
         Truth.assertThat(failure).named("message sent to failure endpoint")
                 .isInstanceOf(FailedMessage.class);
@@ -156,7 +164,8 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test
-    public void shouldCatchMessageFactoryFailures() throws InterruptedException {
+    public void shouldCatchMessageFactoryFailures() throws InterruptedException,
+            InvalidPayloadException {
         toFailures.expectedMessageCount(1);
 
         RuntimeException exception = new RuntimeException("Simulated runtime exception while parsing message");
@@ -166,7 +175,12 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
 
         toFailures.assertIsSatisfied();
 
-        Object failure = toFailures.getExchanges().get(0).getIn().getBody();
+        Collection<?> failures = toFailures.getExchanges().get(0).getIn()
+                .getMandatoryBody(Collection.class);
+
+        Truth.assertThat(failures).named("failed messages").hasSize(1);
+
+        Object failure = failures.iterator().next();
 
         Truth.assertThat(failure).named("message sent to failure endpoint")
                 .isInstanceOf(FailedMessage.class);
@@ -194,14 +208,20 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test(timeout = 1000L)
-    public void shouldWrapTimeoutsInRecoverableExceptionsAndSendToFailuresUri() throws InterruptedException {
+    public void shouldWrapTimeoutsInRecoverableExceptionsAndSendToFailuresUri()
+            throws InterruptedException, InvalidPayloadException {
         toFailures.expectedMessageCount(1);
 
         toShortTimeout.sendBody(Arrays.asList(Duration.ofSeconds(5)));
 
         toFailures.assertIsSatisfied();
 
-        Object failure = toFailures.getExchanges().get(0).getIn().getBody();
+        Collection<?> failures = toFailures.getExchanges().get(0).getIn()
+                .getMandatoryBody(Collection.class);
+
+        Truth.assertThat(failures).named("failed messages").hasSize(1);
+
+        Object failure = failures.iterator().next();
 
         Truth.assertThat(failure).named("message sent to failure endpoint")
                 .isInstanceOf(FailedMessage.class);
@@ -211,6 +231,30 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         Truth.assertThat(failedMessage.parsedMessage().get()).isInstanceOf(TimeConsumingMessage.class);
         Truth.assertThat(failedMessage.originalMessage()).isEqualTo(Duration.ofSeconds(5));
         Truth.assertThat(failedMessage.exception()).isInstanceOf(RecoverableException.class);
+    }
+
+    @Test(timeout = 1000L)
+    public void shouldSendAllFailuresInBatchToFailureUriInSameCollection() throws InterruptedException {
+        toFailures.expectedMessageCount(1);
+
+        Exception exception1 = new Exception("Simulated failure 1");
+        Exception exception2 = new Exception("Simulated failure 2");
+        Exception exception3 = new Exception("Simulated failure 3");
+        List<Exception> messages = Arrays.asList(exception1, exception2, exception3);
+
+        // Our message factory treats incoming exceptions as failing messages.
+        toIncoming.sendBody(messages);
+
+        toFailures.expectedMessageCount(1);
+
+        Collection<?> failures = toFailures.getExchanges().get(0).getIn().getBody(Collection.class);
+
+        Truth.assertThat(failures).named("failed messages").hasSize(3);
+        Truth.assertThat(failures.stream()
+                .map(FailedMessage.class::cast)
+                .map(FailedMessage::exception)
+                .collect(Collectors.toList()))
+                .containsExactly(exception1, exception2, exception3);
     }
 
     static class FailingMessage implements Message {

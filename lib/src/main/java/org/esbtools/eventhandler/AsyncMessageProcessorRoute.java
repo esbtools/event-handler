@@ -42,6 +42,17 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
 
     private static final AtomicInteger idCounter = new AtomicInteger(0);
 
+    /**
+     * @param fromUri Endpoint to consume from, expected to create exchanges with bodies instances
+     *                of {@link Collection}.
+     * @param failureUri Endpoint where failures will be sent to as a {@code Collection} of
+     *                   {@link FailedMessage}s.
+     * @param processTimeout How to long to wait for a message process before timing out? Time outs
+     *                       are considered {@link FailedMessage#isRecoverable() recoverable
+     *                       failures}.
+     * @param messageFactory Accepts each element in the exchange body {@code Collection} and
+     *                       parses them to create message implementations which will be processed.
+     */
     public AsyncMessageProcessorRoute(String fromUri, String failureUri, Duration processTimeout,
             MessageFactory messageFactory) {
         this.fromUri = Objects.requireNonNull(fromUri, "fromUri");
@@ -105,7 +116,6 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
             // Deal with failures...
             exchange.getIn().setBody(failures);
         })
-        .split(body())
         .to(failureUri);
     }
 
