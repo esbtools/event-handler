@@ -50,6 +50,12 @@ public final class FailedMessage {
         return exception;
     }
 
+    /**
+     * A recoverable failure is one that is entirely transient: the message should be retried as it
+     * will likely work.
+     *
+     * <p>Examples would be failures due to transient networking problems or unavailable locks.
+     */
     public boolean isRecoverable() {
         return exception instanceof RecoverableException;
     }
