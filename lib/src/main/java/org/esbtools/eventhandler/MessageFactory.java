@@ -19,5 +19,9 @@
 package org.esbtools.eventhandler;
 
 public interface MessageFactory {
+    // TODO(ahenning): This should probably either be an InputStream or a parameterized type of input
+    // I think generic type is probably best: the input is a function of what natively gets sent to
+    // the message processor route, which is entirely up to the developer. She also chooses what
+    // message factory to use, and so those types should align. Generics communicate this naturally.
     Message getMessageForBody(Object body) throws Exception;
 }
