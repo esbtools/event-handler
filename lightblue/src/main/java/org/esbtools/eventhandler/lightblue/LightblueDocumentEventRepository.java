@@ -415,7 +415,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         break;
                     }
                 } catch (Exception e) {
-                    logger.error("Failed to parse event entity: {}. Exception was: {}", eventEntity, e);
+                    if (logger.isErrorEnabled()) {
+                        logger.error("Failed to parse event entity: " + eventEntity, e);
+                    }
                 }
             }
 
