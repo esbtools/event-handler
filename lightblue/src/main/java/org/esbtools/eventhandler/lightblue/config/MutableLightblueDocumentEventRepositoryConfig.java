@@ -30,7 +30,7 @@ import java.util.Set;
 
 @ThreadSafe
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
-    private Collection<String> canonicalTypesToProcess = Collections.emptySet();
+    private Set<String> canonicalTypesToProcess = Collections.emptySet();
     private int documentEventsBatchSize = 0;
     private Duration processingTimeout = Duration.ofMinutes(10);
     private Duration expireThreshold = Duration.ofMinutes(2);
@@ -52,7 +52,8 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
             Collection<String> initialCanonicalTypesToProcess,
             int initialDocumentEventsBatchSize, Duration processingTimeout,
             Duration expireThreshold) {
-        this.canonicalTypesToProcess = Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess");
+        this.canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(
+                Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess")));
         this.documentEventsBatchSize = Objects.requireNonNull(initialDocumentEventsBatchSize, "initialDocumentEventsBatchSize");
         this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
         this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
@@ -64,12 +65,12 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
      */
     @Override
     public Set<String> getCanonicalTypesToProcess() {
-        return new HashSet<>(canonicalTypesToProcess);
+        return canonicalTypesToProcess;
     }
 
     public MutableLightblueDocumentEventRepositoryConfig setCanonicalTypesToProcess(
             Collection<String> types) {
-        canonicalTypesToProcess = types;
+        canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(types));
         return this;
     }
 
