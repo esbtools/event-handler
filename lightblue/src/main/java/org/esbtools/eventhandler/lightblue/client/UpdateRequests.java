@@ -76,14 +76,14 @@ public abstract class UpdateRequests {
 
     /** "Status" here means status and corresponding date(s) to go along with it. */
     public static DataUpdateRequest notificationStatusIfCurrent(NotificationEntity entity,
-            @Nullable Date originalProcessingTime) {
+            @Nullable Date originalProcessingDate) {
         DataUpdateRequest request = new DataUpdateRequest(
                 NotificationEntity.ENTITY_NAME,
                 NotificationEntity.ENTITY_VERSION);
 
         request.where(Query.and(
                 Query.withValue("_id", BinOp.eq, entity.get_id()),
-                Query.withValue("processingDate", BinOp.eq, originalProcessingTime)
+                Query.withValue("processingDate", BinOp.eq, originalProcessingDate)
         ));
 
         List<Update> setStatusAndDates = new ArrayList<>(3);
@@ -137,7 +137,7 @@ public abstract class UpdateRequests {
 
     /** "Status" here means status and corresponding date(s) to go along with it. */
     public static DataUpdateRequest documentEventStatusIfCurrent(DocumentEventEntity entity,
-            @Nullable ZonedDateTime originalProcessingTime) {
+            @Nullable ZonedDateTime originalProcessingDate) {
         DataUpdateRequest request = new DataUpdateRequest(
                 DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
@@ -149,10 +149,10 @@ public abstract class UpdateRequests {
 
         idStatusAndDateMatch.add(Query.withValue("_id", BinOp.eq, entity.get_id()));
 
-        if (originalProcessingTime != null) {
+        if (originalProcessingDate != null) {
             idStatusAndDateMatch.add(Query.withValue(
                     "processingDate", BinOp.eq,
-                    Date.from(originalProcessingTime.toInstant())));
+                    Date.from(originalProcessingDate.toInstant())));
             idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.processing.toString()));
         } else {
             idStatusAndDateMatch.add(Query.withValue("processingDate", BinOp.eq, Literal.value(null)));
