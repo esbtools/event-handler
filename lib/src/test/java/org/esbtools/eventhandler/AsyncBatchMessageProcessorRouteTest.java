@@ -42,6 +42,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
@@ -214,7 +215,7 @@ public class AsyncBatchMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test(timeout = 1000L)
-    public void shouldWrapTimeoutsInRecoverableExceptionsAndSendToFailuresUri()
+    public void shouldSendTimeoutsToFailureUri()
             throws InterruptedException, InvalidPayloadException {
         toFailures.expectedMessageCount(1);
 
@@ -236,7 +237,7 @@ public class AsyncBatchMessageProcessorRouteTest extends CamelTestSupport {
 
         Truth.assertThat(failedMessage.parsedMessage().get()).isInstanceOf(TimeConsumingMessage.class);
         Truth.assertThat(failedMessage.originalMessage()).isEqualTo(Duration.ofSeconds(5));
-        Truth.assertThat(failedMessage.exception()).isInstanceOf(RecoverableException.class);
+        Truth.assertThat(failedMessage.exception()).isInstanceOf(TimeoutException.class);
     }
 
     @Test(timeout = 1000L)

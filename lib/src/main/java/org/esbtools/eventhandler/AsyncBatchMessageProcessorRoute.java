@@ -48,9 +48,7 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
      *                {@code messageFactory} to parse them into {@link Message}s.
      * @param failureUri Endpoint where failures will be sent to as a {@code Collection} of
      *                   {@link FailedMessage}s.
-     * @param processTimeout How to long to wait for a message process before timing out? Time outs
-     *                       are considered {@link FailedMessage#isRecoverable() recoverable
-     *                       failures}.
+     * @param processTimeout How to long to wait for a message process before timing out?
      * @param messageFactory Accepts each element in the exchange body {@code Collection} and
      *                       parses them to create message implementations which will be processed.
      */
@@ -122,10 +120,8 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
                     failures.add(failure);
                 } catch (InterruptedException | TimeoutException e) {
                     log.warn("Timed out processing message: " + processingMsg.parsedMessage, e);
-                    // TODO(ahenning): Consider removing recoverable exception thing
-                    RecoverableException recoverableException = new RecoverableException(e);
-                    FailedMessage failure = new FailedMessage(processingMsg.originalMessage,
-                            processingMsg.parsedMessage, recoverableException);
+                    FailedMessage failure = new FailedMessage(
+                            processingMsg.originalMessage, processingMsg.parsedMessage, e);
                     failures.add(failure);
                 }
             }

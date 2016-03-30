@@ -141,12 +141,8 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                                     "): " + parsedMessage, e);
 
                             suppressPreviousFailureInNewException(originalFailure, e);
-
-                            // TODO(ahenning): Consider removing recoverable exception thing
-                            RecoverableException recoverableException = new RecoverableException(e);
-
-                            FailedMessage failure = new FailedMessage(originalFailure.originalMessage(),
-                                    parsedMessage, recoverableException);
+                            FailedMessage failure = new FailedMessage(
+                                    originalFailure.originalMessage(), parsedMessage, e);
                             newFailures.add(failure);
                         }
                     }
