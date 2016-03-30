@@ -45,7 +45,7 @@ import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
-public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
+public class AsyncBatchMessageProcessorRouteTest extends CamelTestSupport {
     List<Object> persistence = new ArrayList<>();
 
     MessageFactory messageFactory = new ByTypeMessageFactory(persistence);
@@ -111,9 +111,9 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     @Override
     protected RouteBuilder[] createRouteBuilders() throws Exception {
         return new RouteBuilder[]{
-                new AsyncMessageProcessorRoute("direct:incoming", "mock:failures",
+                new AsyncBatchMessageProcessorRoute("direct:incoming", "mock:failures",
                         Duration.ofMinutes(1), messageFactory),
-                new AsyncMessageProcessorRoute("direct:short_timeout", "mock:failures",
+                new AsyncBatchMessageProcessorRoute("direct:short_timeout", "mock:failures",
                         Duration.ofMillis(1), messageFactory)
         };
     }
