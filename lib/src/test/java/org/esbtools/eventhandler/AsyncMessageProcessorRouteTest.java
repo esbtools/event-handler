@@ -61,11 +61,12 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
 
     /**
      * Demonstrates the kind of message parsing behavior a real factory might do by creating one of
-     * three types of messages based on the provided object:
+     * four types of messages based on the provided object:
      *
      * <ul>
-     *     <li>{@link FailingMessage} when the object is an Exception</li>
+     *     <li>{@link FutureFailingMessage} when the object is an Exception</li>
      *     <li>{@link TimeConsumingMessage} when the object is a {@link Duration}</li>
+     *     <li>{@link ImmediatelyFailingMessage} when the body is a {@link ImmediateMessageProcessFailure}</li>
      *     <li>In all other cases, creates a {@link TracingPersistingMessage} which persists when
      *     message processing starts and ends with the provided object as the final result.</li>
      * </ul>
@@ -83,7 +84,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         @Override
         public Message getMessageForBody(Object body) {
             if (body instanceof Exception) {
-                return new FailingMessage((Exception) body);
+                return new FutureFailingMessage((Exception) body);
             }
 
             if (body instanceof Duration) {
@@ -92,6 +93,10 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
 
             if (body instanceof SimulatedMessageFactoryFailure) {
                 throw ((SimulatedMessageFactoryFailure) body).exception;
+            }
+
+            if (body instanceof ImmediateMessageProcessFailure) {
+                return new ImmediatelyFailingMessage(((ImmediateMessageProcessFailure) body).exception);
             }
 
             return new TracingPersistingMessage(body, persistence);
@@ -134,7 +139,8 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test
-    public void shouldWrapFailuresAndSendToFailureUriAsCollection() throws InvalidPayloadException {
+    public void shouldWrapFailuresAndSendToFailureUriAsCollection() throws InvalidPayloadException,
+            InterruptedException {
         toFailures.expectedMessageCount(1);
 
         Exception exception = new Exception("Simulated failure");
@@ -143,7 +149,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         // Our message factory treats incoming exceptions as failing messages.
         toIncoming.sendBody(messages);
 
-        toFailures.expectedMessageCount(1);
+        toFailures.assertIsSatisfied();
 
         Collection<?> failures = toFailures.getExchanges().get(0).getIn()
                 .getMandatoryBody(Collection.class);
@@ -158,7 +164,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         FailedMessage failedMessage = (FailedMessage) failure;
 
         Truth.assertThat(failedMessage.parsedMessage().get())
-                .isEqualTo(new FailingMessage(exception));
+                .isEqualTo(new FutureFailingMessage(exception));
         Truth.assertThat(failedMessage.originalMessage()).isEqualTo(exception);
         Truth.assertThat(failedMessage.exception()).isEqualTo(exception);
     }
@@ -245,7 +251,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         // Our message factory treats incoming exceptions as failing messages.
         toIncoming.sendBody(messages);
 
-        toFailures.expectedMessageCount(1);
+        toFailures.assertIsSatisfied();
 
         Collection<?> failures = toFailures.getExchanges().get(0).getIn().getBody(Collection.class);
 
@@ -257,10 +263,40 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
                 .containsExactly(exception1, exception2, exception3);
     }
 
-    static class FailingMessage implements Message {
+    @Test(timeout = 1000L)
+    public void shouldCatchFailuresWhenGettingMessageFuturesRetainingParsedMessage()
+            throws Exception {
+        toFailures.expectedMessageCount(1);
+
+        RuntimeException exception = new RuntimeException("Simulated failure");
+        ImmediateMessageProcessFailure originalMessage = new ImmediateMessageProcessFailure(
+                exception);
+
+        toIncoming.sendBody(Arrays.asList(originalMessage));
+
+        toFailures.assertIsSatisfied();
+
+        Collection<?> failures = toFailures.getExchanges().get(0).getIn()
+                .getMandatoryBody(Collection.class);
+
+        Truth.assertThat(failures).named("failed messages").hasSize(1);
+
+        Object failure = failures.iterator().next();
+
+        Truth.assertThat(failure).named("message sent to failure endpoint")
+                .isInstanceOf(FailedMessage.class);
+
+        FailedMessage failedMessage = (FailedMessage) failure;
+
+        Truth.assertThat(failedMessage.parsedMessage().get()).isInstanceOf(ImmediatelyFailingMessage.class);
+        Truth.assertThat(failedMessage.originalMessage()).isEqualTo(originalMessage);
+        Truth.assertThat(failedMessage.exception()).isEqualTo(exception);
+    }
+
+    static class FutureFailingMessage implements Message {
         private final Exception exception;
 
-        FailingMessage(Exception exception) {
+        FutureFailingMessage(Exception exception) {
             this.exception = exception;
         }
 
@@ -280,13 +316,46 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            FailingMessage that = (FailingMessage) o;
+            FutureFailingMessage that = (FutureFailingMessage) o;
             return Objects.equals(exception, that.exception);
         }
 
         @Override
         public int hashCode() {
             return Objects.hash(exception);
+        }
+    }
+
+    static class ImmediatelyFailingMessage implements Message {
+        private final RuntimeException exception;
+
+        ImmediatelyFailingMessage(RuntimeException exception) {
+            this.exception = exception;
+        }
+
+        @Override
+        public Future<Void> process() {
+            throw exception;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ImmediatelyFailingMessage that = (ImmediatelyFailingMessage) o;
+            return Objects.equals(exception, that.exception);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(exception);
+        }
+
+        @Override
+        public String toString() {
+            return "ImmediatelyFailingMessage{" +
+                    "exception=" + exception +
+                    '}';
         }
     }
 
@@ -354,10 +423,18 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
         }
     }
 
+    static class ImmediateMessageProcessFailure {
+        private final RuntimeException exception;
+
+        ImmediateMessageProcessFailure(RuntimeException exception) {
+            this.exception = exception;
+        }
+    }
+
     static class SimulatedMessageFactoryFailure {
         private final RuntimeException exception;
 
-        public SimulatedMessageFactoryFailure(RuntimeException exception) {
+        SimulatedMessageFactoryFailure(RuntimeException exception) {
             this.exception = exception;
         }
     }

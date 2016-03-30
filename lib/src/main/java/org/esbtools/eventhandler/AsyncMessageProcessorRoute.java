@@ -44,7 +44,8 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
 
     /**
      * @param fromUri Endpoint to consume from, expected to create exchanges with bodies instances
-     *                of {@link Collection}.
+     *                of {@link Collection}. The elements of this collection will be provided to
+     *                {@code messageFactory} to parse them into {@link Message}s.
      * @param failureUri Endpoint where failures will be sent to as a {@code Collection} of
      *                   {@link FailedMessage}s.
      * @param processTimeout How to long to wait for a message process before timing out? Time outs
@@ -60,6 +61,8 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
         this.processTimeout = Objects.requireNonNull(processTimeout, "processTimeout");
         this.messageFactory = Objects.requireNonNull(messageFactory, "messageFactory");
     }
+
+    // TODO(ahenning): Consider parameterizing multiple from URIs instead of one
 
     @Override
     public void configure() throws Exception {
@@ -82,17 +85,32 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
 
             // Start processing all of the messages in the batch in parallel.
             for (Object message : messages) {
+                final Message parsedMessage;
+
                 try {
-                    Message parsedMessage = messageFactory.getMessageForBody(message);
-                    Future<Void> processingFuture = parsedMessage.process();
-                    ProcessingMessage processing = new ProcessingMessage(
-                            message, parsedMessage, processingFuture);
-                    processingMessages.add(processing);
-                    log.debug("Processing on route {}: {}", routeId, parsedMessage);
+                    parsedMessage = messageFactory.getMessageForBody(message);
                 } catch (Exception e) {
                     log.error("Failure parsing message. Body was: " + message, e);
                     failures.add(new FailedMessage(message, e));
+                    continue;
                 }
+
+                final Future<Void> processingFuture;
+
+                try {
+                    processingFuture = parsedMessage.process();
+                } catch (Exception e) {
+                    log.error("Failed to processing message: " + parsedMessage, e);
+                    FailedMessage failure = new FailedMessage(message, parsedMessage, e);
+                    failures.add(failure);
+                    continue;
+                }
+
+                ProcessingMessage processing = new ProcessingMessage(
+                        message, parsedMessage, processingFuture);
+                processingMessages.add(processing);
+
+                log.debug("Processing on route {}: {}", routeId, parsedMessage);
             }
 
             // Wait for processing to complete.
