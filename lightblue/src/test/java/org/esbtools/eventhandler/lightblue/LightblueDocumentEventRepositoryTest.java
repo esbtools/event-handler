@@ -123,7 +123,7 @@ public class LightblueDocumentEventRepositoryTest {
     public void shouldRetrieveDocumentEventsForSpecifiedEntities() throws Exception {
         DocumentEventEntity stringEvent = newStringDocumentEventEntity("foo");
 
-        DocumentEventEntity otherEvent = DocumentEventEntity.newlyCreated("Other", 50,
+        DocumentEventEntity otherEvent = DocumentEventEntity.newlyCreated(null, "Other", 50,
                 ZonedDateTime.now(fixedClock), new DocumentEventEntity.KeyAndValue("value", "foo"));
 
         insertDocumentEventEntities(stringEvent, otherEvent);
