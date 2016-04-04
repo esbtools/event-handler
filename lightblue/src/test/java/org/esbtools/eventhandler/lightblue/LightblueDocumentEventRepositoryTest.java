@@ -55,7 +55,6 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -488,8 +487,8 @@ public class LightblueDocumentEventRepositoryTest {
     @Test
     public void shouldAddNewDocumentEventsEntitiesAsUnprocessedAndShouldNotUpdateExistingEventsWithIds()
             throws LightblueException {
-        StringDocumentEvent event1 = new StringDocumentEvent("1", fixedClock);
-        MultiStringDocumentEvent event2 = new MultiStringDocumentEvent(Arrays.asList("2"), fixedClock);
+        StringDocumentEvent event1 = new StringDocumentEvent(null, "1", fixedClock);
+        MultiStringDocumentEvent event2 = new MultiStringDocumentEvent(null, Arrays.asList("2"), fixedClock);
 
         List<LightblueDocumentEvent> events = new ArrayList<>();
         events.add(event1);
@@ -524,8 +523,8 @@ public class LightblueDocumentEventRepositoryTest {
     public void shouldUpdateProcessedEntitiesWithStatusAndDatePostPublishing() throws LightblueException {
         Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
 
-        StringDocumentEvent event1 = new StringDocumentEvent("1", creationTimeClock);
-        StringDocumentEvent event2 = new StringDocumentEvent("2", creationTimeClock);
+        StringDocumentEvent event1 = new StringDocumentEvent(null, "1", creationTimeClock);
+        StringDocumentEvent event2 = new StringDocumentEvent(null, "2", creationTimeClock);
         DocumentEventEntity entity1 = event1.wrappedDocumentEventEntity();
         DocumentEventEntity entity2 = event2.wrappedDocumentEventEntity();
         entity1.set_id("1");
@@ -709,20 +708,20 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     private DocumentEventEntity newMultiStringDocumentEventEntity(String... values) {
-        return new MultiStringDocumentEvent(Arrays.asList(values), fixedClock)
+        return new MultiStringDocumentEvent(null, Arrays.asList(values), fixedClock)
                 .wrappedDocumentEventEntity();
     }
 
     private DocumentEventEntity newStringDocumentEventEntity(String value) {
-        return new StringDocumentEvent(value, fixedClock).wrappedDocumentEventEntity();
+        return new StringDocumentEvent(null, value, fixedClock).wrappedDocumentEventEntity();
     }
 
     private DocumentEventEntity newStringDocumentEventEntity(String value, Clock clock) {
-        return new StringDocumentEvent(value, clock).wrappedDocumentEventEntity();
+        return new StringDocumentEvent(null, value, clock).wrappedDocumentEventEntity();
     }
 
     private DocumentEventEntity newRandomStringDocumentEventEntityWithPriorityOverride(int priority) {
-        DocumentEventEntity entity = new StringDocumentEvent(UUID.randomUUID().toString(), fixedClock)
+        DocumentEventEntity entity = new StringDocumentEvent(null, UUID.randomUUID().toString(), fixedClock)
                 .wrappedDocumentEventEntity();
         entity.setPriority(priority);
         return entity;
@@ -735,7 +734,7 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     private LightblueDocumentEvent newDocumentEventThatStartedProcessingAt(Instant processingDate) {
-        LightblueDocumentEvent event = new StringDocumentEvent("processing", fixedClock);
+        LightblueDocumentEvent event = new StringDocumentEvent(null, "processing", fixedClock);
         DocumentEventEntity expiredEntity = event.wrappedDocumentEventEntity();
         expiredEntity.setStatus(DocumentEventEntity.Status.processing);
         expiredEntity.setProcessingDate(ZonedDateTime.ofInstant(processingDate, fixedClock.getZone()));

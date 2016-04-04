@@ -18,21 +18,22 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
-import com.google.common.base.Joiner;
-import com.google.common.util.concurrent.Futures;
 import org.esbtools.eventhandler.DocumentEvent;
+import org.esbtools.eventhandler.lightblue.DocumentEventEntity;
+import org.esbtools.eventhandler.lightblue.DocumentEventEntity.KeyAndValue;
 import org.esbtools.eventhandler.lightblue.Identity;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEvent;
 import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
-import org.esbtools.eventhandler.lightblue.DocumentEventEntity;
 
+import com.google.common.base.Joiner;
+import com.google.common.util.concurrent.Futures;
+
+import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Future;
@@ -50,12 +51,14 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
     private final DocumentEventEntity wrappedEntity;
     private final Clock clock;
 
-    public MultiStringDocumentEvent(Collection<String> values, Clock clock) {
+    public MultiStringDocumentEvent(@Nullable String sourceNotificationId,
+            Collection<String> values, Clock clock) {
         this.values = new HashSet<>(values);
         this.clock = clock;
 
         creationDate = ZonedDateTime.now(clock);
-        wrappedEntity = toNewDocumentEventEntity();
+        wrappedEntity = DocumentEventEntity.newlyCreated(sourceNotificationId, "MultiString", 50,
+                creationDate, new KeyAndValue("values", Joiner.on('|').join(this.values)));
     }
 
     public Set<String> values() {
@@ -77,17 +80,6 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
     @Override
     public DocumentEventEntity wrappedDocumentEventEntity() {
         return wrappedEntity;
-    }
-
-    public DocumentEventEntity toNewDocumentEventEntity() {
-        DocumentEventEntity entity = new DocumentEventEntity();
-        entity.setCanonicalType("MultiString");
-        entity.setParameters(Arrays.asList(
-                new DocumentEventEntity.KeyAndValue("values", Joiner.on('|').join(values))));
-        entity.setStatus(DocumentEventEntity.Status.unprocessed);
-        entity.setCreationDate(creationDate);
-        entity.setPriority(50);
-        return entity;
     }
 
     @Override
@@ -135,7 +127,7 @@ public class MultiStringDocumentEvent implements LightblueDocumentEvent {
         mergedValues.addAll(other.values);
         mergedValues.addAll(this.values);
 
-        return new MultiStringDocumentEvent(mergedValues, clock);
+        return new MultiStringDocumentEvent(null, mergedValues, clock);
     }
 
     @Override
