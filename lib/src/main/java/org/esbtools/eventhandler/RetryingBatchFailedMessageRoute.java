@@ -43,8 +43,8 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
     private final Duration processTimeout;
     private final String deadLetterUri;
 
-    private static final String NEXT_RETRY_ATTEMPT_NUMBER_PROPERTY = "eventHandlerFailedMessageNextRetryAttemptNumber";
-    private static final Integer FIRST_RETRY_ATTEMPT_NUMBER = 1;
+    private static final String NEXT_ATTEMPT_NUMBER_PROPERTY = "nextAttemptNumber";
+    private static final Integer FIRST_ATTEMPT_NUMBER = 1;
 
     public RetryingBatchFailedMessageRoute(String fromUri, Expression retryDelayMillis,
             int maxRetryCount, Duration processTimeout, String deadLetterUri) {
@@ -69,10 +69,10 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                 // See: https://issues.apache.org/jira/browse/CAMEL-2654
                 .process(exchange -> {
                     Integer retryAttempt = Optional.ofNullable(
-                            exchange.getProperty(NEXT_RETRY_ATTEMPT_NUMBER_PROPERTY, Integer.class))
-                            .orElse(FIRST_RETRY_ATTEMPT_NUMBER);
+                            exchange.getProperty(NEXT_ATTEMPT_NUMBER_PROPERTY, Integer.class))
+                            .orElse(FIRST_ATTEMPT_NUMBER);
                     // Preemptively increment retry attempt for next loop.
-                    exchange.setProperty(NEXT_RETRY_ATTEMPT_NUMBER_PROPERTY, retryAttempt + 1);
+                    exchange.setProperty(NEXT_ATTEMPT_NUMBER_PROPERTY, retryAttempt + 1);
 
                     Collection oldFailures = exchange.getIn().getMandatoryBody(Collection.class);
 
@@ -180,15 +180,11 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
         return new Predicate() {
             @Override
             public boolean matches(Exchange exchange) {
-                Integer retryAttempt = Optional.ofNullable(
-                        exchange.getProperty(NEXT_RETRY_ATTEMPT_NUMBER_PROPERTY, Integer.class))
-                        .orElse(FIRST_RETRY_ATTEMPT_NUMBER);
+                Integer nextAttemptNumber = Optional.ofNullable(
+                        exchange.getProperty(NEXT_ATTEMPT_NUMBER_PROPERTY, Integer.class))
+                        .orElse(FIRST_ATTEMPT_NUMBER);
 
-                if (retryAttempt - FIRST_RETRY_ATTEMPT_NUMBER >= maxRetryCount) {
-                    return true;
-                }
-
-                return false;
+                return nextAttemptNumber - FIRST_ATTEMPT_NUMBER >= maxRetryCount;
             }
         };
     }
