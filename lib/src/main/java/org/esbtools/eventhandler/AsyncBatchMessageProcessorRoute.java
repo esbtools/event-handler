@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class AsyncMessageProcessorRoute extends RouteBuilder {
+public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
     private final String fromUri;
     private final String failureUri;
     private final Duration processTimeout;
@@ -48,21 +48,17 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
      *                {@code messageFactory} to parse them into {@link Message}s.
      * @param failureUri Endpoint where failures will be sent to as a {@code Collection} of
      *                   {@link FailedMessage}s.
-     * @param processTimeout How to long to wait for a message process before timing out? Time outs
-     *                       are considered {@link FailedMessage#isRecoverable() recoverable
-     *                       failures}.
+     * @param processTimeout How to long to wait for a message process before timing out?
      * @param messageFactory Accepts each element in the exchange body {@code Collection} and
      *                       parses them to create message implementations which will be processed.
      */
-    public AsyncMessageProcessorRoute(String fromUri, String failureUri, Duration processTimeout,
-            MessageFactory messageFactory) {
+    public AsyncBatchMessageProcessorRoute(String fromUri, String failureUri,
+            Duration processTimeout, MessageFactory messageFactory) {
         this.fromUri = Objects.requireNonNull(fromUri, "fromUri");
         this.failureUri = Objects.requireNonNull(failureUri, "failureUri");
         this.processTimeout = Objects.requireNonNull(processTimeout, "processTimeout");
         this.messageFactory = Objects.requireNonNull(messageFactory, "messageFactory");
     }
-
-    // TODO(ahenning): Consider parameterizing multiple from URIs instead of one
 
     @Override
     public void configure() throws Exception {
@@ -78,39 +74,39 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
                         exchangeBody.getClass().getName() + ": " + exchangeBody);
             }
 
-            Collection messages = (Collection) exchangeBody;
+            Collection originalMessages = (Collection) exchangeBody;
 
-            List<ProcessingMessage> processingMessages = new ArrayList<>(messages.size());
+            List<ProcessingMessage> processingMessages = new ArrayList<>(originalMessages.size());
             List<FailedMessage> failures = new ArrayList<>();
 
             // Start processing all of the messages in the batch in parallel.
-            for (Object message : messages) {
-                final Message parsedMessage;
+            for (Object originalMessage : originalMessages) {
+                final Message message;
 
                 try {
-                    parsedMessage = messageFactory.getMessageForBody(message);
+                    message = messageFactory.getMessageForBody(originalMessage);
                 } catch (Exception e) {
-                    log.error("Failure parsing message. Body was: " + message, e);
-                    failures.add(new FailedMessage(message, e));
+                    log.error("Failure parsing message. Body was: " + originalMessage, e);
+                    failures.add(new FailedMessage(originalMessage, e));
                     continue;
                 }
 
                 final Future<Void> processingFuture;
 
                 try {
-                    processingFuture = parsedMessage.process();
+                    processingFuture = message.process();
                 } catch (Exception e) {
-                    log.error("Failed to processing message: " + parsedMessage, e);
-                    FailedMessage failure = new FailedMessage(message, parsedMessage, e);
+                    log.error("Failed to process message: " + message, e);
+                    FailedMessage failure = new FailedMessage(originalMessage, message, e);
                     failures.add(failure);
                     continue;
                 }
 
                 ProcessingMessage processing = new ProcessingMessage(
-                        message, parsedMessage, processingFuture);
+                        originalMessage, message, processingFuture);
                 processingMessages.add(processing);
 
-                log.debug("Processing on route {}: {}", routeId, parsedMessage);
+                log.debug("Processing on route {}: {}", routeId, message);
             }
 
             // Wait for processing to complete.
@@ -124,9 +120,8 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
                     failures.add(failure);
                 } catch (InterruptedException | TimeoutException e) {
                     log.warn("Timed out processing message: " + processingMsg.parsedMessage, e);
-                    RecoverableException recoverableException = new RecoverableException(e);
-                    FailedMessage failure = new FailedMessage(processingMsg.originalMessage,
-                            processingMsg.parsedMessage, recoverableException);
+                    FailedMessage failure = new FailedMessage(
+                            processingMsg.originalMessage, processingMsg.parsedMessage, e);
                     failures.add(failure);
                 }
             }
@@ -137,7 +132,9 @@ public class AsyncMessageProcessorRoute extends RouteBuilder {
         .to(failureUri);
     }
 
-    /** Simple struct for storing a message and its future processing result. */
+    /**
+     * Simple struct for storing a message and its future processing result.
+     */
     private static class ProcessingMessage {
         final Object originalMessage;
         final Message parsedMessage;

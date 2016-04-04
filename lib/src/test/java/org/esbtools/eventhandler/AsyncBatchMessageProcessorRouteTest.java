@@ -42,10 +42,11 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
-public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
+public class AsyncBatchMessageProcessorRouteTest extends CamelTestSupport {
     List<Object> persistence = new ArrayList<>();
 
     MessageFactory messageFactory = new ByTypeMessageFactory(persistence);
@@ -111,9 +112,9 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     @Override
     protected RouteBuilder[] createRouteBuilders() throws Exception {
         return new RouteBuilder[]{
-                new AsyncMessageProcessorRoute("direct:incoming", "mock:failures",
+                new AsyncBatchMessageProcessorRoute("direct:incoming", "mock:failures",
                         Duration.ofMinutes(1), messageFactory),
-                new AsyncMessageProcessorRoute("direct:short_timeout", "mock:failures",
+                new AsyncBatchMessageProcessorRoute("direct:short_timeout", "mock:failures",
                         Duration.ofMillis(1), messageFactory)
         };
     }
@@ -214,7 +215,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
     }
 
     @Test(timeout = 1000L)
-    public void shouldWrapTimeoutsInRecoverableExceptionsAndSendToFailuresUri()
+    public void shouldSendTimeoutsToFailureUri()
             throws InterruptedException, InvalidPayloadException {
         toFailures.expectedMessageCount(1);
 
@@ -236,7 +237,7 @@ public class AsyncMessageProcessorRouteTest extends CamelTestSupport {
 
         Truth.assertThat(failedMessage.parsedMessage().get()).isInstanceOf(TimeConsumingMessage.class);
         Truth.assertThat(failedMessage.originalMessage()).isEqualTo(Duration.ofSeconds(5));
-        Truth.assertThat(failedMessage.exception()).isInstanceOf(RecoverableException.class);
+        Truth.assertThat(failedMessage.exception()).isInstanceOf(TimeoutException.class);
     }
 
     @Test(timeout = 1000L)
