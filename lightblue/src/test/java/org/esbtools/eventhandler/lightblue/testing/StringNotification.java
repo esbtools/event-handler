@@ -59,7 +59,8 @@ public class StringNotification implements LightblueNotification {
 
     @Override
     public Future<Collection<DocumentEvent>> toDocumentEvents() {
-        return Futures.immediateFuture(Collections.singleton(new StringDocumentEvent(value, clock)));
+        return Futures.immediateFuture(Collections.singleton(
+                new StringDocumentEvent(entity.get_id(), value, clock)));
     }
 
     @Override

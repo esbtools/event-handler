@@ -66,6 +66,7 @@ public class MultiStringNotification implements LightblueNotification {
 
     @Override
     public Future<Collection<DocumentEvent>> toDocumentEvents() {
-        return Futures.immediateFuture(Arrays.asList(new MultiStringDocumentEvent(values, clock)));
+        return Futures.immediateFuture(Arrays.asList(
+                new MultiStringDocumentEvent(entity.get_id(), values, clock)));
     }
 }

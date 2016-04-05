@@ -26,6 +26,7 @@ import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.TypeAndValueIdentity;
 import org.esbtools.eventhandler.lightblue.DocumentEventEntity;
 
+import javax.annotation.Nullable;
 import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -41,19 +42,13 @@ public final class StringDocumentEvent implements LightblueDocumentEvent {
     private final ZonedDateTime creationDate;
     private final DocumentEventEntity wrappedEntity;
 
-    public StringDocumentEvent(String value, Clock clock) {
+    public StringDocumentEvent(@Nullable String sourceNotificationId, String value, Clock clock) {
         this.value = value;
 
         creationDate = ZonedDateTime.now(clock);
 
-        DocumentEventEntity entity = new DocumentEventEntity();
-        entity.setCanonicalType("String");
-        entity.setParameters(Arrays.asList(new DocumentEventEntity.KeyAndValue("value", this.value)));
-        entity.setStatus(DocumentEventEntity.Status.unprocessed);
-        entity.setPriority(50);
-        entity.setCreationDate(creationDate);
-
-        wrappedEntity = entity;
+        wrappedEntity = DocumentEventEntity.newlyCreated(sourceNotificationId, "String", 50,
+                creationDate, new DocumentEventEntity.KeyAndValue("value", this.value));
     }
 
     public String value() {

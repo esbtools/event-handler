@@ -20,6 +20,7 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.redhat.lightblue.client.util.ClientConstants;
+import io.github.alechenninger.lightblue.Description;
 import io.github.alechenninger.lightblue.EntityName;
 import io.github.alechenninger.lightblue.Identity;
 import io.github.alechenninger.lightblue.MinItems;
@@ -56,16 +57,19 @@ public class DocumentEventEntity {
     private ZonedDateTime processingDate;
     private ZonedDateTime processedDate;
     private Set<String> survivorOfIds;
+    private String sourceNotificationId;
 
     private static final String LIGHTBLUE_DATE_FORMAT = ClientConstants.LIGHTBLUE_DATE_FORMAT_STR;
 
-    public static DocumentEventEntity newlyCreated(String canonicalType, int priority,
-            ZonedDateTime creationDate, KeyAndValue... parameters) {
+    public static DocumentEventEntity newlyCreated(@Nullable String sourceNotificationId,
+            String canonicalType, int priority, ZonedDateTime creationDate,
+            KeyAndValue... parameters) {
         DocumentEventEntity entity = new DocumentEventEntity();
         entity.setStatus(Status.unprocessed);
         entity.setCreationDate(creationDate);
         entity.setCanonicalType(canonicalType);
         entity.setPriority(priority);
+        entity.setSourceNotificationId(sourceNotificationId);
         entity.setParameters(Arrays.asList(parameters));
         return entity;
     }
@@ -182,6 +186,17 @@ public class DocumentEventEntity {
         survivorOfIds.addAll(ids);
     }
 
+    public String getSourceNotificationId() {
+        return sourceNotificationId;
+    }
+
+    @Description("If this document event was created as a result of notification processing, " +
+            "this is the id of that notification. Document events can also be created either " +
+            "directly or as the result of a merge, and in those cases this will be null.")
+    public void setSourceNotificationId(String sourceNotificationId) {
+        this.sourceNotificationId = sourceNotificationId;
+    }
+
     @Override
     public String toString() {
         return "DocumentEventEntity{" +
@@ -194,6 +209,7 @@ public class DocumentEventEntity {
                 ", processingDate=" + processingDate +
                 ", processedDate=" + processedDate +
                 ", survivorOfIds=" + survivorOfIds +
+                ", sourceNotificationId='" + sourceNotificationId + '\'' +
                 '}';
     }
 
@@ -210,13 +226,14 @@ public class DocumentEventEntity {
                 Objects.equals(creationDate, that.creationDate) &&
                 Objects.equals(processingDate, that.processingDate) &&
                 Objects.equals(processedDate, that.processedDate) &&
-                Objects.equals(survivorOfIds, that.survivorOfIds);
+                Objects.equals(survivorOfIds, that.survivorOfIds) &&
+                Objects.equals(sourceNotificationId, that.sourceNotificationId);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(_id, canonicalType, parameters, status, priority, creationDate,
-                processingDate, processedDate, survivorOfIds);
+                processingDate, processedDate, survivorOfIds, sourceNotificationId);
     }
 
     public enum Status {
