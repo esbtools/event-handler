@@ -55,7 +55,7 @@ public abstract class FindRequests {
                                 Query.withValue("processingDate", Query.BinOp.lte, Date.from(expiredProcessingDate)))
                 )));
         findEntities.select(Projection.includeFieldRecursively("*"));
-        findEntities.sort(Sort.asc("occurrenceDate"));
+        findEntities.sort(Sort.asc("clientRequestDate"));
         findEntities.range(0, maxNotifications - 1);
 
         return findEntities;

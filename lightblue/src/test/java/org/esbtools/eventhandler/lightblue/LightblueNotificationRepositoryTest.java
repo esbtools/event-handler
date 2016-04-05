@@ -128,9 +128,9 @@ public class LightblueNotificationRepositoryTest {
         notIncludedEntity.setEntityData(Arrays.asList(new NotificationEntity.PathAndValue("foo", null)));
         notIncludedEntity.setEntityVersion("1.0.0");
         notIncludedEntity.setStatus(NotificationEntity.Status.unprocessed);
-        notIncludedEntity.setOccurrenceDate(Date.from(fixedClock.instant()));
+        notIncludedEntity.setClientRequestDate(Date.from(fixedClock.instant()));
         notIncludedEntity.setOperation(NotificationEntity.Operation.insert);
-        notIncludedEntity.setTriggeredByUser("tester");
+        notIncludedEntity.setClientRequestPrincipal("tester");
 
         NotificationEntity entity1 = notificationEntityForStringInsert("1", fixedClock.instant());
         entity1.set_id("thisShouldBeTheOnlyId");

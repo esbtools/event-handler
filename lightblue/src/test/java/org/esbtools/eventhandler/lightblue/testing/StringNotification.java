@@ -37,7 +37,7 @@ public class StringNotification implements LightblueNotification {
     private final Clock clock;
 
     public StringNotification(String value, NotificationEntity.Operation operation,
-            String triggeredByUser, Clock clock) {
+            String clientRequestPrincipal, Clock clock) {
         this.value = value;
         this.clock = clock;
 
@@ -45,10 +45,10 @@ public class StringNotification implements LightblueNotification {
         entity.setStatus(NotificationEntity.Status.unprocessed);
         entity.setEntityName("String");
         entity.setEntityVersion("1.0.0");
-        entity.setOccurrenceDate(Date.from(clock.instant()));
+        entity.setClientRequestDate(Date.from(clock.instant()));
         entity.setEntityData(Arrays.asList(new NotificationEntity.PathAndValue("value", value)));
         entity.setOperation(operation);
-        entity.setTriggeredByUser(triggeredByUser);
+        entity.setClientRequestPrincipal(clientRequestPrincipal);
     }
 
     public StringNotification(NotificationEntity entity, LightblueRequester requester) {

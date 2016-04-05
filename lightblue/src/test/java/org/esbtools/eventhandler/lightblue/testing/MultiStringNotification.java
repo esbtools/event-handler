@@ -47,10 +47,10 @@ public class MultiStringNotification implements LightblueNotification {
         entity.setEntityData(Arrays.asList(
                 new NotificationEntity.PathAndValue("values", Joiner.on('|').join(values))));
         entity.setStatus(NotificationEntity.Status.unprocessed);
-        entity.setTriggeredByUser(triggeredByUser);
+        entity.setClientRequestPrincipal(triggeredByUser);
         entity.setOperation(operation);
         entity.setEntityVersion("1.0.0");
-        entity.setOccurrenceDate(Date.from(clock.instant()));
+        entity.setClientRequestDate(Date.from(clock.instant()));
     }
 
     public MultiStringNotification(NotificationEntity entity, LightblueRequester requester) {
