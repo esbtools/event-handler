@@ -406,7 +406,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                             locksAcquired.add(eventBatch.lock.get());
                         }
 
-                        logger.debug("Acquired lock for resource {}", eventBatch);
+                        logger.debug("Acquired lock for resource {}", eventBatch.getResourceId());
                     }
 
                     eventBatch.addEvent(newEvent);

@@ -305,7 +305,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         entity.setProcessingDate(Date.from(clock.instant()));
                         entity.setStatus(NotificationEntity.Status.processing);
 
-                        logger.debug("Acquired lock for resource {}", processing);
+                        logger.debug("Acquired lock for resource {}", processing.getResourceId());
                     } catch (LockNotAvailableException e) {
                         if (logger.isDebugEnabled()) {
                             logger.debug("Lock not available. This is not fatal. Assuming another" +
