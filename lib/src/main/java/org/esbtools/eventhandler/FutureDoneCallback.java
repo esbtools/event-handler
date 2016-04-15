@@ -1,5 +1,5 @@
 /*
- *  Copyright 2015 esbtools Contributors and/or its affiliates.
+ *  Copyright 2016 esbtools Contributors and/or its affiliates.
  *
  *  This file is part of esbtools.
  *
@@ -18,13 +18,6 @@
 
 package org.esbtools.eventhandler;
 
-/**
- * A function applied to a {@link TransformableFuture} which returns some result of type {@code O},
- * or throws an exception if unable to compute a result.
- *
- * @param <I> The type of input
- * @param <O> The type of output
- */
-public interface FutureTransform<I, O> {
-    O transform(I input) throws Exception;
+public interface FutureDoneCallback {
+    void onDoneOrCancelled() throws Exception;
 }

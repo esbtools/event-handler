@@ -18,12 +18,17 @@
 
 package org.esbtools.eventhandler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 final class FailedTransformableFuture<T> implements TransformableFuture<T> {
     private final Exception exception;
+
+    private static final Logger log = LoggerFactory.getLogger(FailedTransformableFuture.class);
 
     public FailedTransformableFuture(Exception exception) {
         this.exception = exception;
@@ -70,5 +75,16 @@ final class FailedTransformableFuture<T> implements TransformableFuture<T> {
     public TransformableFuture<Void> transformAsyncIgnoringReturn(
             FutureTransform<T, TransformableFuture<?>> futureTransform) {
         return new FailedTransformableFuture<>(exception);
+    }
+
+    @Override
+    public TransformableFuture<T> whenDoneOrCancelled(FutureDoneCallback callback) {
+        try {
+            callback.onDoneOrCancelled();
+        } catch (Exception e) {
+            log.warn("Exception caught and ignored while running future done callback.", e);
+        }
+
+        return this;
     }
 }

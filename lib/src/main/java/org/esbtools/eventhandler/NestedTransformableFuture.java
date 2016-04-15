@@ -81,4 +81,17 @@ public class NestedTransformableFuture<U> implements TransformableFuture<U> {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformAsyncIgnoringReturn(futureTransform));
     }
+
+    @Override
+    public TransformableFuture<U> whenDoneOrCancelled(FutureDoneCallback callback) {
+        nestedFuture.whenDoneOrCancelled(() -> {
+            try {
+                TransformableFuture<U> nextFuture = nestedFuture.get();
+                nextFuture.whenDoneOrCancelled(callback);
+            } catch (Exception e) {
+                callback.onDoneOrCancelled();
+            }
+        });
+        return this;
+    }
 }

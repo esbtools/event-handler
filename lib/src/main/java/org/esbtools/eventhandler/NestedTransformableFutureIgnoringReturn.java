@@ -70,7 +70,7 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
     public <V> TransformableFuture<V> transformSync(FutureTransform<Void, V> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformSync(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
     }
 
     @Override
@@ -78,7 +78,7 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
             FutureTransform<Void, TransformableFuture<V>> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformAsync(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
     }
 
     @Override
@@ -86,6 +86,19 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
             FutureTransform<Void, TransformableFuture<?>> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformAsyncIgnoringReturn(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
+    }
+
+    @Override
+    public TransformableFuture<Void> whenDoneOrCancelled(FutureDoneCallback callback) {
+        nestedFuture.whenDoneOrCancelled(() -> {
+            try {
+                TransformableFuture<?> nextFuture = nestedFuture.get();
+                nextFuture.whenDoneOrCancelled(callback);
+            } catch (Exception e) {
+                callback.onDoneOrCancelled();
+            }
+        });
+        return this;
     }
 }
