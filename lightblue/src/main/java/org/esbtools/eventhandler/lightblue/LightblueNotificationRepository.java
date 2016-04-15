@@ -309,7 +309,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                     } catch (LockNotAvailableException e) {
                         if (logger.isDebugEnabled()) {
                             logger.debug("Lock not available. This is not fatal. Assuming another" +
-                                    " thread is processing notification: " + notification, e);
+                                    " thread is processing notification: " + entity.get_id(), e);
                         }
                     }
                 } catch (Exception e) {
