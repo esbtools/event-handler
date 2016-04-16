@@ -70,8 +70,10 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
             if (!(exchangeBody instanceof Collection)) {
                 throw new IllegalArgumentException("Expected `fromUri` to deliver exchanges with " +
                         "Collection bodies so that we may batch process for efficiency. However, " +
-                        "the uri '" + fromUri + "' returned the " +
-                        exchangeBody.getClass().getName() + ": " + exchangeBody);
+                        "the uri '" + fromUri + "' returned " +
+                        ((exchangeBody == null)
+                                ? "null."
+                                : "the " + exchangeBody.getClass().getName() + ": " + exchangeBody));
             }
 
             Collection originalMessages = (Collection) exchangeBody;
