@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 public class InMemoryLockStrategy implements LockStrategy {
     private static final Map<String, String> resourcesToClients =
@@ -35,6 +36,8 @@ public class InMemoryLockStrategy implements LockStrategy {
 
     private final String clientId;
     private boolean allowLockButImmediateLoseIt = false;
+    private CountDownLatch pauseLatch = new CountDownLatch(0);
+    private volatile CountDownLatch waitForLockLatch = new CountDownLatch(1);
 
     public InMemoryLockStrategy() {
         this(UUID.randomUUID().toString());
@@ -53,7 +56,19 @@ public class InMemoryLockStrategy implements LockStrategy {
                 releaseAll();
             }
 
-            return new InMemoryLockedResource<T>(resourceId, resource);
+            LockedResource<T> lock = new InMemoryLockedResource<T>(resourceId, resource);
+
+            waitForLockLatch.countDown();
+            waitForLockLatch = new CountDownLatch(1);
+
+            while (true) {
+                try {
+                    pauseLatch.await();
+                    return lock;
+                } catch (InterruptedException ignored) {
+                    // Keep waiting...
+                }
+            }
         }
 
         throw new LockNotAvailableException(resourceId, resource);
@@ -69,6 +84,22 @@ public class InMemoryLockStrategy implements LockStrategy {
                 }
             }
         }
+    }
+
+    public void waitForLock() throws InterruptedException {
+        waitForLockLatch.await();
+    }
+
+    public void pauseAfterLock() {
+        if (pauseLatch.getCount() > 0) {
+            return;
+        }
+
+        pauseLatch = new CountDownLatch(1);
+    }
+
+    public void unpause() {
+        pauseLatch.countDown();
     }
 
     public void allowLockButImmediateLoseIt() {
