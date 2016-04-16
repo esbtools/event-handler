@@ -39,6 +39,7 @@ import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.redhat.lightblue.client.request.data.DataSaveRequest;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -55,6 +56,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -632,15 +634,72 @@ public class LightblueDocumentEventRepositoryTest {
     @Test
     public void shouldNotRetrieveNotYetTimedOutProcessingDocumentEvents() throws Exception {
         // Slightly newer than the processing timeout.
-        Instant timedout = fixedClock.instant()
+        Instant notTimedOut = fixedClock.instant()
                 .minus(PROCESSING_TIMEOUT)
                 .plus(Duration.ofMillis(1));
 
-        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(timedout);
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(notTimedOut);
 
         insertDocumentEventEntities(event.wrappedDocumentEventEntity());
 
         assertThat(repository.retrievePriorityDocumentEventsUpTo(1)).isEmpty();
+    }
+
+    /**
+     * This prevents against the following unlikely but possible race condition:
+     * <ol>
+     *     <li>Thread 1 retrieves expired events</li>
+     *     <li>Thread 2 retrieves expired events</li>
+     *     <li>Thread 1 locks expired events</li>
+     *     <li>Thread 1 updates expired events timestamp</li>
+     *     <li>Thread 1 releases lock on expired events and returns</li>
+     *     <li>Thread 2 locks expired events</li>
+     *     <li>Thread 2 updates expired events timestamp</li>
+     *     <li>Thread 2 releases lock on expired events and returns</li>
+     * </ol>
+     *
+     * This would result in the same event being processed twice. The test makes sure that when
+     * thread 2 tries to update the expired events timestamp, it sees that it is modified and does
+     * not return the event.
+     */
+    @Test
+    public void shouldIgnoreRetrievedExpiredEventsUpdatedByAnotherThreadBeforeTimestampCanBeUpdated()
+            throws Exception {
+        lockStrategy.pauseAfterLock();
+
+        // Slightly older than the processing timeout.
+        Instant timedout = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .minus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventThatStartedProcessingAt(timedout);
+
+        DocumentEventEntity inserted =
+                insertDocumentEventEntities(event.wrappedDocumentEventEntity())[0];
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<List<LightblueDocumentEvent>> futureEvents =
+                    executor.submit(() -> repository.retrievePriorityDocumentEventsUpTo(1));
+
+            lockStrategy.waitForLock();
+
+            // Update event timestamp while lock strategy is paused
+            inserted.setProcessingDate(ZonedDateTime.now(fixedClock).plus(1, ChronoUnit.SECONDS));
+            saveDocumentEventEntity(inserted);
+
+            lockStrategy.unpause();
+
+            assertEquals(0, futureEvents.get().size());
+        } finally {
+            executor.shutdown();
+            try {
+                executor.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+            }
+        }
     }
 
     @Test(expected = Exception.class)
@@ -680,6 +739,23 @@ public class LightblueDocumentEventRepositoryTest {
                 .collect(Collectors.toList());
 
         assertThat(values).containsExactly("-12", "-8", "-9", "-5", "-3");
+    }
+
+    @Test
+    public void shouldAllowReprocessingARecentlyProcessedEvent() throws Exception {
+        // Slightly newer than the processing timeout.
+        Instant notTimedOut = fixedClock.instant()
+                .minus(PROCESSING_TIMEOUT)
+                .plus(Duration.ofMillis(1));
+
+        LightblueDocumentEvent event = newDocumentEventPublishedAt(notTimedOut);
+
+        // Manually unprocess the event but don't reset dates
+        event.wrappedDocumentEventEntity().setStatus(DocumentEventEntity.Status.unprocessed);
+
+        repository.addNewDocumentEvents(Collections.singleton(event));
+
+        assertEquals(1, repository.retrievePriorityDocumentEventsUpTo(10).size());
     }
 
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
@@ -741,6 +817,15 @@ public class LightblueDocumentEventRepositoryTest {
         return event;
     }
 
+    private LightblueDocumentEvent newDocumentEventPublishedAt(Instant publishedDate) {
+        LightblueDocumentEvent event = new StringDocumentEvent(null, "published", fixedClock);
+        DocumentEventEntity expiredEntity = event.wrappedDocumentEventEntity();
+        expiredEntity.setStatus(DocumentEventEntity.Status.published);
+        expiredEntity.setProcessingDate(ZonedDateTime.ofInstant(publishedDate.minus(1, ChronoUnit.SECONDS), fixedClock.getZone()));
+        expiredEntity.setProcessedDate(ZonedDateTime.ofInstant(publishedDate, fixedClock.getZone()));
+        return event;
+    }
+
     private DocumentEventEntity[] randomNewDocumentEventEntities(int amount) {
         DocumentEventEntity[] entities = new DocumentEventEntity[amount];
 
@@ -751,11 +836,12 @@ public class LightblueDocumentEventRepositoryTest {
         return entities;
     }
 
-    private void insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
+    private DocumentEventEntity[] insertDocumentEventEntities(DocumentEventEntity... entities) throws LightblueException {
         DataInsertRequest insertEntities = new DataInsertRequest(
                 DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
         insertEntities.create(entities);
-        client.data(insertEntities);
+        insertEntities.returns(Projection.includeFieldRecursively("*"));
+        return client.data(insertEntities, DocumentEventEntity[].class);
     }
 
     /** Orders the entities by priority */
@@ -771,5 +857,11 @@ public class LightblueDocumentEventRepositoryTest {
 
         insertEntities.create(entities);
         client.data(insertEntities);
+    }
+
+    private void saveDocumentEventEntity(DocumentEventEntity entity) throws LightblueException {
+        DataSaveRequest save = new DataSaveRequest(DocumentEventEntity.ENTITY_NAME, DocumentEventEntity.VERSION);
+        save.create(entity);
+        client.data(save);
     }
 }

@@ -18,13 +18,12 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueClientConfiguration;
 import com.redhat.lightblue.client.http.LightblueHttpClient;
 import com.redhat.lightblue.client.util.JSON;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 public abstract class LightblueClients {
     public static LightblueClient withJavaTimeSerializationSupport(LightblueClientConfiguration config) {

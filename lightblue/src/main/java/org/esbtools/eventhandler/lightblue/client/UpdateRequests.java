@@ -153,7 +153,13 @@ public abstract class UpdateRequests {
             idStatusAndDateMatch.add(Query.withValue(
                     "processingDate", BinOp.eq,
                     Date.from(originalProcessingDate.toInstant())));
-            idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.processing.toString()));
+
+            // We don't care if original event was processing or unprocessed. Unprocessed happens
+            // when event is manually unprocessed. Matching timestamp still ensures we prevent
+            // double processing.
+            idStatusAndDateMatch.add(Query.withValues("status", Query.NaryOp.in, Literal.values(
+                    DocumentEventEntity.Status.processing.toString(),
+                    DocumentEventEntity.Status.unprocessed.toString())));
         } else {
             idStatusAndDateMatch.add(Query.withValue("processingDate", BinOp.eq, Literal.value(null)));
             idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.unprocessed.toString()));
