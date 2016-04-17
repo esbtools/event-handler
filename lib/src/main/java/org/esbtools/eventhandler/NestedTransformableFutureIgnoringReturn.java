@@ -89,15 +89,22 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
                         ignored -> futureTransform.transform(null)));
     }
 
+    /**
+     * Because the result in this context is the result of a nested future, and "done" implies
+     * having a result, we put off calling the callbacks until the nested future is done to
+     * coincide with when this future has a result.
+     */
     @Override
     public TransformableFuture<Void> whenDoneOrCancelled(FutureDoneCallback callback) {
         nestedFuture.whenDoneOrCancelled(() -> {
+            final TransformableFuture<?> nextFuture;
             try {
-                TransformableFuture<?> nextFuture = nestedFuture.get();
-                nextFuture.whenDoneOrCancelled(callback);
+                nextFuture = nestedFuture.get();
             } catch (Exception e) {
                 callback.onDoneOrCancelled();
+                return;
             }
+            nextFuture.whenDoneOrCancelled(callback);
         });
         return this;
     }

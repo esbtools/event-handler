@@ -245,6 +245,7 @@ public class BulkLightblueRequester implements LightblueRequester {
 
             result = responses;
             completed = true;
+            callDoneCallbacks();
 
             for (LazyTransformingFuture<U, ?> next : this.next) {
                 try {
@@ -254,14 +255,13 @@ public class BulkLightblueRequester implements LightblueRequester {
                             "future.", e);
                 }
             }
-
-            callDoneCallbacks();
         }
 
         void completeExceptionally(Exception exception) {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
+            callDoneCallbacks();
 
             for (LazyTransformingFuture<U, ?> next : this.next) {
                 try {
@@ -271,8 +271,6 @@ public class BulkLightblueRequester implements LightblueRequester {
                             "future with exception.", e);
                 }
             }
-
-            callDoneCallbacks();
         }
 
         @Override
