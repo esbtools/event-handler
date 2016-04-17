@@ -92,10 +92,8 @@ public class LightblueNotificationRepositoryTest {
             }};
 
     private final MutableLightblueNotificationRepositoryConfig config =
-            new MutableLightblueNotificationRepositoryConfig()
-                    .setEntityNamesToProcess(notificationFactoryByEntityName.keySet())
-                    .setNotificationProcessingTimeout(PROCESSING_TIMEOUT)
-                    .setNotificationExpireThreshold(EXPIRE_THRESHOLD);
+            new MutableLightblueNotificationRepositoryConfig(
+                    notificationFactoryByEntityName.keySet(), PROCESSING_TIMEOUT, EXPIRE_THRESHOLD);
 
     private final InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
 

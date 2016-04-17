@@ -20,13 +20,18 @@ package org.esbtools.eventhandler.lightblue.config;
 
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepositoryConfig;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.concurrent.ThreadSafe;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @ThreadSafe
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
@@ -34,6 +39,8 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     private int documentEventsBatchSize = 0;
     private Duration processingTimeout = Duration.ofMinutes(10);
     private Duration expireThreshold = Duration.ofMinutes(2);
+
+    private static final Logger log = LoggerFactory.getLogger(MutableLightblueDocumentEventRepositoryConfig.class);
 
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
@@ -70,7 +77,20 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
 
     public MutableLightblueDocumentEventRepositoryConfig setCanonicalTypesToProcess(
             Collection<String> types) {
+        Set<String> old = canonicalTypesToProcess;
         canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(types));
+
+        if (!old.equals(canonicalTypesToProcess)) {
+            List<String> removed = old.stream()
+                    .filter(oldCanonicalType -> !canonicalTypesToProcess.contains(oldCanonicalType))
+                    .collect(Collectors.toList());
+            List<String> added = canonicalTypesToProcess.stream()
+                    .filter(newCanonicalType -> !old.contains(newCanonicalType))
+                    .collect(Collectors.toList());
+            log.info("Canonical types to process updated. Removed {}. Added {}. " +
+                    "Currently processing {}.", removed, added, canonicalTypesToProcess);
+        }
+
         return this;
     }
 
@@ -86,7 +106,12 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
 
     public MutableLightblueDocumentEventRepositoryConfig setDocumentEventProcessingTimeout(
             Duration processingTimeout) {
+        Duration old = this.processingTimeout;
         this.processingTimeout = processingTimeout;
+        if (!old.equals(processingTimeout)) {
+            log.info("Document event processing timeout updated." +
+                    " Old value was {}. New value is {}.", old, processingTimeout);
+        }
         return this;
     }
 
@@ -97,12 +122,22 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
 
     public MutableLightblueDocumentEventRepositoryConfig setDocumentEventExpireThreshold(
             Duration expireThreshold) {
+        Duration old = this.expireThreshold;
         this.expireThreshold = expireThreshold;
+        if (!old.equals(expireThreshold)) {
+            log.info("Document event expire threshold updated." +
+                    " Old value was {}. New value is {}.", old, expireThreshold);
+        }
         return this;
     }
 
     public MutableLightblueDocumentEventRepositoryConfig setDocumentEventsBatchSize(int batchSize) {
+        int old = documentEventsBatchSize;
         documentEventsBatchSize = batchSize;
+        if (old != documentEventsBatchSize) {
+            log.info("Document event batch size updated." +
+                    " Old value was {}. New value is {}.", old, documentEventsBatchSize);
+        }
         return this;
     }
 }

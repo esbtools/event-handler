@@ -94,11 +94,9 @@ public class LightblueDocumentEventRepositoryTest {
                 put("MultiString", MultiStringDocumentEvent::new);
             }};
 
-    private MutableLightblueDocumentEventRepositoryConfig config = new MutableLightblueDocumentEventRepositoryConfig()
-            .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
-            .setDocumentEventsBatchSize(DOCUMENT_EVENT_BATCH_SIZE)
-            .setDocumentEventProcessingTimeout(PROCESSING_TIMEOUT)
-            .setDocumentEventExpireThreshold(EXPIRE_THRESHOLD);
+    private MutableLightblueDocumentEventRepositoryConfig config =
+            new MutableLightblueDocumentEventRepositoryConfig(documentEventFactoriesByType.keySet(),
+                    DOCUMENT_EVENT_BATCH_SIZE, PROCESSING_TIMEOUT, EXPIRE_THRESHOLD);
 
     private InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
 
@@ -187,10 +185,11 @@ public class LightblueDocumentEventRepositoryTest {
         SlowDataLightblueClient thread1Client = new SlowDataLightblueClient(client);
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
-        // Larger batch size is needed to guarantee we get all events in both threads.
-        MutableLightblueDocumentEventRepositoryConfig config = new MutableLightblueDocumentEventRepositoryConfig()
-                .setCanonicalTypesToProcess(documentEventFactoriesByType.keySet())
-                .setDocumentEventsBatchSize(20);
+        // Larger batch size (20) is needed to guarantee we get all events in both threads.
+        MutableLightblueDocumentEventRepositoryConfig config =
+                new MutableLightblueDocumentEventRepositoryConfig(
+                        documentEventFactoriesByType.keySet(), 20, Duration.ofMinutes(10),
+                        Duration.ofMinutes(1));
 
         LightblueDocumentEventRepository thread1Repository = new LightblueDocumentEventRepository(
                 thread1Client, new InMemoryLockStrategy(), config,
