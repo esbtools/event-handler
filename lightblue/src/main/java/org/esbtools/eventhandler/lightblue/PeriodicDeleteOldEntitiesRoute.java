@@ -103,8 +103,8 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
 
             LightblueDataResponse response = client.data(deleteRequest);
 
-            log.info("Deleted {} {} with {} before {}",
-                    response.parseMatchCount(), entityName, entityDateField, tooOld);
+            log.info("Deleted {} {} entities with {} before {}",
+                    response.parseModifiedCount(), entityName, entityDateField, tooOld);
         });
     }
 

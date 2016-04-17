@@ -103,8 +103,6 @@ public class PeriodicDeleteOldEntitiesRouteTest extends CamelTestSupport {
 
     @Test
     public void shouldDeleteOldDocumentEventsAndNotificationsIfCanAcquireLocks() throws Exception {
-        lockStrategy.releaseAll();
-
         Instant tooOld = fixedClock.instant()
                 .minus(DELETE_OLDER_THAN)
                 .minus(1, ChronoUnit.SECONDS);
@@ -117,6 +115,8 @@ public class PeriodicDeleteOldEntitiesRouteTest extends CamelTestSupport {
         insertDocumentEventsCreatedAt(notOldEnough, 5);
         insertNotificationsForRequestsAt(tooOld, 10);
         insertNotificationsForRequestsAt(notOldEnough, 5);
+
+        lockStrategy.releaseAll();
 
         List<DocumentEventEntity> fiveRemainingDocEvents =
                 Awaitility.await().until(this::findAllDocumentEvents, Matchers.hasSize(5));
