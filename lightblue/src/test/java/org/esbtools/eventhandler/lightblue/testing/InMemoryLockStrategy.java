@@ -107,6 +107,10 @@ public class InMemoryLockStrategy implements LockStrategy {
         allowLockButImmediateLoseIt = true;
     }
 
+    public Map<String, String> getAcquired() {
+        return new HashMap<>(resourcesToClients);
+    }
+
     private class InMemoryLockedResource<T> implements LockedResource<T> {
         private final String clientId;
         private final String resourceId;

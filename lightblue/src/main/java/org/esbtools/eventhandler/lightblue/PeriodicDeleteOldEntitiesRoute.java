@@ -22,6 +22,7 @@ import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
 import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
 import org.esbtools.eventhandler.lightblue.locking.LockedResource;
 import org.esbtools.eventhandler.lightblue.locking.LostLockException;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.Query;
@@ -41,47 +42,69 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
-public class PeriodicDeleteOldDocumentEventsRoute extends RouteBuilder {
+public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
     private final LightblueClient client;
     private final LockStrategy lockStrategy;
-    private final Duration deleteEventsOlderThan;
+    private final Duration deleteOlderThan;
     private final Duration deleteInterval;
     private final Clock clock;
+    private final String entityName;
+    private final String entityVersion;
+    private final String entityDateField;
 
     /** Package visible for testing. */
-    static final String DELETER_LOCK_RESOURCE_ID = "oldDocumentEventsDeleter";
+    final String deleterLockResourceId;
 
-    private static final Logger log = LoggerFactory.getLogger(PeriodicDeleteOldDocumentEventsRoute.class);
+    private static final Logger log = LoggerFactory.getLogger(PeriodicDeleteOldEntitiesRoute.class);
 
-    public PeriodicDeleteOldDocumentEventsRoute(LightblueClient client, LockStrategy lockStrategy,
-            Duration deleteEventsOlderThan, Duration deleteInterval, Clock clock) {
+    public static PeriodicDeleteOldEntitiesRoute deletingNotificationsOlderThan(
+            Duration deleteOlderThan, Duration deleteInterval, LightblueClient client,
+            LockStrategy lockStrategy, Clock clock) {
+        return new PeriodicDeleteOldEntitiesRoute(NotificationEntity.ENTITY_NAME,
+                NotificationEntity.ENTITY_VERSION, "clientRequestDate", client, lockStrategy,
+                deleteOlderThan, deleteInterval, clock);
+    }
+
+    public static PeriodicDeleteOldEntitiesRoute deletingDocumentEventsOlderThan(
+            Duration deleteOlderThan, Duration deleteInterval, LightblueClient client,
+            LockStrategy lockStrategy, Clock clock) {
+        return new PeriodicDeleteOldEntitiesRoute(DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION, "creationDate", client, lockStrategy,
+                deleteOlderThan, deleteInterval, clock);
+    }
+
+    public PeriodicDeleteOldEntitiesRoute(String entityName, String entityVersion,
+            String entityDateField, LightblueClient client, LockStrategy lockStrategy,
+            Duration deleteOlderThan, Duration deleteInterval, Clock clock) {
         this.client = client;
         this.lockStrategy = lockStrategy;
-        this.deleteEventsOlderThan = deleteEventsOlderThan;
+        this.deleteOlderThan = deleteOlderThan;
         this.deleteInterval = deleteInterval;
         this.clock = clock;
+        this.entityName = entityName;
+        this.entityVersion = entityVersion;
+        this.entityDateField = entityDateField;
+
+        deleterLockResourceId = "old_" + entityName + "_deleter";
     }
 
     @Override
     public void configure() throws Exception {
-        from("timer:oldDocumentEventsDeleter?period=" + deleteInterval.toMillis())
-        .routeId("oldDocumentEventsDeleter")
+        from("timer:" + deleterLockResourceId + "?period=" + deleteInterval.toMillis())
+        .routeId(deleterLockResourceId)
         .routePolicy(new DeleterLockRoutePolicy())
         .process(exchange -> {
-            Instant tooOld = clock.instant().minus(deleteEventsOlderThan);
+            Instant tooOld = clock.instant().minus(deleteOlderThan);
 
-            log.debug("Deleting document events created before {}", tooOld);
+            log.debug("Deleting {} entities with {} before {}", entityName, entityDateField, tooOld);
 
-            DataDeleteRequest deleteOldEvents = new DataDeleteRequest(
-                    DocumentEventEntity.ENTITY_NAME,
-                    DocumentEventEntity.VERSION);
-            deleteOldEvents.where(Query.withValue(
-                    "creationDate", Query.BinOp.lt, Date.from(tooOld)));
+            DataDeleteRequest deleteRequest = new DataDeleteRequest(entityName, entityVersion);
+            deleteRequest.where(Query.withValue(entityDateField, Query.BinOp.lt, Date.from(tooOld)));
 
-            LightblueDataResponse response = client.data(deleteOldEvents);
+            LightblueDataResponse response = client.data(deleteRequest);
 
-            log.info("Deleted {} document events created before {}",
-                    response.parseMatchCount(), tooOld);
+            log.info("Deleted {} {} with {} before {}",
+                    response.parseMatchCount(), entityName, entityDateField, tooOld);
         });
     }
 
@@ -105,16 +128,16 @@ public class PeriodicDeleteOldDocumentEventsRoute extends RouteBuilder {
                     lock.ensureAcquiredOrThrow("Lost lock");
                     return;
                 } catch (LostLockException e) {
-                    log.warn("Lost document events deleter lock, trying to reacquire...", e);
+                    log.warn("Lost deleter lock, trying to reacquire...", e);
                     lock = null;
                 }
             }
 
             try {
-                lock = lockStrategy.tryAcquire(DELETER_LOCK_RESOURCE_ID);
+                lock = lockStrategy.tryAcquire(deleterLockResourceId);
             } catch (LockNotAvailableException e) {
-                log.debug("Old document events deleter lock not available, assuming " +
-                        "another thread is cleaning up old document events.", e);
+                log.debug("Deleter lock not available, assuming " +
+                        "another thread is cleaning up old " + entityName + " entities", e);
                 exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
             }
         }
@@ -125,7 +148,7 @@ public class PeriodicDeleteOldDocumentEventsRoute extends RouteBuilder {
             try {
                 lock.close();
             } catch (IOException e) {
-                log.warn("IOException trying to release old document events deleter lock", e);
+                log.warn("IOException trying to release deleter lock", e);
             }
 
             lock = null;
