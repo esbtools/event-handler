@@ -70,7 +70,7 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
     public <V> TransformableFuture<V> transformSync(FutureTransform<Void, V> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformSync(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
     }
 
     @Override
@@ -78,7 +78,7 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
             FutureTransform<Void, TransformableFuture<V>> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformAsync(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
     }
 
     @Override
@@ -86,6 +86,26 @@ public class NestedTransformableFutureIgnoringReturn implements TransformableFut
             FutureTransform<Void, TransformableFuture<?>> futureTransform) {
         return nestedFuture.transformAsync(
                 nextFuture -> nextFuture.transformAsyncIgnoringReturn(
-                        ignored -> futureTransform.handle(null)));
+                        ignored -> futureTransform.transform(null)));
+    }
+
+    /**
+     * Because the result in this context is the result of a nested future, and "done" implies
+     * having a result, we put off calling the callbacks until the nested future is done to
+     * coincide with when this future has a result.
+     */
+    @Override
+    public TransformableFuture<Void> whenDoneOrCancelled(FutureDoneCallback callback) {
+        nestedFuture.whenDoneOrCancelled(() -> {
+            final TransformableFuture<?> nextFuture;
+            try {
+                nextFuture = nestedFuture.get();
+            } catch (Exception e) {
+                callback.onDoneOrCancelled();
+                return;
+            }
+            nextFuture.whenDoneOrCancelled(callback);
+        });
+        return this;
     }
 }

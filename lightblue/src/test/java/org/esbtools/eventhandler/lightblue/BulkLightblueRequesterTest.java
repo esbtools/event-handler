@@ -5,8 +5,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
+import org.esbtools.eventhandler.TransformableFuture;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponses;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
@@ -227,6 +229,88 @@ public class BulkLightblueRequesterTest {
                 .containsExactly("findTester", "findCoder");
         assertThat(log.subList(2,4))
                 .containsExactly("findAnotherTester", "findAnotherCoder");
+    }
+
+    @Test
+    public void shouldCallDoneCallbacksWhenFuturesCompleteSuccessfully() throws Exception {
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        List<String> log = new ArrayList<>();
+
+        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
+
+        Future<?> futureTester = futureResponse.transformAsync(responses -> {
+            log.add("findTester transform");
+
+            DataFindRequest findAnotherTester = findUserByUsername("muchcoolertester");
+
+            return requester.request(findAnotherTester).transformSync(moreResponses -> {
+                log.add("findAnotherTester");
+                return moreResponses.forRequest(findAnotherTester);
+            }).whenDoneOrCancelled(() -> log.add("findAnotherTester done"));
+        }).whenDoneOrCancelled(() -> log.add("findTester async transform done"));
+
+        futureTester.get();
+
+        assertThat(log).containsExactly("response done", "findTester transform",
+                "findAnotherTester", "findAnotherTester done", "findTester async transform done")
+                .inOrder();
+    }
+
+    @Test
+    public void shouldCallDoneCallbacksWhenFuturesFail() throws Exception {
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        List<String> log = new ArrayList<>();
+
+        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
+
+        Future<?> futureTester = futureResponse.transformAsync(responses -> {
+            log.add("findTester transform");
+
+            DataFindRequest badRequest = new DataFindRequest("foo", "123");
+
+            return requester.request(badRequest).transformSync(moreResponses -> {
+                log.add("badRequest (this shouldn't be here)");
+                return moreResponses.forRequest(badRequest);
+            }).whenDoneOrCancelled(() -> log.add("badRequest done"));
+        }).whenDoneOrCancelled(() -> log.add("findTester async transform done"));
+
+        try {
+            futureTester.get();
+        } catch (Exception ignored) {}
+
+        assertThat(log).containsExactly("response done", "findTester transform", "badRequest done",
+                "findTester async transform done").inOrder();
+    }
+
+    @Test
+    public void shouldCallDoneCallbacksWhenFuturesAreCancelled() throws Exception {
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        List<String> log = new ArrayList<>();
+
+        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
+
+        Future<?> futureTester = futureResponse.transformAsync(responses -> {
+            log.add("findTester transform");
+
+            DataFindRequest findAnotherTester = findUserByUsername("muchcoolertester");
+
+            return requester.request(findAnotherTester).transformSync(moreResponses -> {
+                log.add("findAnotherTester");
+                return moreResponses.forRequest(findAnotherTester);
+            }).whenDoneOrCancelled(() -> log.add("findAnotherTester done"));
+        }).whenDoneOrCancelled(() -> log.add("findTester async transform done"));
+
+        futureTester.cancel(true);
+
+        // We only expect the callback of the cancelled future and the cancelled future only.
+        // The source future may still have other transforms attached to it that are not cancelled.
+        assertThat(log).containsExactly("findTester async transform done");
     }
 
     private void insertUser(String username) throws LightblueException {

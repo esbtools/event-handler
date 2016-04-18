@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
+import org.esbtools.eventhandler.FutureDoneCallback;
 import org.esbtools.eventhandler.FutureTransform;
 import org.esbtools.eventhandler.NestedTransformableFuture;
 import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
@@ -33,6 +34,8 @@ import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueBulkResponseException;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -225,6 +228,10 @@ public class BulkLightblueRequester implements LightblueRequester {
          */
         private final List<LazyTransformingFuture<U, ?>> next = new ArrayList<>(1);
 
+        private final List<FutureDoneCallback> doneCallbacks = new ArrayList<>();
+
+        private static Logger log = LoggerFactory.getLogger(LazyTransformableFuture.class);
+
         /**
          * @param completer Reference to a function which should complete this future when called.
          *                  See {@link #completer}.
@@ -236,14 +243,17 @@ public class BulkLightblueRequester implements LightblueRequester {
         void complete(U responses) {
             if (isDone()) return;
 
-            try {
-                result = responses;
-                completed = true;
-                for (LazyTransformingFuture<U, ?> next : this.next) {
+            result = responses;
+            completed = true;
+            callDoneCallbacks();
+
+            for (LazyTransformingFuture<U, ?> next : this.next) {
+                try {
                     next.complete(result);
+                } catch (Exception e) {
+                    log.warn("Exception caught and ignored while completing next transforming " +
+                            "future.", e);
                 }
-            } catch (Exception e) {
-                completeExceptionally(e);
             }
         }
 
@@ -251,8 +261,15 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
             completed = true;
             this.exception = exception;
+            callDoneCallbacks();
+
             for (LazyTransformingFuture<U, ?> next : this.next) {
-                next.completeExceptionally(exception);
+                try {
+                    next.completeExceptionally(exception);
+                } catch (Exception e) {
+                    log.warn("Exception caught and ignored while completing next transforming " +
+                            "future with exception.", e);
+                }
             }
         }
 
@@ -260,7 +277,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (completed) return false;
             cancelled = true;
-            next.clear();
+            callDoneCallbacks();
             return true;
         }
 
@@ -331,6 +348,30 @@ public class BulkLightblueRequester implements LightblueRequester {
             next.add(future);
             return new NestedTransformableFutureIgnoringReturn(future);
         }
+
+        @Override
+        public TransformableFuture<U> whenDoneOrCancelled(FutureDoneCallback callback) {
+            if (isDone()) {
+                try {
+                    callback.onDoneOrCancelled();
+                } catch (Exception e) {
+                    log.warn("Exception caught and ignored while running future done callback.", e);
+                }
+                return this;
+            }
+            doneCallbacks.add(callback);
+            return this;
+        }
+
+        private void callDoneCallbacks() {
+            for (FutureDoneCallback doneCallback : doneCallbacks) {
+                try {
+                    doneCallback.onDoneOrCancelled();
+                } catch (Exception e) {
+                    log.warn("Exception caught and ignored while running future done callback.", e);
+                }
+            }
+        }
     }
 
     /**
@@ -376,6 +417,12 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
+        public TransformableFuture<LightblueResponses> whenDoneOrCancelled(FutureDoneCallback callback) {
+            backingFuture.whenDoneOrCancelled(callback);
+            return this;
+        }
+
+        @Override
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (!backingFuture.isDone()) {
                 queuedRequests.remove(this);
@@ -417,11 +464,11 @@ public class BulkLightblueRequester implements LightblueRequester {
      * @param <U> The output type as a result of applying the transform function to the input.
      */
     static class LazyTransformingFuture<T, U> implements TransformableFuture<U> {
-        private final FutureTransform<T, U> handler;
+        private final FutureTransform<T, U> transform;
         private final LazyTransformableFuture<U> backingFuture;
 
-        LazyTransformingFuture(FutureTransform<T, U> handler, Completer completer) {
-            this.handler = handler;
+        LazyTransformingFuture(FutureTransform<T, U> transform, Completer completer) {
+            this.transform = transform;
             this.backingFuture = new LazyTransformableFuture<>(completer);
         }
 
@@ -429,8 +476,8 @@ public class BulkLightblueRequester implements LightblueRequester {
             if (isDone()) return;
 
             try {
-                U handled = handler.handle(responses);
-                backingFuture.complete(handled);
+                U transformed = transform.transform(responses);
+                backingFuture.complete(transformed);
             } catch (Exception e) {
                 completeExceptionally(e);
             }
@@ -485,6 +532,12 @@ public class BulkLightblueRequester implements LightblueRequester {
         public TransformableFuture<Void> transformAsyncIgnoringReturn(
                 FutureTransform<U, TransformableFuture<?>> futureTransform) {
             return backingFuture.transformAsyncIgnoringReturn(futureTransform);
+        }
+
+        @Override
+        public TransformableFuture<U> whenDoneOrCancelled(FutureDoneCallback callback) {
+            backingFuture.whenDoneOrCancelled(callback);
+            return this;
         }
     }
 

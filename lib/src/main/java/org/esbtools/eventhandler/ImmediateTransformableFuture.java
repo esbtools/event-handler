@@ -18,12 +18,17 @@
 
 package org.esbtools.eventhandler;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 final class ImmediateTransformableFuture<T> implements TransformableFuture<T> {
     private final T result;
+
+    private static final Logger log = LoggerFactory.getLogger(ImmediateTransformableFuture.class);
 
     public ImmediateTransformableFuture(T result) {
         this.result = result;
@@ -58,7 +63,7 @@ final class ImmediateTransformableFuture<T> implements TransformableFuture<T> {
     @Override
     public <U> TransformableFuture<U> transformSync(FutureTransform<T, U> futureTransform) {
         try {
-            return new ImmediateTransformableFuture<>(futureTransform.handle(result));
+            return new ImmediateTransformableFuture<>(futureTransform.transform(result));
         } catch (Exception e) {
             return new FailedTransformableFuture<>(e);
         }
@@ -68,7 +73,7 @@ final class ImmediateTransformableFuture<T> implements TransformableFuture<T> {
     public <U> TransformableFuture<U> transformAsync(
             FutureTransform<T, TransformableFuture<U>> futureTransform) {
         try {
-            return futureTransform.handle(result);
+            return futureTransform.transform(result);
         } catch (Exception e) {
             return new FailedTransformableFuture<>(e);
         }
@@ -78,9 +83,20 @@ final class ImmediateTransformableFuture<T> implements TransformableFuture<T> {
     public TransformableFuture<Void> transformAsyncIgnoringReturn(
             FutureTransform<T, TransformableFuture<?>> futureTransform) {
         try {
-            return (TransformableFuture<Void>) futureTransform.handle(result);
+            return (TransformableFuture<Void>) futureTransform.transform(result);
         } catch (Exception e) {
             return new FailedTransformableFuture<>(e);
         }
+    }
+
+    @Override
+    public TransformableFuture<T> whenDoneOrCancelled(FutureDoneCallback callback) {
+        try {
+            callback.onDoneOrCancelled();
+        } catch (Exception e) {
+            log.warn("Exception caught and ignored while running future done callback.", e);
+        }
+
+        return this;
     }
 }

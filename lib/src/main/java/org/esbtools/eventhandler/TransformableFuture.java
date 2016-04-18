@@ -87,4 +87,14 @@ public interface TransformableFuture<T> extends Future<T> {
      * because the consumer is ignoring the return value. This would definitely be a bug.
      */
     TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<T, TransformableFuture<?>> futureTransform);
+
+    /**
+     * An asynchronous "finally" block.
+     *
+     * <p>Use to clean up resources or whatever finishing behavior that needs to happen whenever the
+     * future has a result or is cancelled.
+     *
+     * <p>If the future is already done or cancelled, the callback is called immediately.
+     */
+    TransformableFuture<T> whenDoneOrCancelled(FutureDoneCallback callback);
 }
