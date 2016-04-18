@@ -404,9 +404,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         docEventsByIdentity.put(identity, eventBatch);
                         if (eventBatch.lock.isPresent()) {
                             locksAcquired.add(eventBatch.lock.get());
+                            logger.debug("Acquired lock for resource {}", eventBatch.getResourceId());
                         }
-
-                        logger.debug("Acquired lock for resource {}", eventBatch.getResourceId());
                     }
 
                     eventBatch.addEvent(newEvent);
@@ -437,6 +436,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             try {
                 lock = Optional.of(lockStrategy.tryAcquire(this));
             } catch (LockNotAvailableException e) {
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Lock not available. This is not fatal. Assuming another" +
+                            " thread is processing document events sharing identity: " + identity, e);
+                }
                 lock = Optional.empty();
             }
 
