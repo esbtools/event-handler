@@ -34,29 +34,28 @@ public class InMemoryLockStrategy implements LockStrategy {
     private static final Map<String, String> resourcesToClients =
             Collections.synchronizedMap(new HashMap<>());
 
-    private final String clientId;
     private boolean allowLockButImmediateLoseIt = false;
     private CountDownLatch pauseLatch = new CountDownLatch(0);
     private volatile CountDownLatch waitForLockLatch = new CountDownLatch(1);
+    private volatile CountDownLatch waitForTryAcquireLatch = new CountDownLatch(1);
 
     public InMemoryLockStrategy() {
-        this(UUID.randomUUID().toString());
-    }
-
-    public InMemoryLockStrategy(String clientId) {
-        this.clientId = clientId;
     }
 
     @Override
     public <T> LockedResource<T> tryAcquire(String resourceId, T resource) throws LockNotAvailableException {
+        String clientId = UUID.randomUUID().toString();
         String otherClientOrNull = resourcesToClients.putIfAbsent(resourceId, clientId);
+
+        waitForTryAcquireLatch.countDown();
+        waitForTryAcquireLatch = new CountDownLatch(1);
 
         if (otherClientOrNull == null) {
             if (allowLockButImmediateLoseIt) {
-                releaseAll();
+                resourcesToClients.remove(resourceId);
             }
 
-            LockedResource<T> lock = new InMemoryLockedResource<T>(resourceId, resource);
+            LockedResource<T> lock = new InMemoryLockedResource<T>(clientId, resourceId, resource);
 
             waitForLockLatch.countDown();
             waitForLockLatch = new CountDownLatch(1);
@@ -74,16 +73,18 @@ public class InMemoryLockStrategy implements LockStrategy {
         throw new LockNotAvailableException(resourceId, resource);
     }
 
+    public LockedResource<String> forceAcquire(String resourceId) {
+        String clientId = UUID.randomUUID().toString();
+        resourcesToClients.put(resourceId, clientId);
+        return new InMemoryLockedResource<>(clientId, resourceId, resourceId);
+    }
+
     public void releaseAll() {
-        synchronized (resourcesToClients) {
-            Iterator<Map.Entry<String, String>> entries = resourcesToClients.entrySet().iterator();
-            while (entries.hasNext()) {
-                Map.Entry<String, String> entry = entries.next();
-                if (entry.getValue().equals(clientId)) {
-                    entries.remove();
-                }
-            }
-        }
+        resourcesToClients.clear();
+    }
+
+    public void waitForTryAcquire() throws InterruptedException {
+        waitForTryAcquireLatch.await();
     }
 
     public void waitForLock() throws InterruptedException {
@@ -106,18 +107,24 @@ public class InMemoryLockStrategy implements LockStrategy {
         allowLockButImmediateLoseIt = true;
     }
 
+    public Map<String, String> getAcquired() {
+        return new HashMap<>(resourcesToClients);
+    }
+
     private class InMemoryLockedResource<T> implements LockedResource<T> {
+        private final String clientId;
         private final String resourceId;
         private final T resource;
 
-        private InMemoryLockedResource(String resourceId, T resource) {
+        private InMemoryLockedResource(String clientId, String resourceId, T resource) {
+            this.clientId = clientId;
             this.resourceId = resourceId;
             this.resource = resource;
         }
 
         @Override
         public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
-            if (!resourcesToClients.containsKey(resourceId)) {
+            if (!clientId.equals(resourcesToClients.get(resourceId))) {
                 throw new LostLockException(this, lostLockMessage);
             }
         }
