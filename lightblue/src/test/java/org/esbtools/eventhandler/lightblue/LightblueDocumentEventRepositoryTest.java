@@ -231,8 +231,8 @@ public class LightblueDocumentEventRepositoryTest {
             thread2Client.unpause();
             thread1Client.unpause();
 
-            List<LightblueDocumentEvent> thread1Events = futureThread1Events.get(5, TimeUnit.SECONDS);
-            List<LightblueDocumentEvent> thread2Events = futureThread2Events.get(5, TimeUnit.SECONDS);
+            List<LightblueDocumentEvent> thread1Events = futureThread1Events.get(10, TimeUnit.SECONDS);
+            List<LightblueDocumentEvent> thread2Events = futureThread2Events.get(10, TimeUnit.SECONDS);
 
             List<String> retrievedValues = new ArrayList<>();
 

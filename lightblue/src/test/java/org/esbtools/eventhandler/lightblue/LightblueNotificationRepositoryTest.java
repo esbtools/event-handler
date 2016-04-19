@@ -240,8 +240,8 @@ public class LightblueNotificationRepositoryTest {
             thread2Client.unpause();
             thread1Client.unpause();
 
-            List<LightblueNotification> thread1Notifications = futureThread1Events.get(5, TimeUnit.SECONDS);
-            List<LightblueNotification> thread2Notifications = futureThread2Events.get(5, TimeUnit.SECONDS);
+            List<LightblueNotification> thread1Notifications = futureThread1Events.get(10, TimeUnit.SECONDS);
+            List<LightblueNotification> thread2Notifications = futureThread2Events.get(10, TimeUnit.SECONDS);
 
             List<String> retrievedValues = new ArrayList<>();
 
