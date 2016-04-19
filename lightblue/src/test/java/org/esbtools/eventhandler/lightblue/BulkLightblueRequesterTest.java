@@ -3,6 +3,7 @@ package org.esbtools.eventhandler.lightblue;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.esbtools.eventhandler.TransformableFuture;
@@ -32,6 +33,7 @@ import org.junit.rules.ExpectedException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
@@ -311,6 +313,14 @@ public class BulkLightblueRequesterTest {
         // We only expect the callback of the cancelled future and the cancelled future only.
         // The source future may still have other transforms attached to it that are not cancelled.
         assertThat(log).containsExactly("findTester async transform done");
+    }
+
+    @Test(timeout = 1000L)
+    public void shouldCallTransformEvenIfPassedNoRequests() throws Exception {
+        Future<Boolean> future = requester.request(Collections.emptyList())
+                .transformSync(responses -> true);
+
+        assertTrue(future.get());
     }
 
     private void insertUser(String username) throws LightblueException {
