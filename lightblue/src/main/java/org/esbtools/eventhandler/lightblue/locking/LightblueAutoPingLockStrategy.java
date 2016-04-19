@@ -169,8 +169,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                         throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
                     }
                 } catch (LightblueException e) {
-                    logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>",
-                            lock.callerId, lock.resourceId, e);
+                    logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>." +
+                            "Will keep trying.", lock.callerId, lock.resourceId, e);
                 }
             }
         }
