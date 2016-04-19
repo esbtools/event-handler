@@ -121,6 +121,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
             try {
                 if (!locking.ping(callerId, resourceId)) {
+                    autoPinger.cancel(true);
+                    autoPingScheduler.shutdownNow();
                     throw new LostLockException(this, lostLockMessage);
                 }
             } catch (LightblueException e) {
@@ -166,6 +168,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
             public void run() {
                 try {
                     if (!lock.locking.ping(lock.callerId, lock.resourceId)) {
+                        lock.autoPinger.cancel(true);
+                        lock.autoPingScheduler.shutdownNow();
                         throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
                     }
                 } catch (LightblueException e) {
