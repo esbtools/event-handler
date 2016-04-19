@@ -1,3 +1,8 @@
+[![Build Status](https://travis-ci.org/esbtools/event-handler.svg?branch=master)](https://travis-ci.org/esbtools/event-handler.svg?branch=master)
+[![Coverage Status](https://coveralls.io/repos/esbtools/event-handler/badge.svg?branch=master&service=github)](https://coveralls.io/github/esbtools/event-handler?branch=master)
+[![Stories in Ready](https://badge.waffle.io/esbtools/event-handler.png?label=ready&title=Ready)](https://waffle.io/esbtools/event-handler)
+
+
 # event-handler
 
 Notification in, document out.
