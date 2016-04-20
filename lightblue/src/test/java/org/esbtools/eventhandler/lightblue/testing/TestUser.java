@@ -18,9 +18,9 @@
 
 package org.esbtools.eventhandler.lightblue.testing;
 
-import io.github.alechenninger.lightblue.EntityName;
-import io.github.alechenninger.lightblue.Identity;
-import io.github.alechenninger.lightblue.Version;
+import com.redhat.lightblue.generator.EntityName;
+import com.redhat.lightblue.generator.Identity;
+import com.redhat.lightblue.generator.Version;
 
 @EntityName(TestUser.ENTITY_NAME)
 @Version(value = TestUser.ENTITY_VERSION, changelog = "test")

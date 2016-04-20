@@ -28,8 +28,8 @@ import com.redhat.lightblue.mongo.metadata.MongoDataStoreParser;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import io.github.alechenninger.lightblue.MetadataGenerator;
-import io.github.alechenninger.lightblue.javabeans.JavaBeansReflector;
+import com.redhat.lightblue.generator.MetadataGenerator;
+import com.redhat.lightblue.generator.javabeans.JavaBeansReflector;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;

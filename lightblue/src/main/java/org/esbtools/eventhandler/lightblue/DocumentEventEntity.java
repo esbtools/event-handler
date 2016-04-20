@@ -20,13 +20,13 @@ package org.esbtools.eventhandler.lightblue;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.redhat.lightblue.client.util.ClientConstants;
-import io.github.alechenninger.lightblue.Description;
-import io.github.alechenninger.lightblue.EntityName;
-import io.github.alechenninger.lightblue.Identity;
-import io.github.alechenninger.lightblue.MinItems;
-import io.github.alechenninger.lightblue.Required;
-import io.github.alechenninger.lightblue.Transient;
-import io.github.alechenninger.lightblue.Version;
+import com.redhat.lightblue.generator.Description;
+import com.redhat.lightblue.generator.EntityName;
+import com.redhat.lightblue.generator.Identity;
+import com.redhat.lightblue.generator.MinItems;
+import com.redhat.lightblue.generator.Required;
+import com.redhat.lightblue.generator.Transient;
+import com.redhat.lightblue.generator.Version;
 
 import javax.annotation.Nullable;
 import java.time.ZonedDateTime;

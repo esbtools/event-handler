@@ -33,7 +33,7 @@
     <properties>
         <version.event-handler-lib>0.1.0-SNAPSHOT</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.0-SNAPSHOT</version.lightblue-notification-hook-model>
-        <version.lightblue-java-generator-api>0.1.1-SNAPSHOT</version.lightblue-java-generator-api>
+        <version.lightblue-java-generator-api>0.1.0-SNAPSHOT</version.lightblue-java-generator-api>
         <version.lightblue-java-generator>0.1.0-SNAPSHOT</version.lightblue-java-generator>
         <version.lightblue-client>4.0.0</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
@@ -65,10 +65,10 @@
                     <includeProjectDependencies>true</includeProjectDependencies>
                     <includePluginDependencies>true</includePluginDependencies>
                     <executableDependency>
-                        <groupId>io.github.alechenninger.lightblue</groupId>
+                        <groupId>com.redhat.lightblue.generator</groupId>
                         <artifactId>lightblue-java-generator-bin</artifactId>
                     </executableDependency>
-                    <mainClass>io.github.alechenninger.lightblue.Main</mainClass>
+                    <mainClass>com.redhat.lightblue.generator.Main</mainClass>
                     <arguments>
                         <argument>-o ${metadata.outputDirectory}</argument>
                         <argument>org.esbtools.eventhandler.lightblue.DocumentEventEntity</argument>
@@ -77,7 +77,7 @@
                 </configuration>
                 <dependencies>
                     <dependency>
-                        <groupId>io.github.alechenninger.lightblue</groupId>
+                        <groupId>com.redhat.lightblue.generator</groupId>
                         <artifactId>lightblue-java-generator-bin</artifactId>
                         <version>${version.lightblue-java-generator-bin}</version>
                         <type>jar</type>
@@ -132,7 +132,7 @@
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>io.github.alechenninger.lightblue</groupId>
+                <groupId>com.redhat.lightblue.generator</groupId>
                 <artifactId>lightblue-java-generator</artifactId>
                 <version>${version.lightblue-java-generator}</version>
                 <scope>test</scope>
@@ -159,7 +159,7 @@
             <version>${version.lightblue-client}</version>
         </dependency>
         <dependency>
-            <groupId>io.github.alechenninger.lightblue</groupId>
+            <groupId>com.redhat.lightblue.generator</groupId>
             <artifactId>lightblue-java-generator-api</artifactId>
             <version>${version.lightblue-java-generator-api}</version>
         </dependency>
@@ -176,7 +176,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.github.alechenninger.lightblue</groupId>
+            <groupId>com.redhat.lightblue.generator</groupId>
             <artifactId>lightblue-java-generator</artifactId>
             <scope>test</scope>
         </dependency>
