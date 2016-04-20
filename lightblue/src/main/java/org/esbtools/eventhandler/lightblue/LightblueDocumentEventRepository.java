@@ -314,7 +314,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             }
 
             if (response.parseModifiedCount() == 0) {
-                logger.warn("Event updated by another thread. Will not process. Event was: {}", event);
+                logger.warn("Event updated by another thread. Will not process. " +
+                        "Document event id: {}", event.wrappedDocumentEventEntity().get_id());
                 eventsIterator.remove();
                 continue;
             }

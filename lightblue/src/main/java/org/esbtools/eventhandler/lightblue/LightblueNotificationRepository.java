@@ -180,7 +180,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
                 if (response.parseModifiedCount() == 0) {
                     logger.warn("Notification updated by another thread. Will not process. " +
-                            "Event was: {}", notification);
+                            "Notification id: {}", notification.wrappedNotificationEntity().get_id());
                     notificationsIterator.remove();
                 }
             }
