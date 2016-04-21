@@ -26,7 +26,9 @@
     <artifactId>event-handler-parent</artifactId>
     <packaging>pom</packaging>
     <version>0.1.0-SNAPSHOT</version>
+    <name>esbtools: ${project.groupId}|${project.artifactId}</name>
     <description>Event Handler</description>
+    <url>https://github.com/esbtools/event-handler</url>
 
     <licenses>
       <license>
@@ -53,6 +55,39 @@
         <url>https://oss.sonatype.org/content/repositories/snapshots</url>
       </snapshotRepository>
     </distributionManagement>
+
+    <developers>
+      <developer>
+        <id>alechenninger</id>
+        <name>Alec Henninger</name>
+        <email>ahenning@redhat.com</email>
+        <organization>Red Hat</organization>
+        <roles>
+          <role>developer</role>
+        </roles>
+        <timezone>-5</timezone>
+      </developer>
+      <developer>
+        <id>kahowell</id>
+        <name>Kevin Howell</name>
+        <email>khowell@redhat.com</email>
+        <organization>Red Hat</organization>
+        <roles>
+          <role>developer</role>
+        </roles>
+        <timezone>-5</timezone>
+      </developer>
+      <developer>
+        <id>dhaynes</id>
+        <name>Derek Haynes</name>
+        <email>dhaynes@redhat.com</email>
+        <organization>Red Hat</organization>
+        <roles>
+          <role>developer</role>
+        </roles>
+        <timezone>+1</timezone>
+      </developer>
+    </developers>
 
     <modules>
         <module>lib</module>
@@ -217,7 +252,7 @@
               </plugin>
         </plugins>
     </build>
-    
+
     <profiles>
             <profile>
               <id>release</id>
