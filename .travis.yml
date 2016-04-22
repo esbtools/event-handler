@@ -10,7 +10,7 @@ after_success:
 - '[[ $TRAVIS_BRANCH == "master" ]] && [[ $TRAVIS_JDK_VERSION == "oraclejdk8" ]] &&
   { mvn -B clean deploy -DskipTests; };'
 after_script:
-- mvn clean -DsourceEncoding=UTF-8 cobertura:cobertura coveralls:report
+- mvn clean -DsourceEncoding=UTF-8 cobertura:cobertura coveralls:report >> coveralls-output
 notifications:
   email: false
   irc:
