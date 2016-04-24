@@ -45,7 +45,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
 
     private static final String NEXT_ATTEMPT_NUMBER_PROPERTY = "nextAttemptNumber";
     private static final Integer FIRST_ATTEMPT_NUMBER = 1;
-    
+
     public RetryingBatchFailedMessageRoute(String fromUri, Expression retryDelayMillis,
             int maxRetryCount, Duration processTimeout, String deadLetterUri) {
         this.fromUri = fromUri;
