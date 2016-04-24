@@ -33,10 +33,10 @@
     <properties>
         <version.event-handler-lib>0.1.0-SNAPSHOT</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.0-SNAPSHOT</version.lightblue-notification-hook-model>
-        <version.lightblue-java-generator-api>0.1.0</version.lightblue-java-generator-api>
-        <version.lightblue-java-generator-lib>0.1.0</version.lightblue-java-generator-lib>
-        <version.lightblue-java-generator-bin>0.1.0</version.lightblue-java-generator-bin>
-        <version.lightblue-client>4.0.0</version.lightblue-client>
+        <version.lightblue-java-generator-api>0.1.1-SNAPSHOT</version.lightblue-java-generator-api>
+        <version.lightblue-java-generator-lib>0.1.1-SNAPSHOT</version.lightblue-java-generator-lib>
+        <version.lightblue-java-generator-bin>0.1.1-SNAPSHOT</version.lightblue-java-generator-bin>
+        <version.lightblue-client>4.4.0</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
         <version.exec-maven-plugin>1.4.0</version.exec-maven-plugin>
 
