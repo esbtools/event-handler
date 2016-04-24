@@ -45,7 +45,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
 
     private static final String NEXT_ATTEMPT_NUMBER_PROPERTY = "nextAttemptNumber";
     private static final Integer FIRST_ATTEMPT_NUMBER = 1;
-
+    
     public RetryingBatchFailedMessageRoute(String fromUri, Expression retryDelayMillis,
             int maxRetryCount, Duration processTimeout, String deadLetterUri) {
         this.fromUri = fromUri;
@@ -97,6 +97,9 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                             // This happens when message factory failed to get message from original
                             // body. We won't bother trying get the message from the message factory
                             // again; if that fails it is usually a bug that retrying won't circumvent.
+                            log.warn("Failed message had no parsed message. There is no message " +
+                                    "to retry without trying to parse again, which is usually " +
+                                    "fruitless. Sending to dead letter URI {}.", deadLetterUri);
                             continue;
                         }
 
@@ -104,6 +107,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         final Future<Void> reprocessingFuture;
 
                         try {
+                            log.debug("Retry attempt #{} of failed message {}", retryAttempt, message);
                             reprocessingFuture = message.process();
                         } catch (Exception e) {
                             log.error("Failed to reprocess message (retry attempt " +
