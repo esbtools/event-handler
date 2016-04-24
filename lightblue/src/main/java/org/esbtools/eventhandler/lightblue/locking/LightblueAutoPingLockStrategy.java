@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Uses lightblue's locking APIs with TTL, automatically pinging the lock in the background until it
@@ -95,6 +96,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         private final ScheduledExecutorService autoPingScheduler =
                 Executors.newSingleThreadScheduledExecutor();
         private final ScheduledFuture<?> autoPinger;
+        private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
         private static final Logger logger = LoggerFactory.getLogger(AutoPingingLock.class);
 
@@ -123,11 +125,13 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                 if (!locking.ping(callerId, resourceId)) {
                     autoPinger.cancel(true);
                     autoPingScheduler.shutdownNow();
+                    isClosed.set(true);
                     throw new LostLockException(this, lostLockMessage);
                 }
             } catch (LightblueException e) {
-                throw new LostLockException(this, "Failed to ping lock, assuming lost. " +
-                        lostLockMessage, e);
+                throw new LostLockException(this, "Failed to ping lock, assuming lost. This can " +
+                        "happen if lock is already closed or failed to communicate with " +
+                        "lightblue. " + lostLockMessage, e);
             }
         }
 
@@ -138,10 +142,15 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
 
         @Override
         public void close() throws IOException {
+            if (isClosed.get()) {
+                return;
+            }
+
             try {
                 autoPinger.cancel(true);
                 autoPingScheduler.shutdownNow();
                 locking.release(callerId, resourceId);
+                isClosed.set(true);
             } catch (LightblueException e) {
                 throw new IOException("Unable to release lock. callerId: " + callerId +
                         ", resourceId: " + resourceId, e);
@@ -170,6 +179,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                     if (!lock.locking.ping(lock.callerId, lock.resourceId)) {
                         lock.autoPinger.cancel(true);
                         lock.autoPingScheduler.shutdownNow();
+                        lock.isClosed.set(true);
                         throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
                     }
                 } catch (LightblueException e) {
