@@ -29,6 +29,7 @@ import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.MultiStringDocumentEvent;
 import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
 import org.esbtools.eventhandler.lightblue.testing.StringDocumentEvent;
+import org.esbtools.eventhandler.lightblue.testing.TestLogger;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -45,6 +46,7 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.net.UnknownHostException;
@@ -77,6 +79,9 @@ public class LightblueDocumentEventRepositoryTest {
 
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
+
+    @Rule
+    public TestLogger testLogger = new TestLogger();
 
     private LightblueClient client;
 
