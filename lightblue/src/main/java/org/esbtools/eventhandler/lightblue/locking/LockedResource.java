@@ -32,6 +32,10 @@ public interface LockedResource<T> extends Closeable {
      *
      * <p>If the check fails for another reason, we pessimistically assume the lock was lost, so
      * a {@link LostLockException} is also thrown, with the underlying failure as its cause.
+     *
+     * <p>In any case that this method throws {@code LostLockException}, no further resource clean
+     * up is necessary. The implementation should take care of any necessary cleanup on behalf of the
+     * client since we are giving up on the lock... it is lost, after all.
      */
     void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException;
 

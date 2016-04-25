@@ -129,6 +129,13 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                     throw new LostLockException(this, lostLockMessage);
                 }
             } catch (LightblueException e) {
+                try {
+                    close();
+                } catch (IOException suppressed) {
+                    logger.warn("Caught IOException trying to release lock after failed ping. " +
+                            "Ignoring.", suppressed);
+                }
+
                 throw new LostLockException(this, "Failed to ping lock, assuming lost. This can " +
                         "happen if lock is already closed or failed to communicate with " +
                         "lightblue. " + lostLockMessage, e);
@@ -183,8 +190,8 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                         throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
                     }
                 } catch (LightblueException e) {
-                    logger.error("Periodic lock ping failed for callerId <{}> and resourceId <{}>." +
-                            "Will keep trying.", lock.callerId, lock.resourceId, e);
+                    logger.error("Periodic lock ping failed for callerId <{}> and " +
+                            "resourceId <{}>. Will keep trying.", lock.callerId, lock.resourceId, e);
                 }
             }
         }
