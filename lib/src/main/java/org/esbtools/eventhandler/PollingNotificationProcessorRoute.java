@@ -109,14 +109,13 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 }
             }
 
-            log.debug("Persisting {} document events via route {}: {}",
-                    notificationsToDocumentEvents.size(), exchange.getFromRouteId(),
-                    notificationsToDocumentEvents.values());
-
             List<DocumentEvent> documentEvents = notificationsToDocumentEvents.values()
                     .stream()
                     .flatMap(Collection::stream)
                     .collect(Collectors.toList());
+
+            log.debug("Persisting {} document events via route {}: {}",
+                    documentEvents.size(), exchange.getFromRouteId(), documentEvents);
 
             try {
                 documentEventRepository.addNewDocumentEvents(documentEvents);
