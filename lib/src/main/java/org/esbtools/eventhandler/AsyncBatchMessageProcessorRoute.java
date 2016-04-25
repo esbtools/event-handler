@@ -23,6 +23,7 @@ import org.apache.camel.builder.RouteBuilder;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
@@ -81,6 +82,9 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
             List<ProcessingMessage> processingMessages = new ArrayList<>(originalMessages.size());
             List<FailedMessage> failures = new ArrayList<>();
 
+            log.debug("Received {} messages on route {}: {}",
+                    originalMessages.size(), routeId, originalMessages);
+
             // Start processing all of the messages in the batch in parallel.
             for (Object originalMessage : originalMessages) {
                 final Message message;
@@ -107,14 +111,20 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
                 ProcessingMessage processing = new ProcessingMessage(
                         originalMessage, message, processingFuture);
                 processingMessages.add(processing);
-
-                log.debug("Processing on route {}: {}", routeId, message);
             }
+
+            List<Message> processedSuccessfully = log.isDebugEnabled()
+                    ? new ArrayList<>(processingMessages.size())
+                    : Collections.emptyList();
 
             // Wait for processing to complete.
             for (ProcessingMessage processingMsg : processingMessages) {
                 try {
                     processingMsg.future.get(processTimeout.toMillis(), TimeUnit.MILLISECONDS);
+
+                    if (log.isDebugEnabled()) {
+                        processedSuccessfully.add(processingMsg.parsedMessage);
+                    }
                 } catch (ExecutionException e) {
                     log.error("Failed to process message: " + processingMsg.parsedMessage, e);
                     FailedMessage failure = new FailedMessage(processingMsg.originalMessage,
@@ -127,6 +137,9 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
                     failures.add(failure);
                 }
             }
+
+            log.debug("Processed {} messages on route {}: {}",
+                    processedSuccessfully.size(), routeId, processedSuccessfully);
 
             // Deal with failures...
             exchange.getIn().setBody(failures);

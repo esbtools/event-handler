@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RetryingBatchFailedMessageRoute extends RouteBuilder {
     private final String fromUri;
@@ -42,6 +43,11 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
     private final int maxRetryCount;
     private final Duration processTimeout;
     private final String deadLetterUri;
+
+    private final int idCount = idCounter.getAndIncrement();
+    private final String routeId = "failedMessageRetryer-" + idCount;
+
+    private static final AtomicInteger idCounter = new AtomicInteger(0);
 
     private static final String NEXT_ATTEMPT_NUMBER_PROPERTY = "nextAttemptNumber";
     private static final Integer FIRST_ATTEMPT_NUMBER = 1;
@@ -58,6 +64,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
         from(fromUri)
+        .routeId(routeId)
         // We use loop instead of error handler because error handlers start with original message
         // sent to point of failure; we need the message to stay intact to prevent reprocessing
         // already succeeded messages and to keep context of previous tries' failures.
@@ -79,6 +86,9 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                     List<FailedMessage> newFailures = new ArrayList<>();
                     List<ReprocessingFailure> reprocessingFailures =
                             new ArrayList<>(oldFailures.size());
+
+                    log.debug("About to retry {} messages on route {}, attempt #{}: {}",
+                            oldFailures.size(), routeId, retryAttempt, oldFailures);
 
                     // Begin processing all failed messages again in parallel.
                     for (Object failureAsObject : oldFailures) {
@@ -107,7 +117,6 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         final Future<Void> reprocessingFuture;
 
                         try {
-                            log.debug("Retry attempt #{} of failed message {}", retryAttempt, message);
                             reprocessingFuture = message.process();
                         } catch (Exception e) {
                             log.error("Failed to reprocess message (retry attempt " +
@@ -119,6 +128,9 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
 
                         reprocessingFailures.add(new ReprocessingFailure(failure, reprocessingFuture));
                     }
+
+                    log.debug("Retrying {} messages on {}, attempt #{}: {}",
+                            reprocessingFailures.size(), routeId, retryAttempt, reprocessingFailures);
 
                     for (ReprocessingFailure reprocessingFailure : reprocessingFailures) {
                         FailedMessage originalFailure = reprocessingFailure.originalFailure;
@@ -215,6 +227,13 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
         private ReprocessingFailure(FailedMessage originalFailure, Future<Void> reprocessingFuture) {
             this.originalFailure = originalFailure;
             this.reprocessingFuture = reprocessingFuture;
+        }
+
+        @Override
+        public String toString() {
+            return "ReprocessingFailure{" +
+                    "originalFailure=" + originalFailure +
+                    '}';
         }
     }
 }

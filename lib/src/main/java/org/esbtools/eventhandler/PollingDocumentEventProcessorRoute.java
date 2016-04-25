@@ -114,8 +114,8 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 }
             }
 
-            log.debug("Publishing on route {}: {}",
-                    exchange.getFromRouteId(), eventsToDocuments.values());
+            log.debug("Publishing {} documents on route {}: {}",
+                    eventsToDocuments.size(), exchange.getFromRouteId(), eventsToDocuments.values());
 
             exchange.getIn().setBody(Iterables.concat(eventsToDocuments.entrySet(), failedEvents));
         })
