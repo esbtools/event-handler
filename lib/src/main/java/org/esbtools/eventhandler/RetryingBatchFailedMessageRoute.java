@@ -29,6 +29,7 @@ import org.apache.camel.builder.RouteBuilder;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -119,7 +120,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         try {
                             reprocessingFuture = message.process();
                         } catch (Exception e) {
-                            log.error("Failed to reprocess message (retry attempt " +
+                            log.error("Failed to reprocess message (retry attempt #" +
                                     retryAttempt + "): " + message, e);
                             suppressPreviousFailureInNewException(failure, e);
                             newFailures.add(new FailedMessage(failure.originalMessage(), message, e));
@@ -129,8 +130,9 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         reprocessingFailures.add(new ReprocessingFailure(failure, reprocessingFuture));
                     }
 
-                    log.debug("Retrying {} messages on {}, attempt #{}: {}",
-                            reprocessingFailures.size(), routeId, retryAttempt, reprocessingFailures);
+                    List<Message> reprocessedSuccessfully = log.isDebugEnabled()
+                            ? new ArrayList<>(reprocessingFailures.size())
+                            : Collections.emptyList();
 
                     for (ReprocessingFailure reprocessingFailure : reprocessingFailures) {
                         FailedMessage originalFailure = reprocessingFailure.originalFailure;
@@ -138,10 +140,14 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         try {
                             reprocessingFailure.reprocessingFuture
                                     .get(processTimeout.toMillis(), TimeUnit.MILLISECONDS);
+
+                            if (log.isDebugEnabled()) {
+                                reprocessedSuccessfully.add(originalFailure.parsedMessage().get());
+                            }
                         } catch (ExecutionException e) {
                             Message parsedMessage = originalFailure.parsedMessage().get();
 
-                            log.error("Failed to reprocess message (retry attempt " + retryAttempt +
+                            log.error("Failed to reprocess message (retry attempt #" + retryAttempt +
                                     "): " + parsedMessage, e);
 
                             Throwable realException = e.getCause();
@@ -153,7 +159,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         } catch (InterruptedException | TimeoutException e) {
                             Message parsedMessage = originalFailure.parsedMessage().get();
 
-                            log.warn("Timed out reprocessing message (retry attempt " + retryAttempt +
+                            log.warn("Timed out reprocessing message (retry attempt #" + retryAttempt +
                                     "): " + parsedMessage, e);
 
                             suppressPreviousFailureInNewException(originalFailure, e);
@@ -162,6 +168,9 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                             newFailures.add(failure);
                         }
                     }
+
+                    log.debug("Retry attempt #{} successful! Processed {} messages on route {}: {}",
+                            retryAttempt, reprocessedSuccessfully.size(), routeId, reprocessedSuccessfully);
 
                     // Give new failures another shot or dead letter them.
                     exchange.getIn().setBody(newFailures);
