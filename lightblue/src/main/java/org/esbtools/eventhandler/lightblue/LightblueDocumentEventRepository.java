@@ -401,6 +401,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     SharedIdentityEvents eventBatch = docEventsByIdentity.get(identity);
 
                     if (eventBatch == null) {
+                        if (locksAcquired.size() == maxIdentities) {
+                            continue;
+                        }
+
                         eventBatch = new SharedIdentityEvents(lockStrategy, identity, clock);
                         docEventsByIdentity.put(identity, eventBatch);
                         if (eventBatch.lock.isPresent()) {
@@ -410,10 +414,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     }
 
                     eventBatch.addEvent(newEvent);
-
-                    if (locksAcquired.size() == maxIdentities) {
-                        break;
-                    }
                 } catch (Exception e) {
                     if (logger.isErrorEnabled()) {
                         logger.error("Failed to parse event entity: " + eventEntity, e);
