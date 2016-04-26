@@ -3,6 +3,7 @@
         <!--make the profile active all the time -->
         <activeProfile>securecentral</activeProfile>
     </activeProfiles>
+
     <profiles>
         <profile>
             <id>securecentral</id>
@@ -18,11 +19,17 @@
             </repositories>
             <pluginRepositories>
                 <pluginRepository>
-                    <id>central</id>
-                    <url>https://repo1.maven.org/maven2</url>
-                    <releases>
-                        <enabled>true</enabled>
-                    </releases>
+                  <id>central</id>
+                  <url>https://repo1.maven.org/maven2</url>
+                  <releases>
+                    <enabled>true</enabled>
+                  </releases>
+                </pluginRepository>
+                <pluginRepository>
+                  <id>snapshots-repo</id>
+                  <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                  <releases><enabled>false</enabled></releases>
+                  <snapshots><enabled>true</enabled></snapshots>
                 </pluginRepository>
             </pluginRepositories>
         </profile>
