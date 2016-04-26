@@ -499,6 +499,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     updates.put(newOrMergerEvent, DocumentEventUpdate.timestamp(newOrMergerEvent, clock));
 
                     newOrMergerEvent = null;
+
+                    logger.debug("Event {} superseded by event {}",
+                            newOrMergerEventEntity.get_id(), previousEntity.get_id());
+
                     break;
                 } else if (previouslyOptimizedEvent.isSupersededBy(newOrMergerEvent)) {
                     // Previous entity was processing; now it is superseded and removed from
@@ -515,6 +519,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
                     newOrMergerEventEntity.addSurvivorOfIds(previousEntity.get_id());
                     newOrMergerEventEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
+
+                    logger.debug("Event {} superseded by event {}",
+                            previousEntity.get_id(), newOrMergerEventEntity.get_id());
                 } else if (newOrMergerEvent.couldMergeWith(previouslyOptimizedEvent)) {
                     // Previous entity was processing; now it is merged and removed from optimized
                     // result list.
@@ -547,6 +554,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     if (newOrMergerEventEntity.get_id() != null) {
                         mergerEntity.addSurvivorOfIds(newOrMergerEventEntity.get_id());
                     }
+
+                    logger.debug("Events {} and {} merged into new event {}",
+                            previousEntity.get_id(), newOrMergerEventEntity.get_id(), mergerEntity.get_id());
 
                     newOrMergerEvent = merger;
                     newOrMergerEventEntity = mergerEntity;
