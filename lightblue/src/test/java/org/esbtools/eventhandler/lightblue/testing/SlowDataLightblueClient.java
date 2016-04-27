@@ -28,9 +28,12 @@ import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueMetadataResponse;
 
+import java.time.Duration;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class SlowDataLightblueClient implements LightblueClient {
     private volatile boolean shouldPause = false;
@@ -39,11 +42,13 @@ public class SlowDataLightblueClient implements LightblueClient {
 
     private final LightblueClient delegate;
 
+    private volatile CountDownLatch isPausedLatch = new CountDownLatch(1);
+
     public SlowDataLightblueClient(LightblueClient delegate) {
         this.delegate = delegate;
     }
 
-    public void pauseOnNextRequest() {
+    public void pauseBeforeRequests() {
         shouldPause = true;
     }
 
@@ -61,6 +66,15 @@ public class SlowDataLightblueClient implements LightblueClient {
             currentFuture.complete(response);
         } catch (Exception e) {
             currentFuture.completeExceptionally(e);
+        }
+    }
+
+    public void waitUntilPausedRequestQueuedAtMost(Duration timeout) throws InterruptedException {
+        boolean timedOut = !isPausedLatch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        isPausedLatch = new CountDownLatch(1);
+
+        if (timedOut) {
+            throw new AssertionError("Timed out waiting for next request to queue.");
         }
     }
 
@@ -98,6 +112,7 @@ public class SlowDataLightblueClient implements LightblueClient {
             this.request = request;
 
             if (shouldPause) {
+                isPausedLatch.countDown();
                 return (T) responseFuture.get();
             }
 

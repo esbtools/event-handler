@@ -23,6 +23,7 @@ import org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepositoryConfi
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import java.time.Duration;
 import java.util.Collection;
@@ -30,6 +31,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
     private Set<String> canonicalTypesToProcess = Collections.emptySet();
     private int documentEventsBatchSize = 0;
+    private @Nullable Integer maxDocumentEventsPerInsert = null;
     private Duration processingTimeout = Duration.ofMinutes(10);
     private Duration expireThreshold = Duration.ofMinutes(2);
 
@@ -45,12 +48,7 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     /**
      * Uses empty default values, which will configure a repository to never retrieve anything.
      */
-    public MutableLightblueDocumentEventRepositoryConfig() {
-        this.canonicalTypesToProcess = Collections.emptySet();
-        this.documentEventsBatchSize = 0;
-        this.processingTimeout = Duration.ofMinutes(10);
-        this.expireThreshold = Duration.ofMinutes(2);
-    }
+    public MutableLightblueDocumentEventRepositoryConfig() {}
 
     /**
      * Uses provided as initial values.
@@ -62,6 +60,22 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
         this.canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(
                 Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess")));
         this.documentEventsBatchSize = Objects.requireNonNull(initialDocumentEventsBatchSize, "initialDocumentEventsBatchSize");
+        this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
+        this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
+    }
+
+    /**
+     * Uses provided as initial values.
+     */
+    public MutableLightblueDocumentEventRepositoryConfig(
+            Collection<String> initialCanonicalTypesToProcess, int initialDocumentEventsBatchSize,
+            @Nullable Integer maxDocumentEventsPerInsert, Duration processingTimeout,
+            Duration expireThreshold) {
+        this.canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(
+                Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess")));
+        this.documentEventsBatchSize =
+                Objects.requireNonNull(initialDocumentEventsBatchSize, "initialDocumentEventsBatchSize");
+        this.maxDocumentEventsPerInsert = maxDocumentEventsPerInsert;
         this.processingTimeout = Objects.requireNonNull(processingTimeout, "processingTimeout");
         this.expireThreshold = Objects.requireNonNull(expireThreshold, "expireThreshold");
     }
@@ -99,6 +113,16 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
         return documentEventsBatchSize;
     }
 
+    public MutableLightblueDocumentEventRepositoryConfig setDocumentEventsBatchSize(int batchSize) {
+        int old = documentEventsBatchSize;
+        documentEventsBatchSize = batchSize;
+        if (old != documentEventsBatchSize) {
+            log.info("Document event batch size updated." +
+                    " Old value was {}. New value is {}.", old, documentEventsBatchSize);
+        }
+        return this;
+    }
+
     @Override
     public Duration getDocumentEventProcessingTimeout() {
         return processingTimeout;
@@ -131,12 +155,18 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
         return this;
     }
 
-    public MutableLightblueDocumentEventRepositoryConfig setDocumentEventsBatchSize(int batchSize) {
-        int old = documentEventsBatchSize;
-        documentEventsBatchSize = batchSize;
-        if (old != documentEventsBatchSize) {
-            log.info("Document event batch size updated." +
-                    " Old value was {}. New value is {}.", old, documentEventsBatchSize);
+    @Override
+    public Optional<Integer> getMaxDocumentEventsPerInsert() {
+        return Optional.ofNullable(maxDocumentEventsPerInsert);
+    }
+
+    public MutableLightblueDocumentEventRepositoryConfig setMaxDocumentEventsPerInsert(
+            @Nullable Integer maxDocumentEventsPerInsert) {
+        Integer old = this.maxDocumentEventsPerInsert;
+        this.maxDocumentEventsPerInsert = maxDocumentEventsPerInsert;
+        if (!Objects.equals(old, maxDocumentEventsPerInsert)) {
+            log.info("Max document events per insert updated. " +
+                    "Old value was {}. New value is {}.", old, maxDocumentEventsPerInsert);
         }
         return this;
     }

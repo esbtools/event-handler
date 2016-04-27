@@ -221,8 +221,8 @@ public class LightblueNotificationRepositoryTest {
 
             CountDownLatch bothThreadsStarted = new CountDownLatch(2);
 
-            thread1Client.pauseOnNextRequest();
-            thread2Client.pauseOnNextRequest();
+            thread1Client.pauseBeforeRequests();
+            thread2Client.pauseBeforeRequests();
 
             Future<List<LightblueNotification>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();

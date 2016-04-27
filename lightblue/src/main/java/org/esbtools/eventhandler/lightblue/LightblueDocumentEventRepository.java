@@ -103,7 +103,28 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 .map(LightblueDocumentEventRepository::asEntity)
                 .collect(Collectors.toList());
 
-        lightblue.data(InsertRequests.documentEventsReturningOnlyIds(documentEventEntities));
+        int newEventsCount = documentEventEntities.size();
+        int maxEventsPerInsert = config.getMaxDocumentEventsPerInsert().orElse(newEventsCount);
+
+        int numberOfRequestsOfMaxEvents = newEventsCount / maxEventsPerInsert;
+        int remainder = newEventsCount % maxEventsPerInsert;
+
+        int requests = remainder > 0
+                ? numberOfRequestsOfMaxEvents + 1
+                : numberOfRequestsOfMaxEvents;
+
+        for (int i = 0; i < requests; i++) {
+            int fromIndex = i * maxEventsPerInsert;
+            int toIndex = Math.min(fromIndex + maxEventsPerInsert, newEventsCount);
+
+            List<DocumentEventEntity> entitiesInBatch =
+                    documentEventEntities.subList(fromIndex, toIndex);
+
+            logger.debug("Inserting batch #{} of new document events from {} to {}.",
+                    i, fromIndex, toIndex);
+
+            lightblue.data(InsertRequests.documentEventsReturningOnlyIds(entitiesInBatch));
+        }
     }
 
     @Override

@@ -22,6 +22,7 @@ import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentEventRepository;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 public interface LightblueDocumentEventRepositoryConfig {
@@ -68,4 +69,15 @@ public interface LightblueDocumentEventRepositoryConfig {
      * timestamp before publishing its document. Other alternative schemes are possible.
      */
     Duration getDocumentEventExpireThreshold();
+
+    /**
+     * When adding new document events, we can make (total new events) / (max events per insert)
+     * requests, instead of one request with all new events in a single call. If no integer is
+     * provided (the optional is empty), we will do one request with all new events.
+     *
+     * <p>Setting a limit is recommended as it protects against potentially extremely significant
+     * notifications producing a huge quantity of document events and failing to insert them all in
+     * one call.
+     */
+    Optional<Integer> getMaxDocumentEventsPerInsert();
 }

@@ -29,6 +29,7 @@ import com.redhat.lightblue.generator.Transient;
 import com.redhat.lightblue.generator.Version;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
@@ -46,6 +47,7 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     private Integer notificationExpireThresholdSeconds;
     private Integer documentEventProcessingTimeoutSeconds;
     private Integer documentEventExpireThresholdSeconds;
+    private Integer maxDocumentEventsPerInsert;
 
     public String getDomain() {
         return domain;
@@ -115,6 +117,22 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
         return documentEventExpireThresholdSeconds == null
                 ? null
                 : Duration.ofSeconds(documentEventExpireThresholdSeconds);
+    }
+
+    @Override
+    @Transient
+    public Optional<Integer> getMaxDocumentEventsPerInsert() {
+        return Optional.ofNullable(maxDocumentEventsPerInsert);
+    }
+
+    @Description("When adding new document events, we can make (total new events) / (max events " +
+            "per insert) requests, instead of one request with all new events in a single call. " +
+            "If no integer is provided, we will do one request with all new events.\n" +
+            "Setting a limit is recommended as it protects against potentially extremely " +
+            "significant notifications producing a huge quantity of document events and failing " +
+            "to insert them all in one call.")
+    public void setMaxDocumentEventsPerInsert(Integer maxDocumentEventsPerInsert) {
+        this.maxDocumentEventsPerInsert = maxDocumentEventsPerInsert;
     }
 
     public Integer getDocumentEventExpireThresholdSeconds() {
