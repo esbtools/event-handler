@@ -390,7 +390,6 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
 
             for (DocumentEventEntity eventEntity : entities) {
                 String typeOfEvent = eventEntity.getCanonicalType();
-
                 DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
 
                 try {
@@ -494,14 +493,17 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     previousEntity.addSurvivorOfIds(newOrMergerEventEntity.getSurvivorOfIds());
                     previousEntity.addSurvivorOfIds(newOrMergerEventEntity.get_id());
 
-                    // ...and throw away this new one.
-                    newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.superseded);
-                    updates.put(newOrMergerEvent, DocumentEventUpdate.timestamp(newOrMergerEvent, clock));
-
-                    newOrMergerEvent = null;
+                    // ...and throw away this new one (which means simply drop it if it is a net new
+                    // event as a result of a merge which will have no id yet).
+                    if (newOrMergerEventEntity.get_id() != null) {
+                        newOrMergerEventEntity.setStatus(DocumentEventEntity.Status.superseded);
+                        updates.put(newOrMergerEvent, DocumentEventUpdate.timestamp(newOrMergerEvent, clock));
+                    }
 
                     logger.debug("Event {} superseded by event {}",
                             newOrMergerEventEntity.get_id(), previousEntity.get_id());
+
+                    newOrMergerEvent = null;
 
                     break;
                 } else if (previouslyOptimizedEvent.isSupersededBy(newOrMergerEvent)) {

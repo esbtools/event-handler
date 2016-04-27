@@ -295,36 +295,31 @@ public class LightblueDocumentEventRepositoryTest {
                 newStringDocumentEventEntity("duplicate", creationTimeClock),
                 newStringDocumentEventEntity("duplicate", creationTimeClock));
 
-        repository.retrievePriorityDocumentEventsUpTo(5);
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
 
-        DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
-                DocumentEventEntity.VERSION);
-        findSuperseded.select(Projection.includeFieldRecursively("*"));
-        findSuperseded.where(Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
+        List<DocumentEventEntity> supersededEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
+        List<DocumentEventEntity> survivorEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.neq, DocumentEventEntity.Status.superseded));
 
-        DocumentEventEntity[] supersededEntities = client.data(findSuperseded, DocumentEventEntity[].class);
-
-        DataFindRequest findProcessing = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
-                DocumentEventEntity.VERSION);
-        findProcessing.select(Projection.includeFieldRecursively("*"));
-        findProcessing.where(Query.withValue("status = processing"));
-
-        DocumentEventEntity[] processingEntities = client.data(findProcessing, DocumentEventEntity[].class);
-
-        assertEquals(1, processingEntities.length);
+        assertEquals(1, retrieved.size());
+        assertEquals(1, survivorEntities.size());
         assertEquals(
                 Arrays.asList(expectedProcessedDate, expectedProcessedDate, expectedProcessedDate, expectedProcessedDate),
-                Arrays.stream(supersededEntities)
+                supersededEntities.stream()
                         .map(DocumentEventEntity::getProcessedDate)
                         .map(ZonedDateTime::toInstant)
                         .collect(Collectors.toList()));
 
-        DocumentEventEntity survivorEntity = processingEntities[0];
+        DocumentEventEntity retrievedEntity = survivorEntities.get(0);
+        DocumentEventEntity survivorEntity = survivorEntities.get(0);
 
-        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
-                Arrays.stream(supersededEntities)
-                        .map(DocumentEventEntity::get_id)
-                        .collect(Collectors.toList()));
+        List<String> supersededIds = supersededEntities.stream()
+                .map(DocumentEventEntity::get_id)
+                .collect(Collectors.toList());
+
+        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
+        assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
     }
 
     @Test
@@ -341,28 +336,30 @@ public class LightblueDocumentEventRepositoryTest {
 
         List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
 
-        DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
-                DocumentEventEntity.VERSION);
-        findSuperseded.select(Projection.includeFieldRecursively("*"));
-        findSuperseded.where(Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
-
-        DocumentEventEntity[] supersededEntities = client.data(findSuperseded, DocumentEventEntity[].class);
+        List<DocumentEventEntity> supersededEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.superseded));
+        List<DocumentEventEntity> survivorEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.neq, DocumentEventEntity.Status.superseded));
 
         assertEquals(1, retrieved.size());
+        assertEquals(1, survivorEntities.size());
         assertEquals(
                 Arrays.asList(expectedProcessedDate, expectedProcessedDate, expectedProcessedDate, expectedProcessedDate),
-                Arrays.stream(supersededEntities)
+                supersededEntities.stream()
                         .map(DocumentEventEntity::getProcessedDate)
                         .map(ZonedDateTime::toInstant)
                         .collect(Collectors.toList()));
 
         MultiStringDocumentEvent event = (MultiStringDocumentEvent) retrieved.get(0);
-        DocumentEventEntity survivorEntity = event.wrappedDocumentEventEntity();
+        DocumentEventEntity retrievedEntity = event.wrappedDocumentEventEntity();
+        DocumentEventEntity survivorEntity = survivorEntities.get(0);
 
-        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
-                Arrays.stream(supersededEntities)
-                        .map(DocumentEventEntity::get_id)
-                        .collect(Collectors.toList()));
+        List<String> supersededIds = supersededEntities.stream()
+                .map(DocumentEventEntity::get_id)
+                .collect(Collectors.toList());
+
+        assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
+        assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
         assertThat(event.values()).containsExactly("1", "2", "3", "4", "5");
     }
 
@@ -379,17 +376,22 @@ public class LightblueDocumentEventRepositoryTest {
 
         List<DocumentEventEntity> mergedEntities = findDocumentEventEntitiesWhere(
                 Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.merged));
+        List<DocumentEventEntity> nonMergedEntities = findDocumentEventEntitiesWhere(
+                Query.withValue("status", Query.BinOp.neq, DocumentEventEntity.Status.merged));
 
         assertThat(retrieved).hasSize(1);
+        assertThat(nonMergedEntities).hasSize(1);
         assertThat(mergedEntities).named("merged entities").hasSize(5);
 
         DocumentEventEntity retrievedEntity = retrieved.get(0).wrappedDocumentEventEntity();
+        DocumentEventEntity processingEntity = nonMergedEntities.get(0);
 
-        assertThat(retrievedEntity.getSurvivorOfIds())
-                .containsExactlyElementsIn(
-                mergedEntities.stream()
-                        .map(DocumentEventEntity::get_id)
-                        .collect(Collectors.toList()));
+        List<String> mergedIds = mergedEntities.stream()
+                .map(DocumentEventEntity::get_id)
+                .collect(Collectors.toList());
+
+        assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(mergedIds);
+        assertThat(processingEntity.getSurvivorOfIds()).containsExactlyElementsIn(mergedIds);
     }
 
     @Test
