@@ -79,5 +79,5 @@ public interface LightblueDocumentEventRepositoryConfig {
      * notifications producing a huge quantity of document events and failing to insert them all in
      * one call.
      */
-    Optional<Integer> getMaxDocumentEventsPerInsert();
+    Optional<Integer> getOptionalMaxDocumentEventsPerInsert();
 }

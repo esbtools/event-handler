@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 public class MutableLightblueDocumentEventRepositoryConfig implements LightblueDocumentEventRepositoryConfig {
     private Set<String> canonicalTypesToProcess = Collections.emptySet();
     private int documentEventsBatchSize = 0;
-    private @Nullable Integer maxDocumentEventsPerInsert = null;
+    private Optional<Integer> maxDocumentEventsPerInsert = Optional.empty();
     private Duration processingTimeout = Duration.ofMinutes(10);
     private Duration expireThreshold = Duration.ofMinutes(2);
 
@@ -69,7 +69,7 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
      */
     public MutableLightblueDocumentEventRepositoryConfig(
             Collection<String> initialCanonicalTypesToProcess, int initialDocumentEventsBatchSize,
-            @Nullable Integer maxDocumentEventsPerInsert, Duration processingTimeout,
+            Optional<Integer> maxDocumentEventsPerInsert, Duration processingTimeout,
             Duration expireThreshold) {
         this.canonicalTypesToProcess = Collections.unmodifiableSet(new HashSet<>(
                 Objects.requireNonNull(initialCanonicalTypesToProcess, "initialCanonicalTypesToProcess")));
@@ -156,13 +156,13 @@ public class MutableLightblueDocumentEventRepositoryConfig implements LightblueD
     }
 
     @Override
-    public Optional<Integer> getMaxDocumentEventsPerInsert() {
-        return Optional.ofNullable(maxDocumentEventsPerInsert);
+    public Optional<Integer> getOptionalMaxDocumentEventsPerInsert() {
+        return maxDocumentEventsPerInsert;
     }
 
     public MutableLightblueDocumentEventRepositoryConfig setMaxDocumentEventsPerInsert(
-            @Nullable Integer maxDocumentEventsPerInsert) {
-        Integer old = this.maxDocumentEventsPerInsert;
+            Optional<Integer> maxDocumentEventsPerInsert) {
+        Optional<Integer> old = this.maxDocumentEventsPerInsert;
         this.maxDocumentEventsPerInsert = maxDocumentEventsPerInsert;
         if (!Objects.equals(old, maxDocumentEventsPerInsert)) {
             log.info("Max document events per insert updated. " +

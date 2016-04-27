@@ -63,6 +63,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -93,6 +94,7 @@ public class LightblueDocumentEventRepositoryTest {
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
     private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
     private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
@@ -538,10 +540,11 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldAddNewDocumentEventsInMultipleRequestsLimitedByMaximumEventsPerInsertIfSet() throws Exception {
+    public void shouldAddNewDocumentEventsInMultipleRequestsLimitedByMaximumEventsPerInsertIfSet()
+            throws Exception {
         MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
                 new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
-                        0, 5, Duration.ZERO, Duration.ZERO);
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
 
         SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
 
@@ -559,19 +562,19 @@ public class LightblueDocumentEventRepositoryTest {
                 return null;
             });
 
-            slowClient.waitUntilPausedRequestQueuedAtMost(Duration.ofSeconds(2));
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
             slowClient.flushPendingRequest();
-            slowClient.waitUntilPausedRequestQueuedAtMost(Duration.ofSeconds(2));
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
 
             assertThat(findDocumentEventEntitiesWhere(null)).hasSize(5);
 
             slowClient.flushPendingRequest();
-            slowClient.waitUntilPausedRequestQueuedAtMost(Duration.ofSeconds(2));
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
 
             assertThat(findDocumentEventEntitiesWhere(null)).hasSize(10);
 
             slowClient.flushPendingRequest();
-            addEventsFuture.get(2, TimeUnit.SECONDS);
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
             List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
 
@@ -593,10 +596,11 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsLessThanMax() throws Exception {
+    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsLessThanMax()
+            throws Exception {
         MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
                 new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
-                        0, 5, Duration.ZERO, Duration.ZERO);
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
 
         SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
 
@@ -614,10 +618,10 @@ public class LightblueDocumentEventRepositoryTest {
                 return null;
             });
 
-            slowClient.waitUntilPausedRequestQueuedAtMost(Duration.ofSeconds(2));
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
             slowClient.flushPendingRequest();
 
-            addEventsFuture.get(2, TimeUnit.SECONDS);
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
             List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
 
@@ -639,10 +643,11 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
-    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsEqualToMax() throws Exception {
+    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsEqualToMax()
+            throws Exception {
         MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
                 new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
-                        0, 5, Duration.ZERO, Duration.ZERO);
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
 
         SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
 
@@ -660,10 +665,10 @@ public class LightblueDocumentEventRepositoryTest {
                 return null;
             });
 
-            slowClient.waitUntilPausedRequestQueuedAtMost(Duration.ofSeconds(2));
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
             slowClient.flushPendingRequest();
 
-            addEventsFuture.get(2, TimeUnit.SECONDS);
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 
             List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
 

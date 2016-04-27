@@ -25,6 +25,8 @@ import com.redhat.lightblue.client.request.data.DataFindRequest;
 import org.apache.camel.builder.RouteBuilder;
 
 import java.time.Duration;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -55,11 +57,13 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
             LightblueClient lightblue,
             MutableLightblueNotificationRepositoryConfig notificationRepositoryConfig,
             MutableLightblueDocumentEventRepositoryConfig documentEventRepositoryConfig) {
-        this.pollingInterval = pollingInterval;
-        this.lightblue = lightblue;
-        this.notificationRepositoryConfig = notificationRepositoryConfig;
-        this.documentEventRepositoryConfig = documentEventRepositoryConfig;
-        this.configDomain = configDomain;
+        this.pollingInterval = Objects.requireNonNull(pollingInterval, "pollingInterval");
+        this.lightblue = Objects.requireNonNull(lightblue, "lightblue");
+        this.notificationRepositoryConfig = Objects.requireNonNull(notificationRepositoryConfig,
+                "notificationRepositoryConfig");
+        this.documentEventRepositoryConfig = Objects.requireNonNull(documentEventRepositoryConfig,
+                "documentEventRepositoryConfig");
+        this.configDomain = Objects.requireNonNull(configDomain, "configDomain");
 
         findConfig = FindRequests.eventHandlerConfigForDomain(configDomain);
     }
@@ -119,6 +123,10 @@ public class PollingLightblueConfigUpdateRoute extends RouteBuilder {
                 documentEventRepositoryConfig
                         .setDocumentEventExpireThreshold(documentEventExpireThreshold);
             }
+
+            Optional<Integer> maxDocumentEventsPerInsert = storedConfig
+                    .getOptionalMaxDocumentEventsPerInsert();
+            documentEventRepositoryConfig.setMaxDocumentEventsPerInsert(maxDocumentEventsPerInsert);
         });
     }
 }
