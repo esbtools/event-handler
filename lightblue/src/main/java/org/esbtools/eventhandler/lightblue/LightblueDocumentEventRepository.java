@@ -106,9 +106,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
         int newEventsCount = documentEventEntities.size();
         int maxEventsPerInsert = config.getOptionalMaxDocumentEventsPerInsert().orElse(newEventsCount);
 
-        int requests = (int) Math.ceil((double) newEventsCount / maxEventsPerInsert);
+        int insertCount = (int) Math.ceil((double) newEventsCount / maxEventsPerInsert);
 
-        for (int i = 0; i < requests; i++) {
+        for (int i = 0; i < insertCount; i++) {
             int fromIndex = i * maxEventsPerInsert;
             int toIndex = Math.min(fromIndex + maxEventsPerInsert, newEventsCount);
 
