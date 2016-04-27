@@ -21,6 +21,7 @@ package org.esbtools.eventhandler.lightblue.config;
 import org.esbtools.eventhandler.lightblue.LightblueDocumentEventRepositoryConfig;
 import org.esbtools.eventhandler.lightblue.LightblueNotificationRepositoryConfig;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.redhat.lightblue.generator.Description;
 import com.redhat.lightblue.generator.EntityName;
 import com.redhat.lightblue.generator.Identity;
@@ -28,7 +29,9 @@ import com.redhat.lightblue.generator.Required;
 import com.redhat.lightblue.generator.Transient;
 import com.redhat.lightblue.generator.Version;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
@@ -46,6 +49,7 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     private Integer notificationExpireThresholdSeconds;
     private Integer documentEventProcessingTimeoutSeconds;
     private Integer documentEventExpireThresholdSeconds;
+    private Integer maxDocumentEventsPerInsert;
 
     public String getDomain() {
         return domain;
@@ -133,6 +137,29 @@ public class EventHandlerConfigEntity implements LightblueNotificationRepository
     public void setDocumentEventExpireThresholdSeconds(
             Integer documentEventExpireThresholdSeconds) {
         this.documentEventExpireThresholdSeconds = documentEventExpireThresholdSeconds;
+    }
+
+    @Override
+    @Transient
+    @JsonIgnore
+    // TODO(ahenning): When metadata generator supports optional, remove @Transient and combine
+    // with getMaxDocumentEventsPerInsert
+    public Optional<Integer> getOptionalMaxDocumentEventsPerInsert() {
+        return Optional.ofNullable(maxDocumentEventsPerInsert);
+    }
+
+    public Integer getMaxDocumentEventsPerInsert() {
+        return maxDocumentEventsPerInsert;
+    }
+
+    @Description("When adding new document events, we can make (total new events) / (max events " +
+            "per insert) requests, instead of one request with all new events in a single call. " +
+            "If no integer is provided, we will do one request with all new events.\n" +
+            "Setting a limit is recommended as it protects against potentially extremely " +
+            "significant notifications producing a huge quantity of document events and failing " +
+            "to insert them all in one call.")
+    public void setMaxDocumentEventsPerInsert(@Nullable Integer maxDocumentEventsPerInsert) {
+        this.maxDocumentEventsPerInsert = maxDocumentEventsPerInsert;
     }
 
     @Override

@@ -47,7 +47,6 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.net.UnknownHostException;
@@ -59,10 +58,12 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -93,6 +94,7 @@ public class LightblueDocumentEventRepositoryTest {
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
     private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
     private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
@@ -219,8 +221,8 @@ public class LightblueDocumentEventRepositoryTest {
 
             CountDownLatch bothThreadsStarted = new CountDownLatch(2);
 
-            thread1Client.pauseOnNextRequest();
-            thread2Client.pauseOnNextRequest();
+            thread1Client.pauseBeforeRequests();
+            thread2Client.pauseBeforeRequests();
 
             Future<List<LightblueDocumentEvent>> futureThread1Events = executor.submit(() -> {
                 bothThreadsStarted.countDown();
@@ -538,6 +540,156 @@ public class LightblueDocumentEventRepositoryTest {
     }
 
     @Test
+    public void shouldAddNewDocumentEventsInMultipleRequestsLimitedByMaximumEventsPerInsertIfSet()
+            throws Exception {
+        MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
+                new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
+
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+
+        Collection<StringDocumentEvent> newEvents = randomNewStringDocumentEvents(13);
+
+        repository = new LightblueDocumentEventRepository(slowClient, lockStrategy,
+                max5EventsPerInsert, documentEventFactoriesByType, fixedClock);
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        slowClient.pauseBeforeRequests();
+
+        try {
+            Future<?> addEventsFuture = executor.submit(() -> {
+                repository.addNewDocumentEvents(newEvents);
+                return null;
+            });
+
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
+            slowClient.flushPendingRequest();
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
+
+            assertThat(findDocumentEventEntitiesWhere(null)).hasSize(5);
+
+            slowClient.flushPendingRequest();
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
+
+            assertThat(findDocumentEventEntitiesWhere(null)).hasSize(10);
+
+            slowClient.flushPendingRequest();
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+            List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
+
+            assertThat(allInserted).hasSize(13);
+
+            List<String> insertedValues = allInserted.stream()
+                    .map(StringDocumentEvent::new)
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            List<String> expectedValues = newEvents.stream()
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            assertThat(insertedValues).containsExactlyElementsIn(expectedValues);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsLessThanMax()
+            throws Exception {
+        MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
+                new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
+
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+
+        Collection<StringDocumentEvent> newEvents = randomNewStringDocumentEvents(3);
+
+        repository = new LightblueDocumentEventRepository(slowClient, lockStrategy,
+                max5EventsPerInsert, documentEventFactoriesByType, fixedClock);
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        slowClient.pauseBeforeRequests();
+
+        try {
+            Future<?> addEventsFuture = executor.submit(() -> {
+                repository.addNewDocumentEvents(newEvents);
+                return null;
+            });
+
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
+            slowClient.flushPendingRequest();
+
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+            List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
+
+            assertThat(allInserted).hasSize(3);
+
+            List<String> insertedValues = allInserted.stream()
+                    .map(StringDocumentEvent::new)
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            List<String> expectedValues = newEvents.stream()
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            assertThat(insertedValues).containsExactlyElementsIn(expectedValues);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void shouldAddNewDocumentEventsInOneRequestIfMaxEventsPerInsertSetButEventCountIsEqualToMax()
+            throws Exception {
+        MutableLightblueDocumentEventRepositoryConfig max5EventsPerInsert =
+                new MutableLightblueDocumentEventRepositoryConfig(Collections.emptyList(),
+                        0, Optional.of(5), Duration.ZERO, Duration.ZERO);
+
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+
+        Collection<StringDocumentEvent> newEvents = randomNewStringDocumentEvents(5);
+
+        repository = new LightblueDocumentEventRepository(slowClient, lockStrategy,
+                max5EventsPerInsert, documentEventFactoriesByType, fixedClock);
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        slowClient.pauseBeforeRequests();
+
+        try {
+            Future<?> addEventsFuture = executor.submit(() -> {
+                repository.addNewDocumentEvents(newEvents);
+                return null;
+            });
+
+            slowClient.waitUntilPausedRequestQueuedAtMost(REQUEST_TIMEOUT);
+            slowClient.flushPendingRequest();
+
+            addEventsFuture.get(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+
+            List<DocumentEventEntity> allInserted = findDocumentEventEntitiesWhere(null);
+
+            assertThat(allInserted).hasSize(5);
+
+            List<String> insertedValues = allInserted.stream()
+                    .map(StringDocumentEvent::new)
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            List<String> expectedValues = newEvents.stream()
+                    .map(StringDocumentEvent::value)
+                    .collect(Collectors.toList());
+
+            assertThat(insertedValues).containsExactlyElementsIn(expectedValues);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     public void shouldUpdateProcessedEntitiesWithStatusAndDatePostPublishing() throws LightblueException {
         Clock creationTimeClock = Clock.offset(fixedClock, Duration.ofHours(1).negated());
 
@@ -840,6 +992,12 @@ public class LightblueDocumentEventRepositoryTest {
         expiredEntity.setProcessingDate(ZonedDateTime.ofInstant(publishedDate.minus(1, ChronoUnit.SECONDS), fixedClock.getZone()));
         expiredEntity.setProcessedDate(ZonedDateTime.ofInstant(publishedDate, fixedClock.getZone()));
         return event;
+    }
+
+    private Collection<StringDocumentEvent> randomNewStringDocumentEvents(int amount) {
+        return Arrays.stream(randomNewDocumentEventEntities(amount))
+                .map(StringDocumentEvent::new)
+                .collect(Collectors.toList());
     }
 
     private DocumentEventEntity[] randomNewDocumentEventEntities(int amount) {
