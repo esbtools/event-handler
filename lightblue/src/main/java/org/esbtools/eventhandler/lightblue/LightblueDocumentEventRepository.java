@@ -20,7 +20,6 @@ package org.esbtools.eventhandler.lightblue;
 
 import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.eventhandler.DocumentEventRepository;
-import org.esbtools.eventhandler.EventHandlerException;
 import org.esbtools.eventhandler.FailedDocumentEvent;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
 import org.esbtools.eventhandler.lightblue.client.FindRequests;
@@ -272,8 +271,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         savedEvents.add(event);
                     }
                 } else {
-                    insertAndUpdateEvents.add(UpdateRequests.documentEventStatusIfCurrent(
-                            entity, update.originalProcessingDate));
+                    insertAndUpdateEvents.add(
+                            UpdateRequests.documentEventStatusDatesAndSurvivorOfIfCurrent(
+                                    entity, update.originalProcessingDate));
                     savedEvents.add(event);
                 }
             }

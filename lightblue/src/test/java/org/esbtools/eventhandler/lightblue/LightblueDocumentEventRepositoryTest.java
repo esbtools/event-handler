@@ -295,7 +295,7 @@ public class LightblueDocumentEventRepositoryTest {
                 newStringDocumentEventEntity("duplicate", creationTimeClock),
                 newStringDocumentEventEntity("duplicate", creationTimeClock));
 
-        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(5);
+        repository.retrievePriorityDocumentEventsUpTo(5);
 
         DataFindRequest findSuperseded = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
@@ -304,7 +304,14 @@ public class LightblueDocumentEventRepositoryTest {
 
         DocumentEventEntity[] supersededEntities = client.data(findSuperseded, DocumentEventEntity[].class);
 
-        assertEquals(1, retrieved.size());
+        DataFindRequest findProcessing = new DataFindRequest(DocumentEventEntity.ENTITY_NAME,
+                DocumentEventEntity.VERSION);
+        findProcessing.select(Projection.includeFieldRecursively("*"));
+        findProcessing.where(Query.withValue("status = processing"));
+
+        DocumentEventEntity[] processingEntities = client.data(findProcessing, DocumentEventEntity[].class);
+
+        assertEquals(1, processingEntities.length);
         assertEquals(
                 Arrays.asList(expectedProcessedDate, expectedProcessedDate, expectedProcessedDate, expectedProcessedDate),
                 Arrays.stream(supersededEntities)
@@ -312,7 +319,7 @@ public class LightblueDocumentEventRepositoryTest {
                         .map(ZonedDateTime::toInstant)
                         .collect(Collectors.toList()));
 
-        DocumentEventEntity survivorEntity = retrieved.get(0).wrappedDocumentEventEntity();
+        DocumentEventEntity survivorEntity = processingEntities[0];
 
         assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(
                 Arrays.stream(supersededEntities)

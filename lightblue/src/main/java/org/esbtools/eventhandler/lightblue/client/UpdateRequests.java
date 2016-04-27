@@ -136,14 +136,14 @@ public abstract class UpdateRequests {
     }
 
     /** "Status" here means status and corresponding date(s) to go along with it. */
-    public static DataUpdateRequest documentEventStatusIfCurrent(DocumentEventEntity entity,
+    public static DataUpdateRequest documentEventStatusDatesAndSurvivorOfIfCurrent(DocumentEventEntity entity,
             @Nullable ZonedDateTime originalProcessingDate) {
         DataUpdateRequest request = new DataUpdateRequest(
                 DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION);
 
         List<Query> idStatusAndDateMatch = new ArrayList<>();
-        List<Update> updateStatusAndDate = new ArrayList<>(2);
+        List<Update> updateStatusDateAndSurvivorOf = new ArrayList<>(2);
 
         ZonedDateTime processedDate = entity.getProcessedDate();
 
@@ -161,19 +161,31 @@ public abstract class UpdateRequests {
                     DocumentEventEntity.Status.processing.toString(),
                     DocumentEventEntity.Status.unprocessed.toString())));
         } else {
-            idStatusAndDateMatch.add(Query.withValue("processingDate", BinOp.eq, Literal.value(null)));
-            idStatusAndDateMatch.add(Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.unprocessed.toString()));
+            idStatusAndDateMatch.add(
+                    Query.withValue("processingDate", BinOp.eq, Literal.value(null)));
+            idStatusAndDateMatch.add(
+                    Query.withValue("status", BinOp.eq, DocumentEventEntity.Status.unprocessed.toString()));
         }
 
         if (processedDate != null) {
-            updateStatusAndDate.add(Update.set("processedDate", Date.from(processedDate.toInstant())));
+            updateStatusDateAndSurvivorOf.add(
+                    Update.set("processedDate", Date.from(processedDate.toInstant())));
         }
 
-        updateStatusAndDate.add(Update.set("status", entity.getStatus().toString()));
-        updateStatusAndDate.add(Update.set("processingDate", Date.from(entity.getProcessingDate().toInstant())));
+        updateStatusDateAndSurvivorOf.add(
+                Update.set("status", entity.getStatus().toString()));
+        updateStatusDateAndSurvivorOf.add(
+                Update.set("processingDate", Date.from(entity.getProcessingDate().toInstant())));
+
+        if (entity.getSurvivorOfIds() != null) {
+            String[] survivorOfIds = entity.getSurvivorOfIds().stream().toArray(String[]::new);
+            updateStatusDateAndSurvivorOf.add(Update.set("survivorOfIds",
+                    // https://github.com/lightblue-platform/lightblue-client/issues/289
+                    Literal.value(Literal.toJson(Literal.values(survivorOfIds)))));
+        }
 
         request.where(Query.and(idStatusAndDateMatch));
-        request.updates(updateStatusAndDate);
+        request.updates(updateStatusDateAndSurvivorOf);
 
         return request;
     }
