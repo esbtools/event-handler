@@ -516,8 +516,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         updates.put(newOrMergerEvent, DocumentEventUpdate.timestamp(newOrMergerEvent, clock));
                     }
 
-                    logger.debug("Event {} superseded by event {}",
-                            newOrMergerEventEntity.get_id(), previousEntity.get_id());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Event {} superseded by event {}",
+                                identify(newOrMergerEventEntity), identify(previousEntity));
+                    }
 
                     newOrMergerEvent = null;
 
@@ -538,8 +540,10 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                     newOrMergerEventEntity.addSurvivorOfIds(previousEntity.get_id());
                     newOrMergerEventEntity.addSurvivorOfIds(previousEntity.getSurvivorOfIds());
 
-                    logger.debug("Event {} superseded by event {}",
-                            previousEntity.get_id(), newOrMergerEventEntity.get_id());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Event {} superseded by event {}",
+                                identify(previousEntity), identify(newOrMergerEventEntity));
+                    }
                 } else if (newOrMergerEvent.couldMergeWith(previouslyOptimizedEvent)) {
                     // Previous entity was processing; now it is merged and removed from optimized
                     // result list.
@@ -573,8 +577,12 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         mergerEntity.addSurvivorOfIds(newOrMergerEventEntity.get_id());
                     }
 
-                    logger.debug("Events {} and {} merged into new event {}",
-                            previousEntity.get_id(), newOrMergerEventEntity.get_id(), mergerEntity.get_id());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(
+                                "Events {} and {} merged into new event which now merges all of {}",
+                                identify(previousEntity), identify(newOrMergerEventEntity),
+                                identify(mergerEntity));
+                    }
 
                     newOrMergerEvent = merger;
                     newOrMergerEventEntity = mergerEntity;
@@ -587,6 +595,16 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 updates.put(newOrMergerEvent, DocumentEventUpdate.timestamp(newOrMergerEvent, clock));
             }
         }
+    }
+
+    /**
+     * @return A concise string identifying the event in some way whether it has an existing id or
+     * not.
+     */
+    static String identify(DocumentEventEntity eventEntity) {
+        return eventEntity.get_id() != null
+                ? "<id=" + eventEntity.get_id() + ">"
+                : "<survivorOfIds=" + eventEntity.getSurvivorOfIds() + ">";
     }
 
     /**
@@ -641,5 +659,4 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
             this.event = event;
         }
     }
-
 }
