@@ -33,16 +33,16 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 public class SlowDataLightblueClient implements LightblueClient {
     private volatile boolean shouldPause = false;
     private volatile Callable<?> request;
     private volatile CompletableFuture<Object> responseFuture = new CompletableFuture<>();
+    private volatile CountDownLatch isPausedLatch = new CountDownLatch(1);
 
     private final LightblueClient delegate;
-
-    private volatile CountDownLatch isPausedLatch = new CountDownLatch(1);
 
     public SlowDataLightblueClient(LightblueClient delegate) {
         this.delegate = delegate;
@@ -61,7 +61,7 @@ public class SlowDataLightblueClient implements LightblueClient {
         CompletableFuture<Object> currentFuture = responseFuture;
         responseFuture = new CompletableFuture<>();
 
-        // Reset latch before we unpause
+        // Reset latch before we flush
         isPausedLatch = new CountDownLatch(1);
 
         try {
@@ -114,8 +114,11 @@ public class SlowDataLightblueClient implements LightblueClient {
             this.request = request;
 
             if (shouldPause) {
+                // Another thread is likely to flush once pause latch is counted, which means we
+                // need to grab the response future before it may be reassigned.
+                Future<T> currentResponseFuture = (Future<T>) responseFuture;
                 isPausedLatch.countDown();
-                return (T) responseFuture.get();
+                return currentResponseFuture.get();
             }
 
             return request.call();

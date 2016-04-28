@@ -94,7 +94,7 @@ public class LightblueDocumentEventRepositoryTest {
     private static final int DOCUMENT_EVENT_BATCH_SIZE = 10;
     private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
     private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private Map<String, DocumentEventFactory> documentEventFactoriesByType =
             new HashMap<String, DocumentEventFactory>() {{
