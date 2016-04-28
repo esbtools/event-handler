@@ -61,6 +61,9 @@ public class SlowDataLightblueClient implements LightblueClient {
         CompletableFuture<Object> currentFuture = responseFuture;
         responseFuture = new CompletableFuture<>();
 
+        // Reset latch before we unpause
+        isPausedLatch = new CountDownLatch(1);
+
         try {
             Object response = request.call();
             currentFuture.complete(response);
@@ -71,7 +74,6 @@ public class SlowDataLightblueClient implements LightblueClient {
 
     public void waitUntilPausedRequestQueuedAtMost(Duration timeout) throws InterruptedException {
         boolean timedOut = !isPausedLatch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
-        isPausedLatch = new CountDownLatch(1);
 
         if (timedOut) {
             throw new AssertionError("Timed out waiting for next request to queue.");
