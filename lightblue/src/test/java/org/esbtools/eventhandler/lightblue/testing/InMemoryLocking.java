@@ -20,12 +20,15 @@ package org.esbtools.eventhandler.lightblue.testing;
 
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
+import com.redhat.lightblue.client.response.lock.InvalidLockException;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -34,11 +37,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class InMemoryLocking extends Locking {
     private static final Map<String, String> resourcesToCallers = Collections.synchronizedMap(new HashMap<>());
+
     private final List<Ttl> ttls = Collections.synchronizedList(new ArrayList<>());
-
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
-
-    private final AtomicInteger attemptedAcquisitions = new AtomicInteger(0);
+    private volatile CountDownLatch nextPingLatch;
 
     public InMemoryLocking() {
         super("");
@@ -54,8 +56,6 @@ public class InMemoryLocking extends Locking {
 
     @Override
     public boolean acquire(String callerId, String resourceId, Long ttl) throws LightblueException {
-        attemptedAcquisitions.incrementAndGet();
-
         if (resourcesToCallers.putIfAbsent(resourceId, callerId) == null) {
             if (ttl != null) {
                 ttls.add(new Ttl(callerId, resourceId, ttl));
@@ -82,15 +82,27 @@ public class InMemoryLocking extends Locking {
 
     @Override
     public boolean ping(String callerId, String resourceId) throws LightblueException {
-        return ttls.stream()
+        if (nextPingLatch != null) {
+            nextPingLatch.countDown();
+        }
+
+        if (!ttls.stream()
                 .filter(ttl -> ttl.callerId.equals(callerId) && ttl.resourceId.equals(resourceId))
                 .map(Ttl::ping)
                 .findFirst()
-                .orElse(false);
+                .orElse(false)) {
+            throw new InvalidLockException(resourceId);
+        }
+
+        return true;
     }
 
-    public int attemptedAcquisitions() {
-        return attemptedAcquisitions.get();
+    /**
+     * @return false if timed out.
+     */
+    public boolean waitUntilNextPingAtMost(Duration timeout) throws InterruptedException {
+        nextPingLatch = new CountDownLatch(1);
+        return nextPingLatch.await(timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     class Ttl {

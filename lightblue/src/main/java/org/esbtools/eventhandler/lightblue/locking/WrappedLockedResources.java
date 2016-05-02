@@ -38,6 +38,10 @@ class WrappedLockedResources<T> implements LockedResources<T> {
 
     @Override
     public void close() throws IOException {
+        if (locks.isEmpty()) {
+            return;
+        }
+
         List<IOException> exceptions = new ArrayList<>(0);
 
         for (LockedResource lock : locks) {

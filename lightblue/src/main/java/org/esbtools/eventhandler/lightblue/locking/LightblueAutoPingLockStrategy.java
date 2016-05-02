@@ -20,6 +20,7 @@ package org.esbtools.eventhandler.lightblue.locking;
 
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
+import com.redhat.lightblue.client.response.lock.InvalidLockException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,9 +124,7 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
         public void ensureAcquiredOrThrow(String lostLockMessage) throws LostLockException {
             try {
                 if (!locking.ping(callerId, resourceId)) {
-                    autoPinger.cancel(true);
-                    autoPingScheduler.shutdownNow();
-                    isClosed.set(true);
+                    stopPinging();
                     throw new LostLockException(this, lostLockMessage);
                 }
             } catch (LightblueException e) {
@@ -173,6 +172,16 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
                     '}';
         }
 
+        /**
+         * Does NOT call out to lightblue to release the lock. If lightblue may still have the lock
+         * and you are not okay with it expiring on its own, use {@link #close()}.
+         */
+        private void stopPinging() {
+            autoPinger.cancel(true);
+            autoPingScheduler.shutdownNow();
+            isClosed.set(true);
+        }
+
         static class PingTask implements Runnable {
             final AutoPingingLock lock;
 
@@ -184,11 +193,17 @@ public class LightblueAutoPingLockStrategy implements LockStrategy {
             public void run() {
                 try {
                     if (!lock.locking.ping(lock.callerId, lock.resourceId)) {
-                        lock.autoPinger.cancel(true);
-                        lock.autoPingScheduler.shutdownNow();
-                        lock.isClosed.set(true);
+                        lock.stopPinging();
                         throw new RuntimeException("Lost lock. Will stop pinging. Lock was: " + lock);
                     }
+
+                    logger.debug("Periodic lock ping successful. callerId={} resourceId={}",
+                            lock.callerId, lock.resourceId);
+                } catch (InvalidLockException e) {
+                    logger.error("Tried to ping an invalid lock. Will stop pinging. Lock was: " +
+                            lock, e);
+                    lock.stopPinging();
+                    throw new RuntimeException(e);
                 } catch (LightblueException e) {
                     logger.error("Periodic lock ping failed for callerId <{}> and " +
                             "resourceId <{}>. Will keep trying.", lock.callerId, lock.resourceId, e);
