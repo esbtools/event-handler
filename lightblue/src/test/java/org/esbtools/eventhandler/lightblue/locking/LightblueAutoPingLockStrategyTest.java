@@ -46,9 +46,6 @@ public class LightblueAutoPingLockStrategyTest {
 
     InMemoryLocking inMemoryLocking = new InMemoryLocking();
 
-    // TODO: The multi client paradigm is not necessary actually since we use unique caller id per
-    // call.
-
     LightblueAutoPingLockStrategy lockStrategy2SecondPing = new LightblueAutoPingLockStrategy(
             inMemoryLocking, Duration.ofSeconds(2));
 
