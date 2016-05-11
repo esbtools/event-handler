@@ -29,7 +29,7 @@
     <version>0.1.1-SNAPSHOT</version>
 
     <properties>
-        <version.event-handler-lib>0.1.0</version.event-handler-lib>
+        <version.event-handler-lib>0.1.1-SNAPSHOT</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.0</version.lightblue-notification-hook-model>
         <version.lightblue-java-generator-api>0.1.2</version.lightblue-java-generator-api>
         <version.lightblue-java-generator-lib>0.1.2</version.lightblue-java-generator-lib>
