@@ -44,7 +44,7 @@ import java.util.Set;
  */
 @EntityName(DocumentEventEntity.ENTITY_NAME)
 // TODO(ahenning): preferImplementationVersion doesn't work yet, continue to update version value
-@Version(value = "0.1.0", preferImplementationVersion = true, changelog = "Initial release")
+@Version(value = "0.1.1-SNAPSHOT", preferImplementationVersion = true, changelog = "Initial release")
 public class DocumentEventEntity {
     public static final String ENTITY_NAME = "documentEvent";
     public static final String VERSION = Version.FromAnnotation.onEntity(DocumentEventEntity.class);

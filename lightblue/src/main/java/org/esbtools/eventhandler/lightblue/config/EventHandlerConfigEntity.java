@@ -36,7 +36,7 @@ import java.util.Set;
 
 @EntityName(EventHandlerConfigEntity.ENTITY_NAME)
 // TODO(ahenning): preferImplementationVersion doesn't work yet, continue to update version value
-@Version(value = "0.1.0", preferImplementationVersion = true, changelog = "Initial domain-specific config")
+@Version(value = "0.1.1-SNAPSHOT", preferImplementationVersion = true, changelog = "Initial domain-specific config")
 public class EventHandlerConfigEntity implements LightblueNotificationRepositoryConfig,
         LightblueDocumentEventRepositoryConfig {
     public static final String ENTITY_NAME = "eventHandlerConfig";
