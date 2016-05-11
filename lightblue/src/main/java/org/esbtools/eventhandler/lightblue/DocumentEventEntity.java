@@ -43,10 +43,11 @@ import java.util.Set;
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
  */
 @EntityName(DocumentEventEntity.ENTITY_NAME)
-@Version(value = DocumentEventEntity.VERSION, changelog = "Initial prototype")
+// TODO(ahenning): preferImplementationVersion doesn't work yet, continue to update version value
+@Version(value = "0.1.0", preferImplementationVersion = true, changelog = "Initial release")
 public class DocumentEventEntity {
     public static final String ENTITY_NAME = "documentEvent";
-    public static final String VERSION = "0.0.1-SNAPSHOT";
+    public static final String VERSION = Version.FromAnnotation.onEntity(DocumentEventEntity.class);
 
     private String _id;
     private String canonicalType;
