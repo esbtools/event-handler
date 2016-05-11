@@ -14,24 +14,22 @@
   ~  GNU General Public License for more details.
   ~
   ~  You should have received a copy of the GNU General Public License
-  ~  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  ~  along with this program.  If not, see <http://www.gnu.org/licenses />.
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <artifactId>event-handler-parent</artifactId>
         <groupId>org.esbtools.eventhandler</groupId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>event-handler-lightblue</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 
     <properties>
-        <version.event-handler-lib>0.1.0-SNAPSHOT</version.event-handler-lib>
+        <version.event-handler-lib>0.1.0</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.0</version.lightblue-notification-hook-model>
         <version.lightblue-java-generator-api>0.1.2</version.lightblue-java-generator-api>
         <version.lightblue-java-generator-lib>0.1.2</version.lightblue-java-generator-lib>
