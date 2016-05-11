@@ -18,31 +18,25 @@
 
 package org.esbtools.eventhandler.lightblue;
 
-import org.esbtools.eventhandler.lightblue.locking.LockNotAvailableException;
-import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
-import org.esbtools.eventhandler.lightblue.locking.LockedResource;
-import org.esbtools.eventhandler.lightblue.locking.LostLockException;
-import org.esbtools.lightbluenotificationhook.NotificationEntity;
-
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.Query;
-import com.redhat.lightblue.client.request.data.DataDeleteRequest;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-import org.apache.camel.Exchange;
-import org.apache.camel.Route;
-import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.support.RoutePolicySupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.annotation.Nullable;
-import java.io.IOException;
 import java.sql.Date;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
+import org.apache.camel.builder.RouteBuilder;
+import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
+import org.esbtools.eventhandler.lightblue.locking.LockingRoutePolicy;
+import org.esbtools.lightbluenotificationhook.NotificationEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.request.data.DataDeleteRequest;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
+
 public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
+
     private final LightblueClient client;
     private final LockStrategy lockStrategy;
     private final Duration deleteOlderThan;
@@ -92,7 +86,7 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
     public void configure() throws Exception {
         from("timer:" + deleterLockResourceId + "?period=" + deleteInterval.toMillis())
         .routeId(deleterLockResourceId)
-        .routePolicy(new DeleterLockRoutePolicy())
+        .routePolicy(new LockingRoutePolicy(deleterLockResourceId, lockStrategy))
         .process(exchange -> {
             Instant tooOld = clock.instant().minus(deleteOlderThan);
 
@@ -108,50 +102,5 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
         });
     }
 
-    private class DeleterLockRoutePolicy extends RoutePolicySupport {
-        private @Nullable LockedResource<String> lock;
 
-        @Override
-        public void onStop(Route route) {
-            releaseLock();
-        }
-
-        @Override
-        public void onSuspend(Route route) {
-            releaseLock();
-        }
-
-        @Override
-        public synchronized void onExchangeBegin(Route route, Exchange exchange) {
-            if (lock != null) {
-                try {
-                    lock.ensureAcquiredOrThrow("Lost lock");
-                    return;
-                } catch (LostLockException e) {
-                    log.warn("Lost deleter lock, trying to reacquire...", e);
-                    lock = null;
-                }
-            }
-
-            try {
-                lock = lockStrategy.tryAcquire(deleterLockResourceId);
-            } catch (LockNotAvailableException e) {
-                log.debug("Deleter lock not available, assuming " +
-                        "another thread is cleaning up old " + entityName + " entities", e);
-                exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
-            }
-        }
-
-        private synchronized void releaseLock() {
-            if (lock == null) return;
-
-            try {
-                lock.close();
-            } catch (IOException e) {
-                log.warn("IOException trying to release deleter lock", e);
-            }
-
-            lock = null;
-        }
-    }
 }
