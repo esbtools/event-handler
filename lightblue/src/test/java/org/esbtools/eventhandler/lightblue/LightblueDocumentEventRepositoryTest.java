@@ -319,9 +319,15 @@ public class LightblueDocumentEventRepositoryTest {
         List<String> supersededIds = supersededEntities.stream()
                 .map(DocumentEventEntity::get_id)
                 .collect(Collectors.toList());
+        List<String> supersededSurvivorOfIds = supersededEntities.stream()
+                .flatMap(e -> Optional.ofNullable(e.getSurvivorOfIds())
+                        .orElse(Collections.emptySet())
+                        .stream())
+                .collect(Collectors.toList());
 
         assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
         assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
+        assertThat(supersededSurvivorOfIds).named("superseded entities survivor of ids").isEmpty();
     }
 
     @Test
@@ -360,9 +366,16 @@ public class LightblueDocumentEventRepositoryTest {
                 .map(DocumentEventEntity::get_id)
                 .collect(Collectors.toList());
 
+        List<String> supersededSurvivorOfIds = supersededEntities.stream()
+                .flatMap(e -> Optional.ofNullable(e.getSurvivorOfIds())
+                        .orElse(Collections.emptySet())
+                        .stream())
+                .collect(Collectors.toList());
+
         assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
         assertThat(survivorEntity.getSurvivorOfIds()).containsExactlyElementsIn(supersededIds);
         assertThat(event.values()).containsExactly("1", "2", "3", "4", "5");
+        assertThat(supersededSurvivorOfIds).named("superseded entities survivor of ids").isEmpty();
     }
 
     @Test
@@ -391,13 +404,19 @@ public class LightblueDocumentEventRepositoryTest {
         List<String> mergedIds = mergedEntities.stream()
                 .map(DocumentEventEntity::get_id)
                 .collect(Collectors.toList());
+        List<String> mergedSurvivorOfIds = mergedEntities.stream()
+                .flatMap(e -> Optional.ofNullable(e.getSurvivorOfIds())
+                        .orElse(Collections.emptySet())
+                        .stream())
+                .collect(Collectors.toList());
 
         assertThat(retrievedEntity.getSurvivorOfIds()).containsExactlyElementsIn(mergedIds);
         assertThat(processingEntity.getSurvivorOfIds()).containsExactlyElementsIn(mergedIds);
+        assertThat(mergedSurvivorOfIds).named("merged entities survivor of ids").isEmpty();
     }
 
     @Test
-    public void shouldPersistMergerEntitiesAsProcessingAndUpdateRetrievedWithIdIfCreatedDuringRetrieval()
+    public void shouldPersistSurvivorEntitiesAsProcessingAndUpdateRetrievedWithIdIfCreatedDuringRetrieval()
             throws Exception {
         insertDocumentEventEntities(
                 newMultiStringDocumentEventEntity("1"),

@@ -169,8 +169,10 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                         }
                     }
 
-                    log.debug("Retry attempt #{} successful! Processed {} messages on route {}: {}",
-                            retryAttempt, reprocessedSuccessfully.size(), routeId, reprocessedSuccessfully);
+                    log.debug("Retry attempt #{} successfully processed {}/{} messages " +
+                            "on route {}: {}",
+                            retryAttempt, reprocessedSuccessfully.size(), oldFailures.size(),
+                            routeId, reprocessedSuccessfully);
 
                     // Give new failures another shot or dead letter them.
                     exchange.getIn().setBody(newFailures);

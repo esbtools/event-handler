@@ -175,10 +175,10 @@ public class LightblueAutoPingLockStrategyTest {
 
         InMemoryLocking.releaseAll();
 
-        boolean didNotTimeout = inMemoryLocking.waitUntilNextPingAtMost(Duration.ofSeconds(1));
+        boolean pingOccurred = inMemoryLocking.waitUntilNextPingAtMost(Duration.ofSeconds(1));
 
         // Allow at most one extra ping...
-        if (didNotTimeout) {
+        if (pingOccurred) {
             assertFalse("Got another ping before timeout. This mean lock is still being pinged.",
                     inMemoryLocking.waitUntilNextPingAtMost(Duration.ofSeconds(1)));
         }

@@ -138,8 +138,9 @@ public class AsyncBatchMessageProcessorRoute extends RouteBuilder {
                 }
             }
 
-            log.debug("Processed {} messages on route {}: {}",
-                    processedSuccessfully.size(), routeId, processedSuccessfully);
+            log.debug("Processed {}/{} messages on route {}: {}",
+                    processedSuccessfully.size(), originalMessages.size(),
+                    routeId, processedSuccessfully);
 
             // Deal with failures...
             exchange.getIn().setBody(failures);

@@ -521,6 +521,7 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                                 identify(newOrMergerEventEntity), identify(previousEntity));
                     }
 
+                    newOrMergerEventEntity.setSurvivorOfIds(null);
                     newOrMergerEvent = null;
 
                     break;
@@ -544,6 +545,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                         logger.debug("Event {} superseded by event {}",
                                 identify(previousEntity), identify(newOrMergerEventEntity));
                     }
+
+                    previousEntity.setSurvivorOfIds(null);
                 } else if (newOrMergerEvent.couldMergeWith(previouslyOptimizedEvent)) {
                     // Previous entity was processing; now it is merged and removed from optimized
                     // result list.
@@ -583,6 +586,9 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                                 identify(previousEntity), identify(newOrMergerEventEntity),
                                 identify(mergerEntity));
                     }
+
+                    newOrMergerEventEntity.setSurvivorOfIds(null);
+                    previousEntity.setSurvivorOfIds(null);
 
                     newOrMergerEvent = merger;
                     newOrMergerEventEntity = mergerEntity;
