@@ -38,7 +38,7 @@ events, but pull document messages.
 
 ## Sure. So how do I use it?
 
-Current status: Prototype
+Current status: Beta
 
 To consume this library, you will want to write (or reuse) an implementation of a standard set of
 interfaces to get at notifications and/or document events. Additionally, you will need to write
@@ -55,3 +55,17 @@ High level code and interfaces for outlining these patterns.
 An implementation of an event handler which reads notifications from an cooperating instance of
 [lightblue](https://lightblue.io), specifically one with entities configured to use the
 [lightblue-notification-hook](https://github.com/esbtools/lightblue-notification-hook).
+
+## Releasing
+
+1. Make sure you can push to org.esbtools respositories. Open a ticket up with the Sonatype Jira
+(you will need to create an account), with the OSSRH community project, choose "Task" type (not
+"New Project"), and simply ask for permissions to push to org.esbtools releases and snapshots. A
+currently permitted member may be asked to comment to confirm.
+2. mvn release:prepare
+3. Set versions appropriately, and name the tag simply "event-handler-#.#.#" (instead of 
+event-handler-parent-#.#.#)
+4. mvn release:perform
+
+For more information, see [the Maven release plugin documentation](
+http://maven.apache.org/maven-release/maven-release-plugin/examples/prepare-release.html).
