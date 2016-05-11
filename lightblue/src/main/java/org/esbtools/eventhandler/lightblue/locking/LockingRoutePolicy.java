@@ -10,14 +10,14 @@ import org.apache.camel.support.RoutePolicySupport;
 
 public class LockingRoutePolicy extends RoutePolicySupport {
 
-    private final String identifier;
+    private final String resourceId;
 
     private final LockStrategy lockStrategy;
 
     private @Nullable LockedResource<String> lock;
 
-    public LockingRoutePolicy(String identifier, LockStrategy lockStrategy) {
-        this.identifier = identifier;
+    public LockingRoutePolicy(String resourceId, LockStrategy lockStrategy) {
+        this.resourceId = resourceId;
         this.lockStrategy = lockStrategy;
     }
 
@@ -38,16 +38,16 @@ public class LockingRoutePolicy extends RoutePolicySupport {
                 lock.ensureAcquiredOrThrow("Lost lock");
                 return;
             } catch (LostLockException e) {
-                log.warn("Lost lock w id: " + identifier + ", trying to reacquire...", e);
+                log.warn("Lost lock w id: " + resourceId + ", trying to reacquire...", e);
                 lock = null;
             }
         }
 
         try {
-            lock = lockStrategy.tryAcquire(identifier);
+            lock = lockStrategy.tryAcquire(resourceId);
         } catch (LockNotAvailableException e) {
             log.debug("Lock not available, assuming " +
-                    "another thread is holding lock w/ id: " + identifier, e);
+                    "another thread is holding lock w/ id: " + resourceId, e);
             exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
         }
     }
@@ -58,7 +58,7 @@ public class LockingRoutePolicy extends RoutePolicySupport {
         try {
             lock.close();
         } catch (IOException e) {
-            log.warn("IOException trying to release lock w/ identifier " + identifier, e);
+            log.warn("IOException trying to release lock w/ identifier " + resourceId, e);
         }
 
         lock = null;
