@@ -43,7 +43,7 @@ import java.util.Set;
  * Serialization-friendly "data object" for an entity in the documentEvent collection.
  */
 @EntityName(DocumentEventEntity.ENTITY_NAME)
-@Version(value = "0.1.0", preferImplementationVersion = false, changelog = "Initial release")
+@Version(value = "0.1.1-SNAPSHOT", preferImplementationVersion = false, changelog = "Initial release")
 public class DocumentEventEntity {
     public static final String ENTITY_NAME = "documentEvent";
     public static final String VERSION = Version.FromAnnotation.onEntity(DocumentEventEntity.class);
