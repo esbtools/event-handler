@@ -62,11 +62,12 @@ An implementation of an event handler which reads notifications from an cooperat
 (you will need to create an account), with the OSSRH community project, choose "Task" type (not
 "New Project"), and simply ask for permissions to push to org.esbtools releases and snapshots. A
 currently permitted member may be asked to comment to confirm.
-2. mvn release:prepare
-3. Set versions appropriately, and name the tag simply "event-handler-#.#.#" (instead of 
+2. Make sure lightblue entity class versions are not SNAPSHOT-ed.
+3. mvn release:prepare
+4. Set versions appropriately, and name the tag simply "event-handler-#.#.#" (instead of
 event-handler-parent-#.#.#)
-4. mvn release:perform
-5. Bump interproject dependencies to use latest versions (more intuitive to develop everything 
+5. mvn release:perform
+6. Bump interproject dependencies to use latest versions (more intuitive to develop everything
 together). For example. lightblue module depends on lib. Bump this dependency to latest lib
 SNAPSHOT.
 
