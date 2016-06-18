@@ -62,7 +62,8 @@ An implementation of an event handler which reads notifications from an cooperat
 (you will need to create an account), with the OSSRH community project, choose "Task" type (not
 "New Project"), and simply ask for permissions to push to org.esbtools releases and snapshots. A
 currently permitted member may be asked to comment to confirm.
-2. Make sure lightblue entity class versions are not SNAPSHOT-ed.
+2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and 
+eventHandlerConfig)
 3. mvn release:prepare
 4. Set versions appropriately, and name the tag simply "event-handler-#.#.#" (instead of
 event-handler-parent-#.#.#)
