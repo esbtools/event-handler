@@ -65,7 +65,7 @@ currently permitted member may be asked to comment to confirm.
 2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and 
 eventHandlerConfig)
 3. mvn release:prepare
-4. Set versions appropriately, and name the tag simply "event-handler-#.#.#" (instead of
+4. Set versions appropriately, and name the tag simply "V#.#.#" (instead of
 event-handler-parent-#.#.#)
 5. mvn release:perform
 6. Bump interproject dependencies to use latest versions (more intuitive to develop everything
