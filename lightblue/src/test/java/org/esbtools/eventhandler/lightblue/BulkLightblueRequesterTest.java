@@ -9,7 +9,7 @@ import static org.junit.Assert.fail;
 import org.esbtools.eventhandler.TransformableFuture;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
-import org.esbtools.eventhandler.lightblue.client.LightblueResponses;
+import org.esbtools.eventhandler.lightblue.client.LightblueDataResponses;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
@@ -239,7 +239,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {
@@ -266,7 +266,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {
@@ -294,7 +294,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {

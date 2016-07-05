@@ -18,16 +18,11 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
-import org.esbtools.eventhandler.Requester;
 import org.esbtools.eventhandler.Responses;
-import org.esbtools.eventhandler.TransformableFuture;
 
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 
-public interface LightblueRequester extends
-        Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
-
-    TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>> tryRequest(
-            AbstractLightblueDataRequest... req);
+public interface LightblueDataResponses extends
+        Responses<AbstractLightblueDataRequest, LightblueDataResponse> {
 }
