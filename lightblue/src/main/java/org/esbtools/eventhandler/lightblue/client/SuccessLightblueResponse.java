@@ -3,19 +3,28 @@ package org.esbtools.eventhandler.lightblue.client;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueErrorResponse;
 
-public class SuccessLightblueResponse implements LightblueResponse {
+import java.util.NoSuchElementException;
+
+class SuccessLightblueResponse implements LightblueResponse {
+    private final LightblueDataResponse response;
+
+    SuccessLightblueResponse(LightblueDataResponse response) {
+        this.response = response;
+    }
+
     @Override
     public LightblueDataResponse getSuccess() {
-        return null;
+        return response;
     }
 
     @Override
     public boolean isSuccess() {
-        return false;
+        return true;
     }
 
     @Override
     public LightblueErrorResponse getFailure() {
-        return null;
+        throw new NoSuchElementException("There is no error response because the request was " +
+                "successful.");
     }
 }

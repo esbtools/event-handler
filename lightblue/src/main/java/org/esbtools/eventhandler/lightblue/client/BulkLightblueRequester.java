@@ -98,8 +98,9 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public TransformableFuture<LightblueResponses> tryRequest(AbstractLightblueDataRequest... req) {
-
-        return null;
+        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(req);
+        queuedTryRequests.add(responseFuture);
+        return responseFuture;
     }
 
     private void doQueuedRequestsAndCompleteFutures() {
@@ -169,16 +170,14 @@ public class BulkLightblueRequester implements LightblueRequester {
 
                 for (AbstractLightblueDataRequest request : requests) {
                     LightblueDataResponse response = bulkResponse.getResponse(request);
-
+                    responseMap.put(request, LightblueResponse.get(response));
                 }
 
                 batchedFuture.complete(new BulkResponses(responseMap));
             }
         } catch (LightblueException e) {
-            for (LazyRequestTransformableFuture batchedFuture : batch) {
-                batchedFuture.completeExceptionally(e);
-            }
-            // TODO also fail the tryBatch
+            Stream.concat(batch.stream(), tryBatch.stream())
+                    .forEach(batchedFuture -> batchedFuture.completeExceptionally(e));
         }
     }
 
