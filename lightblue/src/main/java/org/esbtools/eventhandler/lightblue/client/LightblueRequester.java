@@ -25,9 +25,46 @@ import org.esbtools.eventhandler.TransformableFuture;
 import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 
+import java.util.Collection;
+
 public interface LightblueRequester extends
         Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
 
-    TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>> tryRequest(
-            AbstractLightblueDataRequest... req);
+    /**
+     * Like {@link #request(Object[])}, except with relaxed failure conditions so that listeners to
+     * this future result may examine and transform errors from lightblue in addition to successful
+     * responses. A listener can examine whether or not these responses are failed with
+     * {@link LightblueResponse#isSuccess()}.
+     *
+     * <p>The returned future will only fail if the lightblue request did not complete and there are
+     * no responses with which to populate the future value.
+     *
+     * <p>This contrasts with {@link #request(Object[])} which always returns successful
+     * {@link LightblueDataResponse}s, and if any responses have returned with errors, the future
+     * will fail.
+     *
+     * @see LightblueResponse
+     */
+    TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>>
+            tryRequest(AbstractLightblueDataRequest... req);
+
+    /**
+     * Like {@link #request(Collection)}, except with relaxed failure conditions so that listeners
+     * to this future result may examine and transform errors from lightblue in addition to
+     * successful responses. A listener can examine whether or not these responses are failed with
+     * {@link LightblueResponse#isSuccess()}.
+     *
+     * <p>The returned future will only fail if the lightblue request did not complete and there are
+     * no responses with which to populate the future value.
+     *
+     * <p>This contrasts with {@link #request(Collection)} which always returns successful
+     * {@link LightblueDataResponse}s, and if any responses have returned with errors, the future
+     * will fail.
+     *
+     * @see LightblueResponse
+     */
+    default TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>>
+            tryRequest(Collection<? extends AbstractLightblueDataRequest> req) {
+        return tryRequest(req.stream().toArray(AbstractLightblueDataRequest[]::new));
+    }
 }

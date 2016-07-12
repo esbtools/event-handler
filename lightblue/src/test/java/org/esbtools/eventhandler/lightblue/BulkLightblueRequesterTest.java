@@ -8,7 +8,7 @@ import static org.junit.Assert.fail;
 
 import org.esbtools.eventhandler.TransformableFuture;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
-import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponseException;
 import org.esbtools.eventhandler.lightblue.client.LightblueDataResponses;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
@@ -155,9 +155,9 @@ public class BulkLightblueRequesterTest {
         try {
             future.get();
         } catch (ExecutionException e) {
-            assertThat(e.getCause()).isInstanceOf(BulkLightblueResponseException.class);
+            assertThat(e.getCause()).isInstanceOf(LightblueResponseException.class);
 
-            BulkLightblueResponseException cause = (BulkLightblueResponseException) e.getCause();
+            LightblueResponseException cause = (LightblueResponseException) e.getCause();
 
             assertThat(cause.errors()).hasSize(2);
         }

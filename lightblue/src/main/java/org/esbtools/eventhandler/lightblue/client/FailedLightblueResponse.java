@@ -27,7 +27,7 @@ class FailedLightblueResponse implements LightblueResponse {
     @Override
     public LightblueDataResponse getSuccess() {
         // TODO: maybe dif exception?
-        throw new BulkLightblueResponseException(errors);
+        throw new LightblueResponseException(errors);
     }
 
     @Override

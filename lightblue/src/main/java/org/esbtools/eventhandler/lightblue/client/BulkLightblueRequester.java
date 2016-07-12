@@ -159,7 +159,7 @@ public class BulkLightblueRequester implements LightblueRequester {
                 if (errors.isEmpty()) {
                     batchedFuture.complete(new BulkDataResponses(responseMap));
                 } else {
-                    batchedFuture.completeExceptionally(new BulkLightblueResponseException(errors));
+                    batchedFuture.completeExceptionally(new LightblueResponseException(errors));
                 }
             }
 
@@ -170,7 +170,7 @@ public class BulkLightblueRequester implements LightblueRequester {
 
                 for (AbstractLightblueDataRequest request : requests) {
                     LightblueDataResponse response = bulkResponse.getResponse(request);
-                    responseMap.put(request, LightblueResponse.get(response));
+                    responseMap.put(request, LightblueResponse.fromClientResponse(response));
                 }
 
                 batchedFuture.complete(new BulkResponses(responseMap));

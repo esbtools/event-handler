@@ -27,12 +27,12 @@ import java.util.stream.Collectors;
 /**
  * Accumulates lightblue {@link Error errors} for a given batch of requests to a single exception.
  */
-public class BulkLightblueResponseException extends RuntimeException {
+public class LightblueResponseException extends RuntimeException {
     private final Collection<Error> errors;
 
-    public BulkLightblueResponseException(Collection<Error> errors) {
+    public LightblueResponseException(Collection<Error> errors) {
         super(errors.stream()
-                .map(BulkLightblueResponseException::toString)
+                .map(LightblueResponseException::toString)
                 .collect(Collectors.toList())
                 .toString());
 
