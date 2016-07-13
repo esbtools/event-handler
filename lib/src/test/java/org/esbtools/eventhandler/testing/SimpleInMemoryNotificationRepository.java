@@ -42,7 +42,7 @@ public class SimpleInMemoryNotificationRepository implements NotificationReposit
     }
 
     public List<FailedNotification> getFailedNotifications() {
-        return failed;
+        return new ArrayList<>(failed);
     }
 
     public void considerNoTransactionsActive() {
