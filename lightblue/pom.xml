@@ -31,9 +31,7 @@
     <properties>
         <version.event-handler-lib>0.1.2-SNAPSHOT</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.0</version.lightblue-notification-hook-model>
-        <version.lightblue-java-generator-api>0.1.2</version.lightblue-java-generator-api>
-        <version.lightblue-java-generator-lib>0.1.2</version.lightblue-java-generator-lib>
-        <version.lightblue-java-generator-bin>0.1.2</version.lightblue-java-generator-bin>
+        <version.lightblue-java-generator>0.1.4-SNAPSHOT</version.lightblue-java-generator>
         <version.lightblue-client>4.5.0</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
         <version.exec-maven-plugin>1.4.0</version.exec-maven-plugin>
@@ -75,7 +73,7 @@
                     <dependency>
                         <groupId>com.redhat.lightblue.generator</groupId>
                         <artifactId>lightblue-java-generator-bin</artifactId>
-                        <version>${version.lightblue-java-generator-bin}</version>
+                        <version>${version.lightblue-java-generator}</version>
                         <type>jar</type>
                         <exclusions>
                             <exclusion>
@@ -130,7 +128,7 @@
             <dependency>
                 <groupId>com.redhat.lightblue.generator</groupId>
                 <artifactId>lightblue-java-generator-lib</artifactId>
-                <version>${version.lightblue-java-generator-lib}</version>
+                <version>${version.lightblue-java-generator}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
@@ -157,7 +155,7 @@
         <dependency>
             <groupId>com.redhat.lightblue.generator</groupId>
             <artifactId>lightblue-java-generator-api</artifactId>
-            <version>${version.lightblue-java-generator-api}</version>
+            <version>${version.lightblue-java-generator}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
