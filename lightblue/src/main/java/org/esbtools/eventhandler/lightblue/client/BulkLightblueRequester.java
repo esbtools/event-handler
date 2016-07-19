@@ -197,7 +197,11 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    // TODO comment a bit why there is this hierarchy
+    /**
+     * We have two response maps: one with guaranteed successful responses (
+     * {@link BulkDataResponses} and one with no guarantees ({@link BulkResponses}). They are both
+     * backed by simple maps, just with different generic types, hence the base class.
+     */
     static abstract class ResponseMap<T> implements Responses<AbstractLightblueDataRequest, T> {
         private final Map<AbstractLightblueDataRequest, T> responseMap;
 
@@ -493,87 +497,6 @@ public class BulkLightblueRequester implements LightblueRequester {
             return backingFuture.get(timeout, unit);
         }
     }
-
-//
-//    /**
-//     * TODO update this comment
-//     * Wraps a {@link LazyTransformableFuture} and some {@link AbstractLightblueDataRequest
-//     * lightblue requests} which are used to complete this in
-//     * {@link #doQueuedRequestsAndCompleteFutures()}. Naturally, then, that function is used as the
-//     * lazy future's completer function. That function and this implementation are tightly coupled.
-//     */
-//    class LazyTryRequestTransformableFuture implements TransformableFuture<LightblueResponses> {
-//        private final LazyTransformableFuture<LightblueResponses> backingFuture =
-//                new LazyTransformableFuture<>(() -> doQueuedRequestsAndCompleteFutures());
-//
-//        final AbstractLightblueDataRequest[] requests;
-//
-//        LazyTryRequestTransformableFuture(AbstractLightblueDataRequest[] requests) {
-//            this.requests = requests;
-//        }
-//
-//        void complete(LightblueResponses responses) {
-//            backingFuture.complete(responses);
-//        }
-//
-//        void completeExceptionally(Exception exception) {
-//            backingFuture.completeExceptionally(exception);
-//        }
-//
-//        @Override
-//        public <U> TransformableFuture<U> transformSync(
-//                FutureTransform<LightblueResponses, U> futureTransform) {
-//            return backingFuture.transformSync(futureTransform);
-//        }
-//
-//        @Override
-//        public <U> TransformableFuture<U> transformAsync(
-//                FutureTransform<LightblueResponses, TransformableFuture<U>> futureTransform) {
-//            return backingFuture.transformAsync(futureTransform);
-//        }
-//
-//        @Override
-//        public TransformableFuture<Void> transformAsyncIgnoringReturn(
-//                FutureTransform<LightblueResponses, TransformableFuture<?>> futureTransform) {
-//            return backingFuture.transformAsyncIgnoringReturn(futureTransform);
-//        }
-//
-//        @Override
-//        public TransformableFuture<LightblueResponses> whenDoneOrCancelled(FutureDoneCallback callback) {
-//            backingFuture.whenDoneOrCancelled(callback);
-//            return this;
-//        }
-//
-//        @Override
-//        public boolean cancel(boolean mayInterruptIfRunning) {
-//            if (!backingFuture.isDone()) {
-//                queuedRequests.remove(this);
-//            }
-//
-//            return backingFuture.cancel(mayInterruptIfRunning);
-//        }
-//
-//        @Override
-//        public boolean isCancelled() {
-//            return backingFuture.isCancelled();
-//        }
-//
-//        @Override
-//        public boolean isDone() {
-//            return backingFuture.isDone();
-//        }
-//
-//        @Override
-//        public LightblueResponses get() throws InterruptedException, ExecutionException {
-//            return backingFuture.get();
-//        }
-//
-//        @Override
-//        public LightblueResponses get(long timeout, TimeUnit unit) throws InterruptedException,
-//                ExecutionException, TimeoutException {
-//            return backingFuture.get(timeout, unit);
-//        }
-//    }
 
     /**
      * A simple lazy future implementation which applies some transformation function to the value
