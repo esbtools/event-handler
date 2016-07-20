@@ -22,6 +22,7 @@ import org.esbtools.eventhandler.FutureDoneCallback;
 import org.esbtools.eventhandler.FutureTransform;
 import org.esbtools.eventhandler.NestedTransformableFuture;
 import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
+import org.esbtools.eventhandler.Responses;
 import org.esbtools.eventhandler.TransformableFuture;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -38,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,6 +51,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 /**
  * A partially thread-safe requester which queues up requests until an associated {@link Future} is
@@ -71,7 +74,9 @@ import java.util.concurrent.TimeoutException;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
-    private final List<LazyRequestTransformableFuture> queuedRequests =
+    private final List<LazyRequestTransformableFuture<LightblueDataResponses>> queuedRequests =
+            Collections.synchronizedList(new ArrayList<>());
+    private final List<LazyRequestTransformableFuture<LightblueResponses>> queuedTryRequests =
             Collections.synchronizedList(new ArrayList<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
@@ -79,39 +84,50 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     @Override
-    public TransformableFuture<LightblueResponses> request(AbstractLightblueDataRequest... requests) {
+    public TransformableFuture<LightblueDataResponses> request(AbstractLightblueDataRequest... requests) {
         LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(requests);
         queuedRequests.add(responseFuture);
         return responseFuture;
     }
 
     @Override
-    public TransformableFuture<LightblueResponses> request(
+    public TransformableFuture<LightblueDataResponses> request(
             Collection<? extends AbstractLightblueDataRequest> requests) {
         return request(requests.toArray(new AbstractLightblueDataRequest[requests.size()]));
     }
 
+    @Override
+    public TransformableFuture<LightblueResponses> tryRequest(AbstractLightblueDataRequest... req) {
+        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(req);
+        queuedTryRequests.add(responseFuture);
+        return responseFuture;
+    }
+
     private void doQueuedRequestsAndCompleteFutures() {
-        List<LazyRequestTransformableFuture> batch;
+        List<LazyRequestTransformableFuture<LightblueDataResponses>> batch;
+        List<LazyRequestTransformableFuture<LightblueResponses>> tryBatch;
 
         synchronized (queuedRequests) {
             batch = new ArrayList<>(queuedRequests);
             queuedRequests.clear();
         }
 
+        synchronized (queuedTryRequests) {
+            tryBatch = new ArrayList<>(queuedTryRequests);
+            queuedTryRequests.clear();
+        }
+
         DataBulkRequest bulkRequest = new DataBulkRequest();
 
-        for (LazyRequestTransformableFuture batchedFuture : batch) {
-            for (AbstractLightblueDataRequest requestInBatch : batchedFuture.requests) {
+        Stream.concat(batch.stream(), tryBatch.stream())
+                .flatMap(requestFuture -> Arrays.stream(requestFuture.requests))
                 // TODO: Determine if any requests are equivalent / duplicated and filter out
-                bulkRequest.add(requestInBatch);
-            }
-        }
+                .forEach(bulkRequest::add);
 
         try {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
-            for (LazyRequestTransformableFuture batchedFuture : batch) {
+            for (LazyRequestTransformableFuture<LightblueDataResponses> batchedFuture : batch) {
                 AbstractLightblueDataRequest[] requests = batchedFuture.requests;
                 Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
                         new HashMap<>(requests.length);
@@ -141,15 +157,27 @@ public class BulkLightblueRequester implements LightblueRequester {
                 }
 
                 if (errors.isEmpty()) {
-                    batchedFuture.complete(new BulkResponses(responseMap));
+                    batchedFuture.complete(new BulkDataResponses(responseMap));
                 } else {
-                    batchedFuture.completeExceptionally(new BulkLightblueResponseException(errors));
+                    batchedFuture.completeExceptionally(new LightblueResponseException(errors));
                 }
             }
-        } catch (LightblueException e) {
-            for (LazyRequestTransformableFuture batchedFuture : batch) {
-                batchedFuture.completeExceptionally(e);
+
+            for (LazyRequestTransformableFuture<LightblueResponses> batchedFuture : tryBatch) {
+                AbstractLightblueDataRequest[] requests = batchedFuture.requests;
+                Map<AbstractLightblueDataRequest, LightblueResponse> responseMap =
+                        new HashMap<>(requests.length);
+
+                for (AbstractLightblueDataRequest request : requests) {
+                    LightblueDataResponse response = bulkResponse.getResponse(request);
+                    responseMap.put(request, LightblueResponse.fromClientResponse(response));
+                }
+
+                batchedFuture.complete(new BulkResponses(responseMap));
             }
+        } catch (LightblueException e) {
+            Stream.concat(batch.stream(), tryBatch.stream())
+                    .forEach(batchedFuture -> batchedFuture.completeExceptionally(e));
         }
     }
 
@@ -169,20 +197,37 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    static class BulkResponses implements LightblueResponses {
-        private final Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap;
+    /**
+     * We have two response maps: one with guaranteed successful responses (
+     * {@link BulkDataResponses} and one with no guarantees ({@link BulkResponses}). They are both
+     * backed by simple maps, just with different generic types, hence the base class.
+     */
+    static abstract class ResponseMap<T> implements Responses<AbstractLightblueDataRequest, T> {
+        private final Map<AbstractLightblueDataRequest, T> responseMap;
 
-        BulkResponses(Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap) {
+        ResponseMap(Map<AbstractLightblueDataRequest, T> responseMap) {
             this.responseMap = responseMap;
         }
 
         @Override
-        public LightblueDataResponse forRequest(AbstractLightblueDataRequest request) {
+        public T forRequest(AbstractLightblueDataRequest request) {
             if (responseMap.containsKey(request)) {
                 return responseMap.get(request);
             }
 
             throw new NoSuchElementException("No response for request: " + request);
+        }
+    }
+
+    static class BulkDataResponses extends ResponseMap<LightblueDataResponse> implements LightblueDataResponses {
+        BulkDataResponses(Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap) {
+            super(responseMap);
+        }
+    }
+
+    static class BulkResponses extends ResponseMap<LightblueResponse> implements LightblueResponses {
+        BulkResponses(Map<AbstractLightblueDataRequest, LightblueResponse> responseMap) {
+            super(responseMap);
         }
     }
 
@@ -380,8 +425,8 @@ public class BulkLightblueRequester implements LightblueRequester {
      * {@link #doQueuedRequestsAndCompleteFutures()}. Naturally, then, that function is used as the
      * lazy future's completer function. That function and this implementation are tightly coupled.
      */
-    class LazyRequestTransformableFuture implements TransformableFuture<LightblueResponses> {
-        private final LazyTransformableFuture<LightblueResponses> backingFuture =
+    class LazyRequestTransformableFuture<T> implements TransformableFuture<T> {
+        private final LazyTransformableFuture<T> backingFuture =
                 new LazyTransformableFuture<>(() -> doQueuedRequestsAndCompleteFutures());
 
         final AbstractLightblueDataRequest[] requests;
@@ -390,7 +435,7 @@ public class BulkLightblueRequester implements LightblueRequester {
             this.requests = requests;
         }
 
-        void complete(LightblueResponses responses) {
+        void complete(T responses) {
             backingFuture.complete(responses);
         }
 
@@ -400,24 +445,24 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         @Override
         public <U> TransformableFuture<U> transformSync(
-                FutureTransform<LightblueResponses, U> futureTransform) {
+                FutureTransform<T, U> futureTransform) {
             return backingFuture.transformSync(futureTransform);
         }
 
         @Override
         public <U> TransformableFuture<U> transformAsync(
-                FutureTransform<LightblueResponses, TransformableFuture<U>> futureTransform) {
+                FutureTransform<T, TransformableFuture<U>> futureTransform) {
             return backingFuture.transformAsync(futureTransform);
         }
 
         @Override
         public TransformableFuture<Void> transformAsyncIgnoringReturn(
-                FutureTransform<LightblueResponses, TransformableFuture<?>> futureTransform) {
+                FutureTransform<T, TransformableFuture<?>> futureTransform) {
             return backingFuture.transformAsyncIgnoringReturn(futureTransform);
         }
 
         @Override
-        public TransformableFuture<LightblueResponses> whenDoneOrCancelled(FutureDoneCallback callback) {
+        public TransformableFuture<T> whenDoneOrCancelled(FutureDoneCallback callback) {
             backingFuture.whenDoneOrCancelled(callback);
             return this;
         }
@@ -442,12 +487,12 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
 
         @Override
-        public LightblueResponses get() throws InterruptedException, ExecutionException {
+        public T get() throws InterruptedException, ExecutionException {
             return backingFuture.get();
         }
 
         @Override
-        public LightblueResponses get(long timeout, TimeUnit unit) throws InterruptedException,
+        public T get(long timeout, TimeUnit unit) throws InterruptedException,
                 ExecutionException, TimeoutException {
             return backingFuture.get(timeout, unit);
         }

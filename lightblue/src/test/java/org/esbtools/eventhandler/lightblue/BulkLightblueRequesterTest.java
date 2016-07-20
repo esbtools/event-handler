@@ -2,13 +2,16 @@ package org.esbtools.eventhandler.lightblue;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.esbtools.eventhandler.TransformableFuture;
 import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
-import org.esbtools.eventhandler.lightblue.client.BulkLightblueResponseException;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponse;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponseException;
+import org.esbtools.eventhandler.lightblue.client.LightblueDataResponses;
 import org.esbtools.eventhandler.lightblue.client.LightblueResponses;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
@@ -22,6 +25,7 @@ import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.redhat.lightblue.client.response.LightblueErrorResponse;
 import com.redhat.lightblue.client.response.LightblueParseException;
 import org.hamcrest.Matchers;
 import org.junit.Before;
@@ -155,9 +159,9 @@ public class BulkLightblueRequesterTest {
         try {
             future.get();
         } catch (ExecutionException e) {
-            assertThat(e.getCause()).isInstanceOf(BulkLightblueResponseException.class);
+            assertThat(e.getCause()).isInstanceOf(LightblueResponseException.class);
 
-            BulkLightblueResponseException cause = (BulkLightblueResponseException) e.getCause();
+            LightblueResponseException cause = (LightblueResponseException) e.getCause();
 
             assertThat(cause.errors()).hasSize(2);
         }
@@ -239,7 +243,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {
@@ -266,7 +270,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {
@@ -294,7 +298,7 @@ public class BulkLightblueRequesterTest {
 
         List<String> log = new ArrayList<>();
 
-        TransformableFuture<LightblueResponses> futureResponse = requester.request(findTester);
+        TransformableFuture<LightblueDataResponses> futureResponse = requester.request(findTester);
         futureResponse.whenDoneOrCancelled(() -> log.add("response done"));
 
         Future<?> futureTester = futureResponse.transformAsync(responses -> {
@@ -321,6 +325,76 @@ public class BulkLightblueRequesterTest {
                 .transformSync(responses -> true);
 
         assertTrue(future.get());
+    }
+
+    @Test(timeout = 1000L)
+    public void shouldAllowGettingFailedAndSuccessResponsesFromTryRequestWithoutExecutionException()
+            throws Exception {
+        insertUser("existing");
+
+        DataFindRequest badRequest = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        badRequest.where(Query.withValue("badField = something"));
+        badRequest.select(Projection.includeFieldRecursively("*"));
+
+        DataFindRequest goodRequest = findUserByUsername("existing");
+
+        LightblueResponses responses = requester.tryRequest(badRequest, goodRequest).get();
+        LightblueResponse badRequestResponse = responses.forRequest(badRequest);
+        LightblueResponse goodRequestResponse = responses.forRequest(goodRequest);
+
+        assertFalse(badRequestResponse.isSuccess());
+        assertTrue(badRequestResponse.getFailure().hasLightblueErrors());
+        assertTrue(goodRequestResponse.isSuccess());
+        assertThat(goodRequestResponse.getSuccess().parseMatchCount()).isEqualTo(1);
+    }
+
+    @Test(timeout = 1000L, expected = LightblueResponseException.class)
+    public void shouldThrowFromGetSuccessIfTryRequestResponseWasNotSuccessful() throws Exception {
+        DataFindRequest badRequest = new DataFindRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
+        badRequest.where(Query.withValue("badField = something"));
+        badRequest.select(Projection.includeFieldRecursively("*"));
+
+        LightblueResponses responses = requester.tryRequest(badRequest).get();
+
+        responses.forRequest(badRequest).getSuccess();
+    }
+
+    @Test(timeout = 1000L)
+    public void shouldCacheBothGuaranteedRequestsAndTriedRequestsTogetherAndSendToLightblueInTheSameBatch() throws Exception {
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+        DataFindRequest findCoder = findUserByUsername("aw3som3cod3r");
+
+        Future<TestUser> futureTester = requester.request(findTester).transformSync((responses -> {
+            return responses.forRequest(findTester).parseProcessed(TestUser.class);
+        }));
+
+        Future<TestUser> futureCoder = requester.tryRequest(findCoder).transformSync((responses -> {
+            return responses.forRequest(findCoder).getSuccess().parseProcessed(TestUser.class);
+        }));
+
+        insertUser("cooltester2000");
+        insertUser("aw3som3cod3r");
+
+        TestUser shouldBeCoder = futureCoder.get();
+
+        // Insert another tester; if the request for tester is made on next .get() we will get
+        // parse exception.
+        insertUser("cooltester2000");
+
+        try {
+            TestUser shouldBeTester = futureTester.get();
+
+            assertNotNull("No user found: request were run eagerly instead of lazily", shouldBeCoder);
+            assertNotNull("No user found: request were run eagerly instead of lazily", shouldBeTester);
+            assertEquals("cooltester2000", shouldBeTester.getUsername());
+            assertEquals("aw3som3cod3r", shouldBeCoder.getUsername());
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof LightblueParseException) {
+                fail("Found multiple users: requests were not batched.");
+            }
+
+            throw e;
+        }
     }
 
     private void insertUser(String username) throws LightblueException {
