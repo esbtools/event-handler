@@ -18,13 +18,13 @@
 
 package org.esbtools.eventhandler;
 
+import com.google.common.collect.TreeTraverser;
 import com.google.common.truth.Truth;
 import com.google.common.util.concurrent.Futures;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.RoutesBuilder;
 import org.apache.camel.builder.ExpressionBuilder;
-import org.apache.camel.builder.NotifyBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.junit4.CamelTestSupport;
 import org.junit.Test;
@@ -38,7 +38,6 @@ import java.util.Collections;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
 public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
@@ -164,10 +163,14 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
         assertEquals(alwaysFailsMsg1, dead1.parsedMessage().get());
         assertEquals(exceptionMessageForRetryAttempt(5), dead1.exception().getMessage());
-        Truth.assertThat(Arrays.stream(dead1.exception().getSuppressed())
-                .map(Throwable::getMessage)
-                .collect(Collectors.toList()))
+
+        SuppressedExceptionTraverser suppressed = new SuppressedExceptionTraverser();
+
+        Truth.assertThat(suppressed.breadthFirstTraversal(dead1.exception())
+                .transform(Throwable::getMessage)
+                .toList())
                 .containsExactly(
+                        exceptionMessageForRetryAttempt(5),
                         exceptionMessageForRetryAttempt(4),
                         exceptionMessageForRetryAttempt(3),
                         exceptionMessageForRetryAttempt(2),
@@ -177,10 +180,11 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
         assertEquals(alwaysFailsMsg2, dead2.parsedMessage().get());
         assertEquals(exceptionMessageForRetryAttempt(5), dead2.exception().getMessage());
-        Truth.assertThat(Arrays.stream(dead2.exception().getSuppressed())
-                .map(Throwable::getMessage)
-                .collect(Collectors.toList()))
+        Truth.assertThat(suppressed.breadthFirstTraversal(dead2.exception())
+                .transform(Throwable::getMessage)
+                .toList())
                 .containsExactly(
+                        exceptionMessageForRetryAttempt(5),
                         exceptionMessageForRetryAttempt(4),
                         exceptionMessageForRetryAttempt(3),
                         exceptionMessageForRetryAttempt(2),
@@ -200,6 +204,28 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
                 Collections.singleton(alwaysFails));
 
         retryDoneFuture.get(6, TimeUnit.SECONDS);
+    }
+
+    @Test
+    public void shouldNotSuppressPreviousFailureExceptionIfItWouldBeRedundant() throws Exception {
+        AlwaysFailsForSameReason alwaysFailsMsg = new AlwaysFailsForSameReason();
+        FailedMessage alwaysFails = new FailedMessage("fail original", alwaysFailsMsg,
+                new Exception("Simulated original failure"));
+
+        toFailureRetry5Retries.sendBody(Collections.singletonList(alwaysFails));
+
+        Collection<FailedMessage> deadLetters =
+                toDlq.getExchanges().get(0).getIn().getMandatoryBody(Collection.class);
+
+        SuppressedExceptionTraverser suppressed = new SuppressedExceptionTraverser();
+
+        Truth.assertThat(suppressed.breadthFirstTraversal(deadLetters.iterator().next().exception())
+                .transform(Throwable::getMessage)
+                .toList())
+                .containsExactly(
+                        "Simulated retry failure",
+                        "Simulated original failure")
+                .inOrder();
     }
 
     static String exceptionMessageForRetryAttempt(int processCount) {
@@ -233,6 +259,22 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
             return Futures.immediateFailedFuture(
                     new Exception(exceptionMessageForRetryAttempt(processCount)));
+        }
+    }
+
+    static class AlwaysFailsForSameReason implements Message {
+
+        @Override
+        public Future<Void> process() {
+            return Futures.immediateFailedFuture(new Exception("Simulated retry failure"));
+        }
+    }
+
+    static class SuppressedExceptionTraverser extends TreeTraverser<Throwable> {
+
+        @Override
+        public Iterable<Throwable> children(Throwable root) {
+            return Arrays.asList(root.getSuppressed());
         }
     }
 }
