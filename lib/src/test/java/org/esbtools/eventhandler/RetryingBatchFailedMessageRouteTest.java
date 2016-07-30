@@ -25,7 +25,6 @@ import org.apache.camel.EndpointInject;
 import org.apache.camel.ProducerTemplate;
 import org.apache.camel.RoutesBuilder;
 import org.apache.camel.builder.ExpressionBuilder;
-import org.apache.camel.builder.NotifyBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.junit4.CamelTestSupport;
 import org.junit.Test;
@@ -39,7 +38,6 @@ import java.util.Collections;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 @RunWith(JUnit4.class)
 public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
@@ -208,6 +206,28 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
         retryDoneFuture.get(6, TimeUnit.SECONDS);
     }
 
+    @Test
+    public void shouldNotSuppressPreviousFailureExceptionIfItWouldBeRedundant() throws Exception {
+        AlwaysFailsForSameReason alwaysFailsMsg = new AlwaysFailsForSameReason();
+        FailedMessage alwaysFails = new FailedMessage("fail original", alwaysFailsMsg,
+                new Exception("Simulated original failure"));
+
+        toFailureRetry5Retries.sendBody(Collections.singletonList(alwaysFails));
+
+        Collection<FailedMessage> deadLetters =
+                toDlq.getExchanges().get(0).getIn().getMandatoryBody(Collection.class);
+
+        SuppressedExceptionTraverser suppressed = new SuppressedExceptionTraverser();
+
+        Truth.assertThat(suppressed.breadthFirstTraversal(deadLetters.iterator().next().exception())
+                .transform(Throwable::getMessage)
+                .toList())
+                .containsExactly(
+                        "Simulated retry failure",
+                        "Simulated original failure")
+                .inOrder();
+    }
+
     static String exceptionMessageForRetryAttempt(int processCount) {
         return "Simulated retry failure " + processCount;
     }
@@ -239,6 +259,14 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
             return Futures.immediateFailedFuture(
                     new Exception(exceptionMessageForRetryAttempt(processCount)));
+        }
+    }
+
+    static class AlwaysFailsForSameReason implements Message {
+
+        @Override
+        public Future<Void> process() {
+            return Futures.immediateFailedFuture(new Exception("Simulated retry failure"));
         }
     }
 

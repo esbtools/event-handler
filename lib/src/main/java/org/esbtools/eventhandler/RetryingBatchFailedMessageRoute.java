@@ -26,11 +26,14 @@ import org.apache.camel.Expression;
 import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -191,11 +194,15 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
      * <p>Makes sure the exceptions are not referring to the same object to avoid a infinite
      * recursion.
      */
-    private void suppressPreviousFailureInNewException(FailedMessage failure, Throwable e) {
-        Throwable previousException = failure.exception();
+    private void suppressPreviousFailureInNewException(FailedMessage previousMsg, Throwable _new) {
+        Throwable previous = previousMsg.exception();
 
-        if (e != previousException && !e.equals(previousException)) {
-            e.addSuppressed(previousException);
+        if (areExceptionsEqual(_new, previous)) {
+            Arrays.stream(previous.getSuppressed())
+                    .filter(e -> e != _new)
+                    .forEach(_new::addSuppressed);
+        } else {
+            _new.addSuppressed(previous);
         }
     }
 
@@ -225,6 +232,30 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                 return true;
             }
         };
+    }
+
+    private static boolean areExceptionsEqual(@Nullable Throwable t1, @Nullable Throwable t2) {
+        if (t1 == t2 || Objects.equals(t1, t2)) {
+            return true;
+        }
+
+        if (t1 == null || t2 == null) {
+            return false;
+        }
+
+        if (!Objects.equals(t1.getMessage(), t2.getMessage())) {
+            return false;
+        }
+
+        if (!Objects.equals(t1.getClass(), t2.getClass())) {
+            return false;
+        }
+
+        if (!Objects.deepEquals(t1.getStackTrace(), t2.getStackTrace())) {
+            return false;
+        }
+
+        return areExceptionsEqual(t1.getCause(), t2.getCause());
     }
 
     private static final class ReprocessingFailure {
