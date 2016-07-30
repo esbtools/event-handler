@@ -41,6 +41,7 @@ import org.esbtools.eventhandler.lightblue.testing.StringNotification;
 import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
+import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Rule;
@@ -89,6 +90,7 @@ public class LightblueNotificationRepositoryTest {
             new HashMap<String, NotificationFactory>() {{
                 put("String", StringNotification::new);
                 put("MultiString", MultiStringNotification::new);
+                put("Fails", (entity, requester) -> { throw new RuntimeException("Uh oh"); });
             }};
 
     private final MutableLightblueNotificationRepositoryConfig config =
@@ -415,6 +417,26 @@ public class LightblueNotificationRepositoryTest {
         LightblueNotification notification = notificationThatStartedProcessingAt(expiredDate);
 
         repository.ensureTransactionActive(notification);
+    }
+
+    @Test
+    public void shouldReturnNotificationsWhichFailedToParse() throws Exception {
+        NotificationEntity gonnaFail = new NotificationEntity();
+        gonnaFail.setClientRequestDate(Date.from(fixedClock.instant()));
+        gonnaFail.setEntityName("Fails");
+        gonnaFail.setEntityVersion("1.0.0");
+        gonnaFail.setOperation(NotificationEntity.Operation.insert);
+        gonnaFail.setStatus(NotificationEntity.Status.unprocessed);
+
+        insertNotificationEntities(gonnaFail);
+
+        List<LightblueNotification> retrieved = repository.retrieveOldestNotificationsUpTo(1);
+
+        assertEquals(1, retrieved.size());
+
+        expectedException.expectCause(CoreMatchers.instanceOf(RuntimeException.class));
+
+        retrieved.get(0).toDocumentEvents().get();
     }
 
     private List<NotificationEntity> findNotificationEntitiesWhere(@Nullable Query query)

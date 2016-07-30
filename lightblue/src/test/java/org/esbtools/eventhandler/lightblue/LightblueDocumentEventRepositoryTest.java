@@ -41,6 +41,8 @@ import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
 import com.redhat.lightblue.client.request.data.DataSaveRequest;
+
+import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Ignore;
@@ -100,6 +102,7 @@ public class LightblueDocumentEventRepositoryTest {
             new HashMap<String, DocumentEventFactory>() {{
                 put("String", StringDocumentEvent::new);
                 put("MultiString", MultiStringDocumentEvent::new);
+                put("Fails", (entity, requester) -> { throw new RuntimeException("Uh oh"); });
             }};
 
     private MutableLightblueDocumentEventRepositoryConfig config =
@@ -943,6 +946,23 @@ public class LightblueDocumentEventRepositoryTest {
         repository.addNewDocumentEvents(Collections.singleton(event));
 
         assertEquals(1, repository.retrievePriorityDocumentEventsUpTo(10).size());
+    }
+
+    @Test
+    public void shouldReturnEventsWhichFailedToParse() throws Exception {
+        DocumentEventEntity gonnaFail = DocumentEventEntity.newlyCreated(null, "Fails", 50,
+                ZonedDateTime.now(fixedClock),
+                new DocumentEventEntity.KeyAndValue("bogus", "value"));
+
+        insertDocumentEventEntities(gonnaFail);
+
+        List<LightblueDocumentEvent> retrieved = repository.retrievePriorityDocumentEventsUpTo(1);
+
+        assertEquals(1, retrieved.size());
+
+        expectedException.expectCause(CoreMatchers.instanceOf(RuntimeException.class));
+
+        retrieved.get(0).lookupDocument().get();
     }
 
     private List<DocumentEventEntity> findDocumentEventEntitiesWhere(@Nullable Query query)
