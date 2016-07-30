@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler;
 
+import com.google.common.collect.TreeTraverser;
 import com.google.common.truth.Truth;
 import com.google.common.util.concurrent.Futures;
 import org.apache.camel.EndpointInject;
@@ -164,10 +165,14 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
         assertEquals(alwaysFailsMsg1, dead1.parsedMessage().get());
         assertEquals(exceptionMessageForRetryAttempt(5), dead1.exception().getMessage());
-        Truth.assertThat(Arrays.stream(dead1.exception().getSuppressed())
-                .map(Throwable::getMessage)
-                .collect(Collectors.toList()))
+
+        SuppressedExceptionTraverser suppressed = new SuppressedExceptionTraverser();
+
+        Truth.assertThat(suppressed.breadthFirstTraversal(dead1.exception())
+                .transform(Throwable::getMessage)
+                .toList())
                 .containsExactly(
+                        exceptionMessageForRetryAttempt(5),
                         exceptionMessageForRetryAttempt(4),
                         exceptionMessageForRetryAttempt(3),
                         exceptionMessageForRetryAttempt(2),
@@ -177,10 +182,11 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
         assertEquals(alwaysFailsMsg2, dead2.parsedMessage().get());
         assertEquals(exceptionMessageForRetryAttempt(5), dead2.exception().getMessage());
-        Truth.assertThat(Arrays.stream(dead2.exception().getSuppressed())
-                .map(Throwable::getMessage)
-                .collect(Collectors.toList()))
+        Truth.assertThat(suppressed.breadthFirstTraversal(dead2.exception())
+                .transform(Throwable::getMessage)
+                .toList())
                 .containsExactly(
+                        exceptionMessageForRetryAttempt(5),
                         exceptionMessageForRetryAttempt(4),
                         exceptionMessageForRetryAttempt(3),
                         exceptionMessageForRetryAttempt(2),
@@ -233,6 +239,14 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
 
             return Futures.immediateFailedFuture(
                     new Exception(exceptionMessageForRetryAttempt(processCount)));
+        }
+    }
+
+    static class SuppressedExceptionTraverser extends TreeTraverser<Throwable> {
+
+        @Override
+        public Iterable<Throwable> children(Throwable root) {
+            return Arrays.asList(root.getSuppressed());
         }
     }
 }

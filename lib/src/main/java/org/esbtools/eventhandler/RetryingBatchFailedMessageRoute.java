@@ -194,12 +194,8 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
     private void suppressPreviousFailureInNewException(FailedMessage failure, Throwable e) {
         Throwable previousException = failure.exception();
 
-        if (e != previousException) {
+        if (e != previousException && !e.equals(previousException)) {
             e.addSuppressed(previousException);
-
-            for (Throwable previousSuppressed : previousException.getSuppressed()) {
-                e.addSuppressed(previousSuppressed);
-            }
         }
     }
 
