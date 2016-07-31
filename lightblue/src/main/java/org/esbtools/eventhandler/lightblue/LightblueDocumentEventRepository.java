@@ -408,32 +408,35 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 String typeOfEvent = eventEntity.getCanonicalType();
                 DocumentEventFactory eventFactoryForType = documentEventFactoriesByType.get(typeOfEvent);
 
+                LightblueDocumentEvent newEvent;
+
                 try {
-                    LightblueDocumentEvent newEvent =
-                            eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
-
-                    Identity identity = newEvent.identity();
-                    SharedIdentityEvents eventBatch = docEventsByIdentity.get(identity);
-
-                    if (eventBatch == null) {
-                        if (locksAcquired.size() == maxIdentities) {
-                            continue;
-                        }
-
-                        eventBatch = new SharedIdentityEvents(lockStrategy, identity, clock);
-                        docEventsByIdentity.put(identity, eventBatch);
-                        if (eventBatch.lock.isPresent()) {
-                            locksAcquired.add(eventBatch.lock.get());
-                            logger.debug("Acquired lock for resource {}", eventBatch.getResourceId());
-                        }
-                    }
-
-                    eventBatch.addEvent(newEvent);
+                    newEvent = eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
                 } catch (Exception e) {
                     if (logger.isErrorEnabled()) {
                         logger.error("Failed to parse event entity: " + eventEntity, e);
                     }
+
+                    newEvent = new UnparseableDocumentEvent(e, eventEntity);
                 }
+
+                Identity identity = newEvent.identity();
+                SharedIdentityEvents eventBatch = docEventsByIdentity.get(identity);
+
+                if (eventBatch == null) {
+                    if (locksAcquired.size() == maxIdentities) {
+                        continue;
+                    }
+
+                    eventBatch = new SharedIdentityEvents(lockStrategy, identity, clock);
+                    docEventsByIdentity.put(identity, eventBatch);
+                    if (eventBatch.lock.isPresent()) {
+                        locksAcquired.add(eventBatch.lock.get());
+                        logger.debug("Acquired lock for resource {}", eventBatch.getResourceId());
+                    }
+                }
+
+                eventBatch.addEvent(newEvent);
             }
 
             return LockedResources.fromLocks(locksAcquired);

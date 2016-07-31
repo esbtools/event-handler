@@ -289,32 +289,36 @@ public class LightblueNotificationRepository implements NotificationRepository {
             Collections.shuffle(shuffled);
 
             for (NotificationEntity entity : shuffled) {
+                LightblueNotification notification;
+
                 try {
-                    LightblueNotification notification = notificationFactoriesByEntityName
+                    notification = notificationFactoriesByEntityName
                             .get(entity.getEntityName())
                             .getNotificationForEntity(entity, requester);
-
-                    Date originalProcessingDate = entity.getProcessingDate();
-
-                    ProcessingNotification processing =
-                            new ProcessingNotification(entity.get_id(), notification,
-                                    originalProcessingDate);
-
-                    try {
-                        acquiredLocks.add(lockStrategy.tryAcquire(processing));
-                        entity.setProcessingDate(Date.from(clock.instant()));
-                        entity.setStatus(NotificationEntity.Status.processing);
-
-                        logger.debug("Acquired lock for resource {}", processing.getResourceId());
-                    } catch (LockNotAvailableException e) {
-                        if (logger.isDebugEnabled()) {
-                            logger.debug("Lock not available. This is not fatal. Assuming another" +
-                                    " thread is processing notification: " + entity.get_id(), e);
-                        }
-                    }
                 } catch (Exception e) {
                     if (logger.isErrorEnabled()) {
                         logger.error("Failed to parse notification entity: " + entity, e);
+                    }
+
+                    notification = new UnparseableNotification(e, entity);
+                }
+
+                Date originalProcessingDate = entity.getProcessingDate();
+
+                ProcessingNotification processing =
+                        new ProcessingNotification(entity.get_id(), notification,
+                                originalProcessingDate);
+
+                try {
+                    acquiredLocks.add(lockStrategy.tryAcquire(processing));
+                    entity.setProcessingDate(Date.from(clock.instant()));
+                    entity.setStatus(NotificationEntity.Status.processing);
+
+                    logger.debug("Acquired lock for resource {}", processing.getResourceId());
+                } catch (LockNotAvailableException e) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Lock not available. This is not fatal. Assuming another" +
+                                " thread is processing notification: " + entity.get_id(), e);
                     }
                 }
             }
