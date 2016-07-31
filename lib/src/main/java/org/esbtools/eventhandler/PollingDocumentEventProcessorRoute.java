@@ -84,7 +84,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 try {
                     eventsToDocuments.put(event, futureDoc.get());
                 } catch (ExecutionException | InterruptedException e) {
-                    log.error("Failed to get future document for document event: " + event, e);
+                    log.error("Failed to get document for document event: " + event, e);
                     failedEvents.add(new FailedDocumentEvent(event, e));
                 }
             }
