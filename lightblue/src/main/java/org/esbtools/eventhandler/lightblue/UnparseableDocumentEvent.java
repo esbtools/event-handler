@@ -22,6 +22,7 @@ import org.esbtools.eventhandler.DocumentEvent;
 
 import com.google.common.util.concurrent.Futures;
 
+import java.util.Objects;
 import java.util.concurrent.Future;
 
 public class UnparseableDocumentEvent implements LightblueDocumentEvent {
@@ -29,8 +30,8 @@ public class UnparseableDocumentEvent implements LightblueDocumentEvent {
     private final DocumentEventEntity entity;
 
     public UnparseableDocumentEvent(Exception exception, DocumentEventEntity entity) {
-        this.exception = exception;
-        this.entity = entity;
+        this.exception = Objects.requireNonNull(exception, "exception");
+        this.entity = Objects.requireNonNull(entity, "entity");
     }
 
     @Override
@@ -61,5 +62,27 @@ public class UnparseableDocumentEvent implements LightblueDocumentEvent {
     @Override
     public DocumentEventEntity wrappedDocumentEventEntity() {
         return entity;
+    }
+
+    @Override
+    public String toString() {
+        return "UnparseableDocumentEvent{" +
+                "exception=" + exception +
+                ", entity=" + entity +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UnparseableDocumentEvent that = (UnparseableDocumentEvent) o;
+        return Objects.equals(exception, that.exception) &&
+                Objects.equals(entity, that.entity);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(exception, entity);
     }
 }

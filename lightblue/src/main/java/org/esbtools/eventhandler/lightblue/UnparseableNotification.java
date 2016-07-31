@@ -23,6 +23,7 @@ import org.esbtools.eventhandler.DocumentEvent;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.concurrent.Future;
 
 public class UnparseableNotification implements LightblueNotification {
@@ -30,8 +31,8 @@ public class UnparseableNotification implements LightblueNotification {
     private final NotificationEntity entity;
 
     public UnparseableNotification(Exception exception, NotificationEntity entity) {
-        this.exception = exception;
-        this.entity = entity;
+        this.exception = Objects.requireNonNull(exception, "exception");
+        this.entity = Objects.requireNonNull(entity, "entity");
     }
 
     @Override
@@ -42,5 +43,27 @@ public class UnparseableNotification implements LightblueNotification {
     @Override
     public Future<Collection<DocumentEvent>> toDocumentEvents() {
         return Futures.immediateFailedFuture(exception);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UnparseableNotification that = (UnparseableNotification) o;
+        return Objects.equals(exception, that.exception) &&
+                Objects.equals(entity, that.entity);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(exception, entity);
+    }
+
+    @Override
+    public String toString() {
+        return "UnparseableNotification{" +
+                "exception=" + exception +
+                ", entity=" + entity +
+                '}';
     }
 }
