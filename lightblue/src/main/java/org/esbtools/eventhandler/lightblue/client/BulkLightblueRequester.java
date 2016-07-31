@@ -46,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -85,7 +86,9 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public TransformableFuture<LightblueDataResponses> request(AbstractLightblueDataRequest... requests) {
-        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(requests);
+        checkNoNullsInRequests(requests);
+        LazyRequestTransformableFuture<LightblueDataResponses> responseFuture =
+                new LazyRequestTransformableFuture<>(requests);
         queuedRequests.add(responseFuture);
         return responseFuture;
     }
@@ -98,7 +101,9 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public TransformableFuture<LightblueResponses> tryRequest(AbstractLightblueDataRequest... req) {
-        LazyRequestTransformableFuture responseFuture = new LazyRequestTransformableFuture(req);
+        checkNoNullsInRequests(req);
+        LazyRequestTransformableFuture<LightblueResponses> responseFuture =
+                new LazyRequestTransformableFuture<>(req);
         queuedTryRequests.add(responseFuture);
         return responseFuture;
     }
@@ -175,7 +180,7 @@ public class BulkLightblueRequester implements LightblueRequester {
 
                 batchedFuture.complete(new BulkResponses(responseMap));
             }
-        } catch (LightblueException e) {
+        } catch (Exception e) {
             Stream.concat(batch.stream(), tryBatch.stream())
                     .forEach(batchedFuture -> batchedFuture.completeExceptionally(e));
         }
@@ -194,6 +199,13 @@ public class BulkLightblueRequester implements LightblueRequester {
             return lightblue.bulkData(bulkRequest);
         } catch (LightblueBulkResponseException e) {
             return e.getBulkResponse();
+        }
+    }
+
+    private static void checkNoNullsInRequests(AbstractLightblueDataRequest[] requests) {
+        Objects.requireNonNull(requests, "requests");
+        for (int i = 0; i < requests.length; i++) {
+            Objects.requireNonNull(requests[i], "requests[" + i + "]");
         }
     }
 
