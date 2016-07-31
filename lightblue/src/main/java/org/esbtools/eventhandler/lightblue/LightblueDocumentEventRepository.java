@@ -413,8 +413,8 @@ public class LightblueDocumentEventRepository implements DocumentEventRepository
                 try {
                     newEvent = eventFactoryForType.getDocumentEventForEntity(eventEntity, requester);
                 } catch (Exception e) {
-                    if (logger.isErrorEnabled()) {
-                        logger.error("Failed to parse event entity: " + eventEntity, e);
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Failed to parse event entity: " + eventEntity, e);
                     }
 
                     newEvent = new UnparseableDocumentEvent(e, eventEntity);

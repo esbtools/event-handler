@@ -296,8 +296,8 @@ public class LightblueNotificationRepository implements NotificationRepository {
                             .get(entity.getEntityName())
                             .getNotificationForEntity(entity, requester);
                 } catch (Exception e) {
-                    if (logger.isErrorEnabled()) {
-                        logger.error("Failed to parse notification entity: " + entity, e);
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Failed to parse notification entity: " + entity, e);
                     }
 
                     notification = new UnparseableNotification(e, entity);
