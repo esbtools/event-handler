@@ -39,7 +39,7 @@ public interface LightblueDocumentEventRepositoryConfig {
      * max batch size of events fetched from lightblue and available for optimization.
      *
      * <p>For example, if you ask for 50 document events to be retrieved, and your batch size is
-     * 100, we will initially fetch 100 document events (assuming there are >= 100 events waiting to
+     * 100, we will initially fetch 100 document events (assuming there are &lt;= 100 events waiting to
      * be processed) from lightblue. Among those 100, we will try to optimize away as many events as
      * possible by checking for events which can be merged or superseded. Finally, among those left,
      * we will return the 50 highest priority events. Any remaining events past 50 will be

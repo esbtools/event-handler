@@ -21,7 +21,7 @@ package org.esbtools.eventhandler;
 /**
  * Maps responses to requests. In the case where you make multiple requests, you will likely want
  * to parse each response differently based on the original request. You can get a response for a
- * given request by calling {@link #forRequest(T)}.
+ * given request by calling {@link #forRequest}.
  *
  * @param <T> The type of request
  * @param <U> The type of response
