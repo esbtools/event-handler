@@ -79,7 +79,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                 // Indenting because delay actually starts a child processor, and needs its own end()
                 // See: https://issues.apache.org/jira/browse/CAMEL-2654
                 .process(exchange -> {
-                    Integer retryAttempt = Optional.ofNullable(
+                    int retryAttempt = Optional.ofNullable(
                             exchange.getProperty(NEXT_ATTEMPT_NUMBER_PROPERTY, Integer.class))
                             .orElse(FIRST_ATTEMPT_NUMBER);
                     // Preemptively increment retry attempt for next loop.
@@ -114,6 +114,7 @@ public class RetryingBatchFailedMessageRoute extends RouteBuilder {
                             log.warn("Failed message had no parsed message. There is no message " +
                                     "to retry without trying to parse again, which is usually " +
                                     "fruitless. Sending to dead letter URI {}.", deadLetterUri);
+                            newFailures.add(failure);
                             continue;
                         }
 
