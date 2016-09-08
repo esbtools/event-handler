@@ -228,6 +228,22 @@ public class RetryingBatchFailedMessageRouteTest extends CamelTestSupport {
                 .inOrder();
     }
 
+    @Test
+    public void shouldSendFailuresWithoutMessagesStraightToDlq() throws Exception {
+        FailedMessage noMsgFailure = new FailedMessage("original", new Exception("Simulated failure"));
+
+        toDlq.expectedMessageCount(1);
+
+        toFailureRetry5Retries.sendBody(Collections.singletonList(noMsgFailure));
+
+        toDlq.assertIsSatisfied();
+
+        Collection<FailedMessage> deadLetters =
+                toDlq.getExchanges().get(0).getIn().getMandatoryBody(Collection.class);
+
+        Truth.assertThat(deadLetters).containsExactly(noMsgFailure);
+    }
+
     static String exceptionMessageForRetryAttempt(int processCount) {
         return "Simulated retry failure " + processCount;
     }
