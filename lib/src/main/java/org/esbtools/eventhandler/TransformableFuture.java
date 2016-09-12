@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler;
 
+import java.util.List;
 import java.util.concurrent.Future;
 
 /**
@@ -35,6 +36,14 @@ public interface TransformableFuture<T> extends Future<T> {
 
     static <T> TransformableFuture<T> immediateFailed(Exception exception) {
         return new FailedTransformableFuture<>(exception);
+    }
+
+    static <T> TransformableFuture<List<T>> combined(TransformableFuture<? extends T>... futures) {
+        return new CombinedTransformableFuture<>(futures);
+    }
+
+    static <T> TransformableFuture<List<T>> combined(List<TransformableFuture<? extends T>> futures) {
+        return new CombinedTransformableFuture<>(futures);
     }
 
     /**
@@ -86,7 +95,8 @@ public interface TransformableFuture<T> extends Future<T> {
      * returning a {@code Future<Future>} which would never have its result {@code Future} examined
      * because the consumer is ignoring the return value. This would definitely be a bug.
      */
-    TransformableFuture<Void> transformAsyncIgnoringReturn(FutureTransform<T, TransformableFuture<?>> futureTransform);
+    TransformableFuture<Void> transformAsyncIgnoringReturn(
+            FutureTransform<T, TransformableFuture<?>> futureTransform);
 
     /**
      * An asynchronous "finally" block.
