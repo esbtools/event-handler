@@ -304,6 +304,8 @@ public class BulkLightblueRequester implements LightblueRequester {
             completed = true;
             callDoneCallbacks();
 
+            // It's important that these transforms are completed eagerly, since this may queue up
+            // additional requests. See LazyTransformingFuture#complete.
             for (LazyTransformingFuture<U, ?> next : this.next) {
                 try {
                     next.complete(result);
@@ -383,7 +385,8 @@ public class BulkLightblueRequester implements LightblueRequester {
 
         @Override
         public <V> TransformableFuture<V> transformSync(FutureTransform<U, V> futureTransform) {
-            LazyTransformingFuture<U, V> future = new LazyTransformingFuture<>(futureTransform, completer);
+            LazyTransformingFuture<U, V> future =
+                    new LazyTransformingFuture<>(futureTransform, completer);
             next.add(future);
             return future;
         }
@@ -483,6 +486,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         public boolean cancel(boolean mayInterruptIfRunning) {
             if (!backingFuture.isDone()) {
                 queuedRequests.remove(this);
+                queuedTryRequests.remove(this);
             }
 
             return backingFuture.cancel(mayInterruptIfRunning);
@@ -529,6 +533,18 @@ public class BulkLightblueRequester implements LightblueRequester {
             this.backingFuture = new LazyTransformableFuture<>(completer);
         }
 
+        /**
+         * Completes, applying the transform function immediately.
+         *
+         * <p>Running the transform function immediately is crucial. If we waited until .get() to
+         * run the transform, then the aggregate effect is that transforms that queue up additional
+         * requests are run one at a time, just before performing those requests, because .get()
+         * needs to return with some results to the caller and so it must call its completion
+         * function (which makes all queued requests). We miss out on batching all requests from
+         * peer transforms. By applying transforms as soon as we have input for them, we queue up
+         * any new requests right away so when the next completer is called, all of the next lazy
+         * futures' requests are already queued up.
+         */
         void complete(T responses) {
             if (isDone()) return;
 

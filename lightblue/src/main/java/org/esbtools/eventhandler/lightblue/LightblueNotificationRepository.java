@@ -132,7 +132,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
                 try {
                     lock.ensureAcquiredOrThrow("Won't update status or process notification.");
                 } catch (LostLockException e) {
-                    logger.warn("Lost lock. This is not fatal. See exception for details.", e);
+                    logger.warn("Lost lock. This is not fatal. See exception for details", e);
                     continue;
                 }
 

@@ -46,8 +46,8 @@ public class LockingRoutePolicy extends RoutePolicySupport {
         try {
             lock = lockStrategy.tryAcquire(resourceId);
         } catch (LockNotAvailableException e) {
-            log.debug("Lock not available, assuming " +
-                    "another thread is holding lock w/ id: " + resourceId, e);
+            log.debug("Lock not available, assuming another thread is holding lock w/ id: " +
+                    resourceId, e);
             exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
         }
     }

@@ -36,7 +36,6 @@ import com.redhat.lightblue.client.request.data.DataDeleteRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 
 public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
-
     private final LightblueClient client;
     private final LockStrategy lockStrategy;
     private final Duration deleteOlderThan;
