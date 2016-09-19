@@ -26,7 +26,6 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>event-handler-lib</artifactId>
-    <version>0.1.5-SNAPSHOT</version>
 
     <dependencies>
         <!-- Camel and friends -->
