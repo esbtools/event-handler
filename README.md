@@ -77,8 +77,6 @@ http://maven.apache.org/maven-release/maven-release-plugin/examples/prepare-rele
 To re-release a previous tag:
 
 1. Create a release.properties file in root project folder with contents like:
-```
-scm.url=scm:git:https://github.com/esbtools/event-handler.git
-scm.tag=VERSION TAG HERE
-```
+<pre><code>scm.url=scm:git:https://github.com/esbtools/event-handler.git
+scm.tag=VERSION TAG HERE</code></pre>
 2. From root project folder, run mvn release:perform -P release
