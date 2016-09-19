@@ -68,9 +68,7 @@ eventHandlerConfig)
 4. Set versions appropriately, and name the tag simply "V#.#.#" (instead of
 event-handler-parent-#.#.#)
 5. mvn release:perform
-6. Bump interproject dependencies to use latest versions (more intuitive to develop everything
-together). For example. lightblue module depends on lib. Bump this dependency to latest lib
-SNAPSHOT.
+6. Resnapshot lightblue entity class versions
 
 For more information, see [the Maven release plugin documentation](
 http://maven.apache.org/maven-release/maven-release-plugin/examples/prepare-release.html).
