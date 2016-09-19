@@ -64,11 +64,21 @@ An implementation of an event handler which reads notifications from an cooperat
 currently permitted member may be asked to comment to confirm.
 2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and 
 eventHandlerConfig)
-3. mvn release:prepare
+3. mvn release:prepare -P release
 4. Set versions appropriately, and name the tag simply "V#.#.#" (instead of
 event-handler-parent-#.#.#)
-5. mvn release:perform
+5. mvn release:perform -P release
 6. Resnapshot lightblue entity class versions
 
 For more information, see [the Maven release plugin documentation](
 http://maven.apache.org/maven-release/maven-release-plugin/examples/prepare-release.html).
+
+### Retrying a release
+To re-release a previous tag:
+
+1. Create a release.properties file in root project folder with contents like:
+```
+scm.url=scm:git:https://github.com/esbtools/event-handler.git
+scm.tag=VERSION TAG HERE
+```
+2. From root project folder, run mvn release:perform -P release
