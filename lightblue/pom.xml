@@ -21,12 +21,12 @@
     <parent>
         <artifactId>event-handler-parent</artifactId>
         <groupId>org.esbtools.eventhandler</groupId>
-        <version>0.1.3-SNAPSHOT</version>
+        <version>0.1.3</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>event-handler-lightblue</artifactId>
-    <version>0.1.3-SNAPSHOT</version>
+    <version>0.1.3</version>
 
     <properties>
         <version.event-handler-lib>0.1.2</version.event-handler-lib>
