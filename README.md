@@ -2,7 +2,6 @@
 [![Coverage Status](https://coveralls.io/repos/esbtools/event-handler/badge.svg?branch=master&service=github)](https://coveralls.io/github/esbtools/event-handler?branch=master)
 [![Stories in Ready](https://badge.waffle.io/esbtools/event-handler.png?label=ready&title=Ready)](https://waffle.io/esbtools/event-handler)
 
-
 # event-handler
 
 Notification in, document out.
@@ -62,7 +61,7 @@ An implementation of an event handler which reads notifications from an cooperat
 (you will need to create an account), with the OSSRH community project, choose "Task" type (not
 "New Project"), and simply ask for permissions to push to org.esbtools releases and snapshots. A
 currently permitted member may be asked to comment to confirm.
-2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and 
+2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and
 eventHandlerConfig)
 3. mvn release:prepare -P release
 4. Set versions appropriately, and name the tag simply "V#.#.#" (instead of
