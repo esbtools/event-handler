@@ -29,7 +29,7 @@ import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.model.DataError;
 import com.redhat.lightblue.client.model.Error;
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.request.CRUDRequest;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueBulkResponseException;
@@ -85,7 +85,7 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     @Override
-    public TransformableFuture<LightblueDataResponses> request(AbstractLightblueDataRequest... requests) {
+    public TransformableFuture<LightblueDataResponses> request(CRUDRequest... requests) {
         checkNoNullsInRequests(requests);
         LazyRequestTransformableFuture<LightblueDataResponses> responseFuture =
                 new LazyRequestTransformableFuture<>(requests);
@@ -95,12 +95,12 @@ public class BulkLightblueRequester implements LightblueRequester {
 
     @Override
     public TransformableFuture<LightblueDataResponses> request(
-            Collection<? extends AbstractLightblueDataRequest> requests) {
-        return request(requests.toArray(new AbstractLightblueDataRequest[requests.size()]));
+            Collection<? extends CRUDRequest> requests) {
+        return request(requests.toArray(new CRUDRequest[requests.size()]));
     }
 
     @Override
-    public TransformableFuture<LightblueResponses> tryRequest(AbstractLightblueDataRequest... req) {
+    public TransformableFuture<LightblueResponses> tryRequest(CRUDRequest... req) {
         checkNoNullsInRequests(req);
         LazyRequestTransformableFuture<LightblueResponses> responseFuture =
                 new LazyRequestTransformableFuture<>(req);
@@ -133,12 +133,12 @@ public class BulkLightblueRequester implements LightblueRequester {
             LightblueBulkDataResponse bulkResponse = tryBulkRequest(bulkRequest);
 
             for (LazyRequestTransformableFuture<LightblueDataResponses> batchedFuture : batch) {
-                AbstractLightblueDataRequest[] requests = batchedFuture.requests;
-                Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap =
+                CRUDRequest[] requests = batchedFuture.requests;
+                Map<CRUDRequest, LightblueDataResponse> responseMap =
                         new HashMap<>(requests.length);
                 List<Error> errors = new ArrayList<>();
 
-                for (AbstractLightblueDataRequest request : requests) {
+                for (CRUDRequest request : requests) {
                     LightblueDataResponse response = bulkResponse.getResponse(request);
 
                     if (response instanceof LightblueErrorResponse) {
@@ -169,11 +169,11 @@ public class BulkLightblueRequester implements LightblueRequester {
             }
 
             for (LazyRequestTransformableFuture<LightblueResponses> batchedFuture : tryBatch) {
-                AbstractLightblueDataRequest[] requests = batchedFuture.requests;
-                Map<AbstractLightblueDataRequest, LightblueResponse> responseMap =
+                CRUDRequest[] requests = batchedFuture.requests;
+                Map<CRUDRequest, LightblueResponse> responseMap =
                         new HashMap<>(requests.length);
 
-                for (AbstractLightblueDataRequest request : requests) {
+                for (CRUDRequest request : requests) {
                     LightblueDataResponse response = bulkResponse.getResponse(request);
                     responseMap.put(request, LightblueResponse.fromClientResponse(response));
                 }
@@ -202,7 +202,7 @@ public class BulkLightblueRequester implements LightblueRequester {
         }
     }
 
-    private static void checkNoNullsInRequests(AbstractLightblueDataRequest[] requests) {
+    private static void checkNoNullsInRequests(CRUDRequest[] requests) {
         Objects.requireNonNull(requests, "requests");
         for (int i = 0; i < requests.length; i++) {
             Objects.requireNonNull(requests[i], "requests[" + i + "]");
@@ -214,15 +214,15 @@ public class BulkLightblueRequester implements LightblueRequester {
      * {@link BulkDataResponses} and one with no guarantees ({@link BulkResponses}). They are both
      * backed by simple maps, just with different generic types, hence the base class.
      */
-    static abstract class ResponseMap<T> implements Responses<AbstractLightblueDataRequest, T> {
-        private final Map<AbstractLightblueDataRequest, T> responseMap;
+    static abstract class ResponseMap<T> implements Responses<CRUDRequest, T> {
+        private final Map<CRUDRequest, T> responseMap;
 
-        ResponseMap(Map<AbstractLightblueDataRequest, T> responseMap) {
+        ResponseMap(Map<CRUDRequest, T> responseMap) {
             this.responseMap = responseMap;
         }
 
         @Override
-        public T forRequest(AbstractLightblueDataRequest request) {
+        public T forRequest(CRUDRequest request) {
             if (responseMap.containsKey(request)) {
                 return responseMap.get(request);
             }
@@ -232,13 +232,13 @@ public class BulkLightblueRequester implements LightblueRequester {
     }
 
     static class BulkDataResponses extends ResponseMap<LightblueDataResponse> implements LightblueDataResponses {
-        BulkDataResponses(Map<AbstractLightblueDataRequest, LightblueDataResponse> responseMap) {
+        BulkDataResponses(Map<CRUDRequest, LightblueDataResponse> responseMap) {
             super(responseMap);
         }
     }
 
     static class BulkResponses extends ResponseMap<LightblueResponse> implements LightblueResponses {
-        BulkResponses(Map<AbstractLightblueDataRequest, LightblueResponse> responseMap) {
+        BulkResponses(Map<CRUDRequest, LightblueResponse> responseMap) {
             super(responseMap);
         }
     }
@@ -444,9 +444,9 @@ public class BulkLightblueRequester implements LightblueRequester {
         private final LazyTransformableFuture<T> backingFuture =
                 new LazyTransformableFuture<>(() -> doQueuedRequestsAndCompleteFutures());
 
-        final AbstractLightblueDataRequest[] requests;
+        final CRUDRequest[] requests;
 
-        LazyRequestTransformableFuture(AbstractLightblueDataRequest[] requests) {
+        LazyRequestTransformableFuture(CRUDRequest[] requests) {
             this.requests = requests;
         }
 

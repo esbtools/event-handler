@@ -21,9 +21,9 @@ package org.esbtools.eventhandler.lightblue.testing;
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
-import com.redhat.lightblue.client.request.AbstractDataBulkRequest;
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
-import com.redhat.lightblue.client.request.LightblueRequest;
+import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.request.LightblueDataRequest;
+import com.redhat.lightblue.client.request.LightblueMetadataRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 import com.redhat.lightblue.client.response.LightblueMetadataResponse;
@@ -86,24 +86,23 @@ public class SlowDataLightblueClient implements LightblueClient {
     }
 
     @Override
-    public LightblueMetadataResponse metadata(LightblueRequest request) throws LightblueException {
+    public LightblueMetadataResponse metadata(LightblueMetadataRequest request) throws LightblueException {
         return delegate.metadata(request);
     }
 
     @Override
-    public LightblueDataResponse data(LightblueRequest request) throws LightblueException {
+    public LightblueDataResponse data(LightblueDataRequest request) throws LightblueException {
         return responseOnceFlushedOrLightblueException(() -> delegate.data(request));
     }
 
     @Override
-    public LightblueBulkDataResponse bulkData(
-            AbstractDataBulkRequest<AbstractLightblueDataRequest> request)
+    public LightblueBulkDataResponse bulkData(DataBulkRequest request)
             throws LightblueException {
         return responseOnceFlushedOrLightblueException(() -> delegate.bulkData(request));
     }
 
     @Override
-    public <T> T data(AbstractLightblueDataRequest request, Class<T> aClass)
+    public <T> T data(LightblueDataRequest request, Class<T> aClass)
             throws LightblueException {
         return responseOnceFlushedOrLightblueException(() -> delegate.data(request, aClass));
     }

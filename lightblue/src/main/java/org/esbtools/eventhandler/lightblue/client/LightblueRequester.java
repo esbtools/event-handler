@@ -22,13 +22,13 @@ import org.esbtools.eventhandler.Requester;
 import org.esbtools.eventhandler.Responses;
 import org.esbtools.eventhandler.TransformableFuture;
 
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.request.CRUDRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 
 import java.util.Collection;
 
 public interface LightblueRequester extends
-        Requester<AbstractLightblueDataRequest, LightblueDataResponse> {
+        Requester<CRUDRequest, LightblueDataResponse> {
 
     /**
      * Like {@link #request(Object[])}, except with relaxed failure conditions so that listeners to
@@ -45,8 +45,8 @@ public interface LightblueRequester extends
      *
      * @see LightblueResponse
      */
-    TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>>
-            tryRequest(AbstractLightblueDataRequest... req);
+    TransformableFuture<? extends Responses<CRUDRequest, LightblueResponse>>
+            tryRequest(CRUDRequest... req);
 
     /**
      * Like {@link #request(Collection)}, except with relaxed failure conditions so that listeners
@@ -63,8 +63,8 @@ public interface LightblueRequester extends
      *
      * @see LightblueResponse
      */
-    default TransformableFuture<? extends Responses<AbstractLightblueDataRequest, LightblueResponse>>
-            tryRequest(Collection<? extends AbstractLightblueDataRequest> req) {
-        return tryRequest(req.stream().toArray(AbstractLightblueDataRequest[]::new));
+    default TransformableFuture<? extends Responses<CRUDRequest, LightblueResponse>>
+            tryRequest(Collection<? extends CRUDRequest> req) {
+        return tryRequest(req.stream().toArray(CRUDRequest[]::new));
     }
 }
