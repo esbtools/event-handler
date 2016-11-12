@@ -20,9 +20,9 @@ package org.esbtools.eventhandler.lightblue.client;
 
 import org.esbtools.eventhandler.Responses;
 
-import com.redhat.lightblue.client.request.AbstractLightblueDataRequest;
+import com.redhat.lightblue.client.request.CRUDRequest;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
 
 public interface LightblueDataResponses extends
-        Responses<AbstractLightblueDataRequest, LightblueDataResponse> {
+        Responses<CRUDRequest, LightblueDataResponse> {
 }
