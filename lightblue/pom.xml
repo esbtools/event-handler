@@ -28,10 +28,10 @@
     <artifactId>event-handler-lightblue</artifactId>
 
     <properties>
-        <version.event-handler-lib>0.1.7-SNAPSHOT</version.event-handler-lib>
+        <version.event-handler-lib>${project.version}</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.3</version.lightblue-notification-hook-model>
         <version.lightblue-java-generator>0.1.4</version.lightblue-java-generator>
-        <version.lightblue-client>5.7.0</version.lightblue-client>
+        <version.lightblue-client>5.8.0-SNAPSHOT</version.lightblue-client>
         <version.jackson>2.6.4</version.jackson>
         <version.exec-maven-plugin>1.5.0</version.exec-maven-plugin>
 
@@ -121,7 +121,7 @@
             <dependency>
                 <groupId>com.redhat.lightblue.client</groupId>
                 <artifactId>lightblue-client-integration-test</artifactId>
-                <version>5.7.0</version>
+                <version>${version.lightblue-client}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -149,7 +149,7 @@
         <dependency>
             <groupId>com.redhat.lightblue.client</groupId>
             <artifactId>lightblue-client-http</artifactId>
-            <version>5.7.0</version>
+            <version>${version.lightblue-client}</version>
         </dependency>
         <dependency>
             <groupId>com.redhat.lightblue.generator</groupId>
