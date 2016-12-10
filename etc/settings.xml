@@ -17,7 +17,7 @@
                     </releases>
                 </repository>
                 <repository>
-                    <id>central</id>
+                    <id>sonatype</id>
                     <url>https://oss.sonatype.org/content/repositories/releases</url>
                     <releases>
                         <enabled>true</enabled>
