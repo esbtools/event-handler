@@ -16,6 +16,13 @@
                         <enabled>true</enabled>
                     </releases>
                 </repository>
+                <repository>
+                    <id>central</id>
+                    <url>https://oss.sonatype.org/content/repositories/releases</url>
+                    <releases>
+                        <enabled>true</enabled>
+                    </releases>
+                </repository>
             </repositories>
             <pluginRepositories>
                 <pluginRepository>
@@ -32,7 +39,7 @@
                   <snapshots><enabled>true</enabled></snapshots>
                 </pluginRepository>
                 <pluginRepository>
-                  <id>snapshots-repo</id>
+                  <id>releases-repo</id>
                   <url>https://oss.sonatype.org/content/repositories/releases</url>
                   <releases><enabled>true</enabled></releases>
                   <snapshots><enabled>false</enabled></snapshots>
