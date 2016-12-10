@@ -31,6 +31,12 @@
                   <releases><enabled>false</enabled></releases>
                   <snapshots><enabled>true</enabled></snapshots>
                 </pluginRepository>
+                <pluginRepository>
+                  <id>snapshots-repo</id>
+                  <url>https://oss.sonatype.org/content/repositories/releases</url>
+                  <releases><enabled>true</enabled></releases>
+                  <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
             </pluginRepositories>
         </profile>
     </profiles>
