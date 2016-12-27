@@ -44,6 +44,7 @@ import org.esbtools.lightbluenotificationhook.NotificationEntity;
 import org.hamcrest.CoreMatchers;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -238,8 +239,9 @@ public class LightblueNotificationRepositoryTest {
             bothThreadsStarted.await();
 
             Thread.sleep(5000);
-
             thread2Client.unpause();
+            
+            Thread.sleep(5000);
             thread1Client.unpause();
 
             List<LightblueNotification> thread1Notifications = futureThread1Events.get(10, TimeUnit.SECONDS);
@@ -316,6 +318,7 @@ public class LightblueNotificationRepositoryTest {
     }
 
     @Test
+    @Ignore("Not required now as locking has been removed from notification processing")
     public void shouldNotReturnOrUpdateNotificationsWhoseLockWasLostBeforeNotificationStatusUpdatesPersisted()
             throws Exception {
         insertNotificationEntities(randomNotificationEntities(20));
