@@ -39,9 +39,9 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final int batchSize;
     private final String documentEndpoint;
     private final String failureEndpoint;
+    private final String routeId;
 
     private static final AtomicInteger idCounter = new AtomicInteger(1);
-    private final int id = idCounter.getAndIncrement();
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
             Duration pollingInterval, int batchSize, String documentEndpoint,
@@ -51,12 +51,24 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
         this.batchSize = batchSize;
         this.documentEndpoint = documentEndpoint;
         this.failureEndpoint = failureEndpoint;
+        this.routeId = "documentEventProcessor-" + idCounter.getAndIncrement();
     }
 
+    public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
+    		Duration pollingInterval, int batchSize, String documentEndpoint,
+            String failureEndpoint, String routeId) {
+        this.documentEventRepository = documentEventRepository;
+        this.pollingInterval = pollingInterval;
+        this.batchSize = batchSize;
+        this.documentEndpoint = documentEndpoint;
+        this.failureEndpoint = failureEndpoint;
+        this.routeId = routeId;
+    }
+    
     @Override
     public void configure() throws Exception {
-        from("timer:pollForDocumentEvents" + id + "?period=" + pollingInterval.toMillis())
-        .routeId("documentEventProcessor-" + id)
+        from("timer:pollForDocumentEvents" + routeId + "?period=" + pollingInterval.toMillis())
+        .routeId(routeId)
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
                     .retrievePriorityDocumentEventsUpTo(batchSize);

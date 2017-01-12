@@ -49,7 +49,7 @@ public class PollingDocumentEventProcessorRouteTest extends CamelTestSupport {
     @Override
     protected RouteBuilder createRouteBuilder() throws Exception {
         return new PollingDocumentEventProcessorRoute(documentEventRepository, Duration.ofSeconds(1),
-                10, "mock:documents", "mock:failures");
+                10, "mock:documents", "mock:failures", "documentEventProcessor-123");
     }
 
     @Test
