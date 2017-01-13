@@ -32,7 +32,6 @@ import com.redhat.lightblue.client.request.data.DataInsertRequest;
 
 import org.esbtools.eventhandler.FailedNotification;
 import org.esbtools.eventhandler.lightblue.config.MutableLightblueNotificationRepositoryConfig;
-import org.esbtools.eventhandler.lightblue.testing.InMemoryLockStrategy;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
 import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
 import org.esbtools.eventhandler.lightblue.testing.MultiStringNotification;
@@ -97,8 +96,6 @@ public class LightblueNotificationRepositoryTest {
             new MutableLightblueNotificationRepositoryConfig(
                     notificationFactoryByEntityName.keySet(), PROCESSING_TIMEOUT, EXPIRE_THRESHOLD);
 
-    private final InMemoryLockStrategy lockStrategy = new InMemoryLockStrategy();
-
     private static final Clock fixedClock = Clock.fixed(Instant.now(), ZoneId.of("GMT"));
     private static final Duration PROCESSING_TIMEOUT = Duration.ofMinutes(1);
     private static final Duration EXPIRE_THRESHOLD = Duration.ofSeconds(30);
@@ -112,7 +109,7 @@ public class LightblueNotificationRepositoryTest {
         // TODO: Try and reduce places canonical types are specified
         // We have 3 here: type list to process, types to factories, and inside the doc event impls
         // themselves.
-        repository = new LightblueNotificationRepository(client, lockStrategy, config,
+        repository = new LightblueNotificationRepository(client, config,
                 notificationFactoryByEntityName, fixedClock);
     }
 
@@ -203,11 +200,11 @@ public class LightblueNotificationRepositoryTest {
         SlowDataLightblueClient thread2Client = new SlowDataLightblueClient(client);
 
         LightblueNotificationRepository thread1Repository = new LightblueNotificationRepository(
-                thread1Client, new InMemoryLockStrategy(), config,
+                thread1Client, config,
                 notificationFactoryByEntityName, fixedClock);
 
         LightblueNotificationRepository thread2Repository = new LightblueNotificationRepository(
-                thread1Client, new InMemoryLockStrategy(), config,
+                thread1Client, config,
                 notificationFactoryByEntityName, fixedClock);
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -236,8 +233,6 @@ public class LightblueNotificationRepositoryTest {
             });
 
             bothThreadsStarted.await();
-
-            Thread.sleep(5000);
 
             thread2Client.unpause();
             thread1Client.unpause();
@@ -313,19 +308,6 @@ public class LightblueNotificationRepositoryTest {
         assertThat(foundFailed).named("found failed entities").hasSize(1);
         assertThat(foundProcessed.get(0).getEntityDataForField("value")).isEqualTo("should succeed");
         assertThat(foundFailed.get(0).getEntityDataForField("value")).isEqualTo("should fail");
-    }
-
-    @Test
-    public void shouldNotReturnOrUpdateNotificationsWhoseLockWasLostBeforeNotificationStatusUpdatesPersisted()
-            throws Exception {
-        insertNotificationEntities(randomNotificationEntities(20));
-
-        // Sneakily steal away any acquired locks
-        lockStrategy.allowLockButImmediateLoseIt();
-
-        List<LightblueNotification> retrieved = repository.retrieveOldestNotificationsUpTo(10);
-
-        assertThat(retrieved).isEmpty();
     }
 
     @Test
