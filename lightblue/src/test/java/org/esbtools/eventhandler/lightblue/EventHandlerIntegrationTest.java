@@ -113,9 +113,9 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
                         /* processingTimeout */ Duration.ofSeconds(60),
                         /* expireThreshold */ Duration.ofSeconds(30));
 
-        notificationRepository1 = new LightblueNotificationRepository(client, lockStrategy1,
+        notificationRepository1 = new LightblueNotificationRepository(client,
                 notificationConfigRepo1, notificationFactoryByEntityName, systemUtc);
-        notificationRepository2 = new LightblueNotificationRepository(client, lockStrategy2,
+        notificationRepository2 = new LightblueNotificationRepository(client,
                 notificationConfigRepo2, notificationFactoryByEntityName, systemUtc);
 
         LightblueDocumentEventRepositoryConfig configForRepo1 =

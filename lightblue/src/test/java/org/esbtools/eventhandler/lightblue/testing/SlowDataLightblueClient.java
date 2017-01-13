@@ -138,6 +138,9 @@ public class SlowDataLightblueClient implements LightblueClient {
 
             throw new RuntimeException(e);
         } catch (Exception e) {
+        	if (e instanceof LightblueException) {
+                throw (LightblueException) e;
+            }
             if (e instanceof RuntimeException) {
                 throw (RuntimeException) e;
             }

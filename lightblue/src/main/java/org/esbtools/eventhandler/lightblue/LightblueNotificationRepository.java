@@ -26,7 +26,6 @@ import org.esbtools.eventhandler.lightblue.client.FindRequests;
 import org.esbtools.eventhandler.lightblue.client.LightblueErrors;
 import org.esbtools.eventhandler.lightblue.client.LightblueRequester;
 import org.esbtools.eventhandler.lightblue.client.UpdateRequests;
-import org.esbtools.eventhandler.lightblue.locking.LockStrategy;
 import org.esbtools.lightbluenotificationhook.NotificationEntity;
 
 import com.redhat.lightblue.client.LightblueClient;
@@ -61,7 +60,6 @@ import java.util.stream.Collectors;
 public class LightblueNotificationRepository implements NotificationRepository {
     private final LightblueClient lightblue;
     private final LightblueNotificationRepositoryConfig config;
-    private final LockStrategy lockStrategy;
     private final Map<String, NotificationFactory> notificationFactoryByEntityName;
     private final Clock clock;
 
@@ -71,11 +69,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(LightblueNotificationRepository.class);
 
-    public LightblueNotificationRepository(LightblueClient lightblue, LockStrategy lockStrategy,
+    public LightblueNotificationRepository(LightblueClient lightblue,
             LightblueNotificationRepositoryConfig config,
             Map<String, NotificationFactory> notificationFactoryByEntityName, Clock clock) {
         this.lightblue = lightblue;
-        this.lockStrategy = lockStrategy;
         this.config = config;
         this.notificationFactoryByEntityName = notificationFactoryByEntityName;
         this.clock = clock;
@@ -267,10 +264,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
         	List<ProcessingNotification> processedNotifications =
                     new ArrayList<>(entities.length);
 
-            // Shuffling the entities means less lock contention among nodes which get similar
-            // batches.
             List<NotificationEntity> shuffled = Arrays.asList(entities);
-            Collections.shuffle(shuffled);
 
             for (NotificationEntity entity : shuffled) {
                 LightblueNotification notification;
@@ -299,7 +293,7 @@ public class LightblueNotificationRepository implements NotificationRepository {
 
             }
 
-            return  processedNotifications;
+            return processedNotifications;
         }
 
         private ProcessingNotification(String notificationId, LightblueNotification notification,
