@@ -104,7 +104,6 @@ public class LightblueNotificationRepository implements NotificationRepository {
                         entitiesToProcess, maxNotifications,
                         clock.instant().minus(processingTimeout)))
                 .parseProcessed(NotificationEntity[].class);
-
         List<ProcessingNotification> processingList =
                 ProcessingNotification.parseNotificationEntities(
                         notificationEntities,
