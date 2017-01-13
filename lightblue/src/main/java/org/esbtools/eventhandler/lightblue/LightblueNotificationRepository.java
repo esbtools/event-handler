@@ -260,10 +260,10 @@ public class LightblueNotificationRepository implements NotificationRepository {
                 LightblueRequester requester,
                 Map<String, ? extends NotificationFactory> notificationFactoriesByEntityName,
                 Clock clock) {
-        	List<ProcessingNotification> processedNotifications =
+           List<ProcessingNotification> processedNotifications =
                     new ArrayList<>(entities.length);
 
-            List<NotificationEntity> shuffled = Arrays.asList(entities);
+           List<NotificationEntity> shuffled = Arrays.asList(entities);
 
             for (NotificationEntity entity : shuffled) {
                 LightblueNotification notification;
