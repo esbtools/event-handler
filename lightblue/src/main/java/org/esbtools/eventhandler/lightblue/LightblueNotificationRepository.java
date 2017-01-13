@@ -263,9 +263,9 @@ public class LightblueNotificationRepository implements NotificationRepository {
            List<ProcessingNotification> processedNotifications =
                     new ArrayList<>(entities.length);
 
-           List<NotificationEntity> shuffled = Arrays.asList(entities);
+           List<NotificationEntity> notificationEntityList = Arrays.asList(entities);
 
-            for (NotificationEntity entity : shuffled) {
+            for (NotificationEntity entity : notificationEntityList) {
                 LightblueNotification notification;
 
                 try {
