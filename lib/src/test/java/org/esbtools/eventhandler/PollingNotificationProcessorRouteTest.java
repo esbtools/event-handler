@@ -43,7 +43,7 @@ public class PollingNotificationProcessorRouteTest extends CamelTestSupport {
     @Override
     protected RouteBuilder createRouteBuilder() throws Exception {
         return new PollingNotificationProcessorRoute(notificationRepository, documentEventRepository,
-                Duration.ofSeconds(1), 10);
+                Duration.ofSeconds(1), Duration.ofSeconds(3), 10);
     }
 
     @Test

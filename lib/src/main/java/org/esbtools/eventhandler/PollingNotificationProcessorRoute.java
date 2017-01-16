@@ -18,9 +18,6 @@
 
 package org.esbtools.eventhandler;
 
-import com.google.common.util.concurrent.Futures;
-import org.apache.camel.builder.RouteBuilder;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,15 +26,22 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+
+import org.apache.camel.builder.RouteBuilder;
+
+import com.google.common.util.concurrent.Futures;
 
 public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
+    private final Duration notificationProcessTimeout;
     private final int batchSize;
 
     private static final AtomicInteger idCounter = new AtomicInteger(1);
@@ -45,11 +49,13 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval,
-            int batchSize) {
+            Duration notificationProcessTimeout, int batchSize) {
         this.notificationRepository = notificationRepository;
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
         this.batchSize = batchSize;
+        this.notificationProcessTimeout = Objects.requireNonNull(notificationProcessTimeout,
+                "notificationProcessTimeout");
     }
 
     @Override
@@ -84,7 +90,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 Future<Collection<DocumentEvent>> futureEvents =
                         notificationToFutureEvents.getValue();
                 try {
-                    Collection<DocumentEvent> events = futureEvents.get();
+                    Collection<DocumentEvent> events = futureEvents.get(notificationProcessTimeout.toMillis(), TimeUnit.MILLISECONDS);
                     notificationsToDocumentEvents.put(notification, events);
                 } catch (ExecutionException | InterruptedException e) {
                     log.error("Failed to get document events for notification: " + notification, e);

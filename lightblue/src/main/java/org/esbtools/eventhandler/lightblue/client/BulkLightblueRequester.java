@@ -18,26 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
-import org.esbtools.eventhandler.FutureDoneCallback;
-import org.esbtools.eventhandler.FutureTransform;
-import org.esbtools.eventhandler.NestedTransformableFuture;
-import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
-import org.esbtools.eventhandler.Responses;
-import org.esbtools.eventhandler.TransformableFuture;
-
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.model.DataError;
-import com.redhat.lightblue.client.model.Error;
-import com.redhat.lightblue.client.request.CRUDRequest;
-import com.redhat.lightblue.client.request.DataBulkRequest;
-import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
-import com.redhat.lightblue.client.response.LightblueBulkResponseException;
-import com.redhat.lightblue.client.response.LightblueDataResponse;
-import com.redhat.lightblue.client.response.LightblueErrorResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,10 +29,32 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
+
+import org.esbtools.eventhandler.FutureDoneCallback;
+import org.esbtools.eventhandler.FutureTransform;
+import org.esbtools.eventhandler.NestedTransformableFuture;
+import org.esbtools.eventhandler.NestedTransformableFutureIgnoringReturn;
+import org.esbtools.eventhandler.Responses;
+import org.esbtools.eventhandler.TransformableFuture;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.model.DataError;
+import com.redhat.lightblue.client.model.Error;
+import com.redhat.lightblue.client.request.CRUDRequest;
+import com.redhat.lightblue.client.request.DataBulkRequest;
+import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
+import com.redhat.lightblue.client.response.LightblueBulkResponseException;
+import com.redhat.lightblue.client.response.LightblueDataResponse;
+import com.redhat.lightblue.client.response.LightblueErrorResponse;
 
 /**
  * A partially thread-safe requester which queues up requests until an associated {@link Future} is
@@ -373,14 +375,36 @@ public class BulkLightblueRequester implements LightblueRequester {
             return result;
         }
 
-        // TODO(ahenning): This ignores the timeout because we aren't doing work in another thread
-        // I'm not sure that anyone will ever care, but if they did, we would do the same lazy
-        // stuff, but just do it in another thread which we could interrupt if it took too long.
-        // In that case we may have to build in interrupt checking during request processing.
         @Override
-        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException,
-                TimeoutException {
-            return get();
+        public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+            if (cancelled) {
+                throw new CancellationException();
+            }
+
+            if (!completed) {
+                ExecutorService executor = Executors.newSingleThreadExecutor();
+                try {
+                    Future<?> submittedTask = executor.submit(() -> {
+                        completer.triggerFutureCompletion();
+                    });
+                    submittedTask.get(timeout, unit);
+                } catch (InterruptedException e) {
+                    throw new TimeoutException();
+                } finally {
+                    executor.shutdownNow();
+                }
+                if (!completed) {
+                    throw new ExecutionException(new IllegalStateException("Future attempted to "
+                            + "lazily trigger completion, but completer did not actually complete "
+                            + "the future. Check the provided completer function for correctness."));
+                }
+            }
+
+            if (exception != null) {
+                throw new ExecutionException(exception);
+            }
+
+            return result;
         }
 
         @Override
