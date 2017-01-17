@@ -41,7 +41,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
     private final NotificationRepository notificationRepository;
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
-    private final Duration notificationProcessTimeout;
+    private final Duration processTimeout;
     private final int batchSize;
 
     private static final AtomicInteger idCounter = new AtomicInteger(1);
@@ -49,12 +49,12 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
 
     public PollingNotificationProcessorRoute(NotificationRepository notificationRepository,
             DocumentEventRepository documentEventRepository, Duration pollingInterval,
-            Duration notificationProcessTimeout, int batchSize) {
+            Duration processTimeout, int batchSize) {
         this.notificationRepository = notificationRepository;
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
         this.batchSize = batchSize;
-        this.notificationProcessTimeout = Objects.requireNonNull(notificationProcessTimeout,
+        this.processTimeout = Objects.requireNonNull(processTimeout,
                 "notificationProcessTimeout");
     }
 
@@ -90,7 +90,7 @@ public class PollingNotificationProcessorRoute extends RouteBuilder {
                 Future<Collection<DocumentEvent>> futureEvents =
                         notificationToFutureEvents.getValue();
                 try {
-                    Collection<DocumentEvent> events = futureEvents.get(notificationProcessTimeout.toMillis(), TimeUnit.MILLISECONDS);
+                    Collection<DocumentEvent> events = futureEvents.get(processTimeout.toMillis(), TimeUnit.MILLISECONDS);
                     notificationsToDocumentEvents.put(notification, events);
                 } catch (ExecutionException | InterruptedException e) {
                     log.error("Failed to get document events for notification: " + notification, e);

@@ -39,7 +39,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private final DocumentEventRepository documentEventRepository;
     private final Duration pollingInterval;
     private final int batchSize;
-    private final Duration documentEventProcessTimeout;
+    private final Duration processTimeout;
     private final String documentEndpoint;
     private final String failureEndpoint;
     private final String routeId;
@@ -47,11 +47,11 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     private static final AtomicInteger idCounter = new AtomicInteger(1);
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
-            Duration pollingInterval,  Duration documentEventProcessTimeout,int batchSize, String documentEndpoint,
+            Duration pollingInterval,  Duration processTimeout,int batchSize, String documentEndpoint,
             String failureEndpoint) {
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
-        this.documentEventProcessTimeout = documentEventProcessTimeout;
+        this.processTimeout = processTimeout;
         this.batchSize = batchSize;
         this.documentEndpoint = documentEndpoint;
         this.failureEndpoint = failureEndpoint;
@@ -59,11 +59,11 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     }
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
-    		Duration pollingInterval, Duration documentEventProcessTimeout, int batchSize, String documentEndpoint,
+    		Duration pollingInterval, Duration processTimeout, int batchSize, String documentEndpoint,
             String failureEndpoint, String routeId) {
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
-        this.documentEventProcessTimeout = documentEventProcessTimeout;
+        this.processTimeout = processTimeout;
         this.batchSize = batchSize;
         this.documentEndpoint = documentEndpoint;
         this.failureEndpoint = failureEndpoint;
@@ -99,7 +99,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
                 Future<?> futureDoc = eventToFutureDocument.getValue();
 
                 try {
-                    eventsToDocuments.put(event, futureDoc.get(documentEventProcessTimeout.toMillis(), TimeUnit.MILLISECONDS));
+                    eventsToDocuments.put(event, futureDoc.get(processTimeout.toMillis(), TimeUnit.MILLISECONDS));
                 } catch (ExecutionException | InterruptedException e) {
                     log.error("Failed to get document for document event: " + event, e);
                     failedEvents.add(new FailedDocumentEvent(event, e));

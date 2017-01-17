@@ -122,7 +122,7 @@ public class BulkLightblueRequesterTest {
 
         requester.request(findTester).transformSync(responses -> {
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
-        }).get(5000, TimeUnit.MILLISECONDS);
+        }).get(50, TimeUnit.MILLISECONDS);
 
     }
     
@@ -135,7 +135,7 @@ public class BulkLightblueRequesterTest {
 
         String userName = requester.request(findTester).transformSync(responses -> {
             return responses.forRequest(findTester).parseProcessed(TestUser.class);
-        }).get(5000, TimeUnit.MILLISECONDS).getUsername();
+        }).get(50, TimeUnit.MILLISECONDS).getUsername();
 
         assertThat(userName).isEqualTo("cooltester2000");
 

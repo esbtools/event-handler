@@ -18,6 +18,7 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -351,47 +353,55 @@ public class BulkLightblueRequester implements LightblueRequester {
         public boolean isDone() {
             return cancelled || completed;
         }
+        
+        private static class TimeoutDuration {
+            final long duration;
+            final TimeUnit timeUnit;
+
+            TimeoutDuration(long duration, TimeUnit timeUnit) {
+
+                this.duration = duration;
+                this.timeUnit = timeUnit;
+            }
+
+        }
 
         @Override
         public U get() throws InterruptedException, ExecutionException {
-            if (cancelled) {
-                throw new CancellationException();
+            try {
+                return get(Optional.empty());
+            } catch (TimeoutException e) {
+                return null;
             }
-
-            if (!completed) {
-                completer.triggerFutureCompletion();
-
-                if (!completed) {
-                    throw new ExecutionException(new IllegalStateException("Future attempted to " +
-                            "lazily trigger completion, but completer did not actually complete " +
-                            "the future. Check the provided completer function for correctness."));
-                }
-            }
-
-            if (exception != null) {
-                throw new ExecutionException(exception);
-            }
-
-            return result;
         }
 
         @Override
         public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+
+            return get(Optional.of(new TimeoutDuration(timeout, unit)));
+        }
+
+        private U get(Optional<TimeoutDuration> timeout)
+                throws TimeoutException, InterruptedException, ExecutionException {
             if (cancelled) {
                 throw new CancellationException();
             }
 
             if (!completed) {
-                ExecutorService executor = Executors.newSingleThreadExecutor();
-                try {
-                    Future<?> submittedTask = executor.submit(() -> {
-                        completer.triggerFutureCompletion();
-                    });
-                    submittedTask.get(timeout, unit);
-                } catch (InterruptedException e) {
-                    throw new TimeoutException();
-                } finally {
-                    executor.shutdownNow();
+                if (timeout.isPresent()) {
+                    ExecutorService executor = Executors.newSingleThreadExecutor();
+                    try {
+                        Future<?> submittedTask = executor.submit(() -> {
+                            completer.triggerFutureCompletion();
+                        });
+                        submittedTask.get(timeout.get().duration, timeout.get().timeUnit);
+                    } catch (TimeoutException e) {
+                        throw new TimeoutException("The request has timed out");
+                    } finally {
+                        executor.shutdownNow();
+                    }
+                } else {
+                    completer.triggerFutureCompletion();
                 }
                 if (!completed) {
                     throw new ExecutionException(new IllegalStateException("Future attempted to "
