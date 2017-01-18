@@ -395,8 +395,6 @@ public class BulkLightblueRequester implements LightblueRequester {
                             completer.triggerFutureCompletion();
                         });
                         submittedTask.get(timeout.get().duration, timeout.get().timeUnit);
-                    } catch (TimeoutException e) {
-                        throw new TimeoutException("The request has timed out");
                     } finally {
                         executor.shutdownNow();
                     }
