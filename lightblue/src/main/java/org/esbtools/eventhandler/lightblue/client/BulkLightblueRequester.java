@@ -371,7 +371,8 @@ public class BulkLightblueRequester implements LightblueRequester {
             try {
                 return get(Optional.empty());
             } catch (TimeoutException e) {
-                return null;
+                throw new ExecutionException("A future without a timeout is attempting to throw a TimeoutException while it should not. "
+                                + "This implies there is a bug in the future code and will need to be corrected ",e);
             }
         }
 
