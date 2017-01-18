@@ -7,33 +7,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.esbtools.eventhandler.TransformableFuture;
-import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
-import org.esbtools.eventhandler.lightblue.client.LightblueResponse;
-import org.esbtools.eventhandler.lightblue.client.LightblueResponseException;
-import org.esbtools.eventhandler.lightblue.client.LightblueDataResponses;
-import org.esbtools.eventhandler.lightblue.client.LightblueResponses;
-import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
-import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
-import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
-import org.esbtools.eventhandler.lightblue.testing.TestUser;
-
-import com.redhat.lightblue.client.LightblueClient;
-import com.redhat.lightblue.client.LightblueException;
-import com.redhat.lightblue.client.Projection;
-import com.redhat.lightblue.client.Query;
-import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
-import com.redhat.lightblue.client.request.data.DataFindRequest;
-import com.redhat.lightblue.client.request.data.DataInsertRequest;
-import com.redhat.lightblue.client.response.LightblueErrorResponse;
-import com.redhat.lightblue.client.response.LightblueParseException;
-import org.hamcrest.Matchers;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +15,35 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import org.esbtools.eventhandler.TransformableFuture;
+import org.esbtools.eventhandler.lightblue.client.BulkLightblueRequester;
+import org.esbtools.eventhandler.lightblue.client.LightblueDataResponses;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponse;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponseException;
+import org.esbtools.eventhandler.lightblue.client.LightblueResponses;
+import org.esbtools.eventhandler.lightblue.testing.LightblueClientConfigurations;
+import org.esbtools.eventhandler.lightblue.testing.LightblueClients;
+import org.esbtools.eventhandler.lightblue.testing.SlowDataLightblueClient;
+import org.esbtools.eventhandler.lightblue.testing.TestMetadataJson;
+import org.esbtools.eventhandler.lightblue.testing.TestUser;
+import org.hamcrest.Matchers;
+import org.junit.Before;
+import org.junit.ClassRule;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import com.redhat.lightblue.client.LightblueClient;
+import com.redhat.lightblue.client.LightblueException;
+import com.redhat.lightblue.client.Projection;
+import com.redhat.lightblue.client.Query;
+import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.data.DataFindRequest;
+import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.redhat.lightblue.client.response.LightblueParseException;
 
 public class BulkLightblueRequesterTest {
     @ClassRule
@@ -90,8 +92,8 @@ public class BulkLightblueRequesterTest {
     }
 
     @Test
-    public void shouldThrowNoSuchElementExceptionIfResponseNotFound() throws ExecutionException,
-            InterruptedException, LightblueException {
+    public void shouldThrowNoSuchElementExceptionIfResponseNotFound()
+            throws ExecutionException, InterruptedException, LightblueException {
         insertUser("cooltester2000");
 
         DataFindRequest findTester = findUserByUsername("cooltester2000");
@@ -102,6 +104,41 @@ public class BulkLightblueRequesterTest {
         requester.request(findTester).transformSync((responses) -> {
             return responses.forRequest(otherRequest).parseProcessed(TestUser.class);
         }).get();
+    }
+
+    @Test
+    public void shouldThrowTimeoutExceptionIfResponseTimeExceedsLimit()
+            throws ExecutionException, InterruptedException, LightblueException, TimeoutException {
+
+        SlowDataLightblueClient slowClient = new SlowDataLightblueClient(client);
+        requester = new BulkLightblueRequester(slowClient);
+
+        insertUser("cooltester2000");
+
+        slowClient.pauseBeforeRequests();
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        expectedException.expect(Matchers.instanceOf(TimeoutException.class));
+
+        requester.request(findTester).transformSync(responses -> {
+            return responses.forRequest(findTester).parseProcessed(TestUser.class);
+        }).get(50, TimeUnit.MILLISECONDS);
+
+    }
+    
+    @Test
+    public void shouldCompleteSuccessfullyIfResponseTimeDoesNotExceedLimit()
+            throws ExecutionException, InterruptedException, LightblueException, TimeoutException {
+
+        insertUser("cooltester2000");
+        DataFindRequest findTester = findUserByUsername("cooltester2000");
+
+        String userName = requester.request(findTester).transformSync(responses -> {
+            return responses.forRequest(findTester).parseProcessed(TestUser.class);
+        }).get(5000, TimeUnit.MILLISECONDS).getUsername();
+
+        assertThat(userName).isEqualTo("cooltester2000");
+
     }
 
     @Test

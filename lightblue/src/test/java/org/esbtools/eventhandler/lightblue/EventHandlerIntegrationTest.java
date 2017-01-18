@@ -137,14 +137,13 @@ public class EventHandlerIntegrationTest extends CamelTestSupport {
     protected RouteBuilder[] createRouteBuilders() throws Exception {
         return new RouteBuilder[] {
                 new PollingNotificationProcessorRoute(notificationRepository1, documentEventRepository1,
-                        Duration.ofSeconds(1), 50),
+                        Duration.ofSeconds(1), Duration.ofSeconds(3), 50),
                 new PollingNotificationProcessorRoute(notificationRepository2, documentEventRepository2,
-                        Duration.ofSeconds(1), 35),
+                        Duration.ofSeconds(1), Duration.ofSeconds(3), 35),
                 new PollingDocumentEventProcessorRoute(documentEventRepository1, Duration.ofSeconds(1),
-                        20, "mock:documents", "mock:failures"),
+                        Duration.ofSeconds(3), 20, "mock:documents", "mock:failures"),
                 new PollingDocumentEventProcessorRoute(documentEventRepository2, Duration.ofSeconds(1),
-                        10, "mock:documents", "mock:failures")
-        };
+                        Duration.ofSeconds(3), 10, "mock:documents", "mock:failures") };
     }
 
     @Test
