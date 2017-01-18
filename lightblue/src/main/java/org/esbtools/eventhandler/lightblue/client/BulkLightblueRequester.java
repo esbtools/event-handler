@@ -371,14 +371,15 @@ public class BulkLightblueRequester implements LightblueRequester {
             try {
                 return get(Optional.empty());
             } catch (TimeoutException e) {
-                throw new ExecutionException("A future without a timeout is attempting to throw a TimeoutException while it should not. "
-                                + "This implies there is a bug in the future code and will need to be corrected ",e);
+                throw new ExecutionException(
+                        "A future without a timeout is attempting to throw a TimeoutException while it should not. "
+                                + "This implies there is a bug in the future code and will need to be corrected ",
+                        e);
             }
         }
 
         @Override
         public U get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-
             return get(Optional.of(new TimeoutDuration(timeout, unit)));
         }
 
@@ -395,7 +396,8 @@ public class BulkLightblueRequester implements LightblueRequester {
                         Future<?> submittedTask = executor.submit(() -> {
                             completer.triggerFutureCompletion();
                         });
-                        submittedTask.get(timeout.get().duration, timeout.get().timeUnit);
+                        TimeoutDuration timeoutDuration = timeout.get();
+                        submittedTask.get(timeoutDuration.duration, timeoutDuration.timeUnit);
                     } finally {
                         executor.shutdownNow();
                     }
