@@ -57,10 +57,11 @@ An implementation of an event handler which reads notifications from an cooperat
 
 ## Releasing
 
-1. Make sure you can push to org.esbtools respositories. Open a ticket up with the Sonatype Jira
-(you will need to create an account), with the OSSRH community project, choose "Task" type (not
-"New Project"), and simply ask for permissions to push to org.esbtools releases and snapshots. A
-currently permitted member may be asked to comment to confirm.
+1. Make sure you can push to org.esbtools respositories. Open a ticket up with the [Sonatype 
+Jira](https://issues.sonatype.org/secure/Dashboard.jspa) (you will need to create an 
+account), with the OSSRH community project, choose "Task" type (not "New Project"), and simply 
+ask for permissions to push to org.esbtools releases and snapshots. A currently permitted 
+member may be asked to comment to confirm.
 2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and
 eventHandlerConfig)
 3. mvn release:prepare -P release
