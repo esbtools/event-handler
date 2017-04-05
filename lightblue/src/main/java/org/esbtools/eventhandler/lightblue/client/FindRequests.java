@@ -47,6 +47,7 @@ public abstract class FindRequests {
                 NotificationEntity.ENTITY_VERSION);
 
         findEntities.where(Query.and(
+                Query.withValue("clientRequestDate", Query.neq, Literal.value(null)),
                 Query.withValues("entityName", Query.NaryOp.in, Literal.values(entityNames)),
                 Query.or(
                         Query.withValue("status", Query.BinOp.eq, DocumentEventEntity.Status.unprocessed),
