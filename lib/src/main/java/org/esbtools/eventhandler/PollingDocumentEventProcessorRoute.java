@@ -59,7 +59,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     }
 
     public PollingDocumentEventProcessorRoute(DocumentEventRepository documentEventRepository,
-    		Duration pollingInterval, Duration processTimeout, int batchSize, String documentEndpoint,
+            Duration pollingInterval, Duration processTimeout, int batchSize, String documentEndpoint,
             String failureEndpoint, String routeId) {
         this.documentEventRepository = documentEventRepository;
         this.pollingInterval = pollingInterval;
@@ -72,7 +72,7 @@ public class PollingDocumentEventProcessorRoute extends RouteBuilder {
     
     @Override
     public void configure() throws Exception {
-        from("timer:pollForDocumentEvents" + routeId + "?period=" + pollingInterval.toMillis())
+        from("timer:pollForDocumentEvents-" + routeId + "?period=" + pollingInterval.toMillis())
         .routeId(routeId)
         .process(exchange -> {
             List<? extends DocumentEvent> documentEvents = documentEventRepository
