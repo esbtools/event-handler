@@ -452,8 +452,7 @@ public class BulkLightblueRequesterTest {
         Mockito.verify(mockClient).bulkData(Mockito.argThat(new ArgumentMatcher<DataBulkRequest>() {
             @Override
             public boolean matches(Object argument) {
-                assertTrue(((DataBulkRequest) argument).isOrdered());
-                return true;
+                return ((DataBulkRequest) argument).isOrdered();
             }
         }));
     }
@@ -465,13 +464,12 @@ public class BulkLightblueRequesterTest {
         LightblueBulkDataResponse lightblueDataResponse = Mockito.mock(LightblueBulkDataResponse.class);
         when(mockClient.bulkData(any(DataBulkRequest.class))).thenReturn(lightblueDataResponse);
 
-        BulkLightblueRequester orderedRequester = new BulkLightblueRequester(mockClient, false);
-        orderedRequester.request(new DataFindRequest("foo"), new DataFindRequest("bar")).get();
+        BulkLightblueRequester unOrderedRequester = new BulkLightblueRequester(mockClient, false);
+        unOrderedRequester.request(new DataFindRequest("foo"), new DataFindRequest("bar")).get();
         Mockito.verify(mockClient).bulkData(Mockito.argThat(new ArgumentMatcher<DataBulkRequest>() {
             @Override
             public boolean matches(Object argument) {
-                assertFalse(((DataBulkRequest) argument).isOrdered());
-                return true;
+                return !((DataBulkRequest) argument).isOrdered();
             }
         }));
     }
