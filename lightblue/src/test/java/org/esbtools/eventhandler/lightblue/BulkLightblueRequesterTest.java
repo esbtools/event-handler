@@ -6,6 +6,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 import java.net.UnknownHostException;
 import java.util.ArrayList;
@@ -35,14 +37,18 @@ import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentMatcher;
+import org.mockito.Mockito;
 
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Projection;
 import com.redhat.lightblue.client.Query;
 import com.redhat.lightblue.client.integration.test.LightblueExternalResource;
+import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.request.data.DataInsertRequest;
+import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueParseException;
 
 public class BulkLightblueRequesterTest {
@@ -433,7 +439,43 @@ public class BulkLightblueRequesterTest {
             throw e;
         }
     }
+    
+    @Test
+    public void shouldBeOrderedIfRequested() throws Exception {
 
+        LightblueClient mockClient = Mockito.mock(LightblueClient.class);
+        LightblueBulkDataResponse lightblueDataResponse = Mockito.mock(LightblueBulkDataResponse.class);
+        when(mockClient.bulkData(any(DataBulkRequest.class))).thenReturn(lightblueDataResponse);
+
+        BulkLightblueRequester orderedRequester = new BulkLightblueRequester(mockClient, true);
+        orderedRequester.request(new DataFindRequest("foo"), new DataFindRequest("bar")).get();
+        Mockito.verify(mockClient).bulkData(Mockito.argThat(new ArgumentMatcher<DataBulkRequest>() {
+            @Override
+            public boolean matches(Object argument) {
+                assertTrue(((DataBulkRequest) argument).isOrdered());
+                return true;
+            }
+        }));
+    }
+    
+    @Test
+    public void shouldBeUnOrderedIfRequested() throws Exception {
+
+        LightblueClient mockClient = Mockito.mock(LightblueClient.class);
+        LightblueBulkDataResponse lightblueDataResponse = Mockito.mock(LightblueBulkDataResponse.class);
+        when(mockClient.bulkData(any(DataBulkRequest.class))).thenReturn(lightblueDataResponse);
+
+        BulkLightblueRequester orderedRequester = new BulkLightblueRequester(mockClient, false);
+        orderedRequester.request(new DataFindRequest("foo"), new DataFindRequest("bar")).get();
+        Mockito.verify(mockClient).bulkData(Mockito.argThat(new ArgumentMatcher<DataBulkRequest>() {
+            @Override
+            public boolean matches(Object argument) {
+                assertFalse(((DataBulkRequest) argument).isOrdered());
+                return true;
+            }
+        }));
+    }
+   
     private void insertUser(String username) throws LightblueException {
         DataInsertRequest insertRequest = new DataInsertRequest(TestUser.ENTITY_NAME, TestUser.ENTITY_VERSION);
         TestUser user = new TestUser();
