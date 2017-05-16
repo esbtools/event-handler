@@ -18,7 +18,6 @@
 
 package org.esbtools.eventhandler.lightblue.client;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -79,15 +78,21 @@ import com.redhat.lightblue.client.response.LightblueErrorResponse;
  */
 public class BulkLightblueRequester implements LightblueRequester {
     private final LightblueClient lightblue;
+    private final boolean ordered;
     private final List<LazyRequestTransformableFuture<LightblueDataResponses>> queuedRequests =
             Collections.synchronizedList(new ArrayList<>());
     private final List<LazyRequestTransformableFuture<LightblueResponses>> queuedTryRequests =
             Collections.synchronizedList(new ArrayList<>());
 
     public BulkLightblueRequester(LightblueClient lightblue) {
-        this.lightblue = lightblue;
+        this(lightblue, true);
     }
 
+    public BulkLightblueRequester(LightblueClient lightblue, boolean ordered) {
+        this.lightblue = lightblue;
+        this.ordered = ordered;
+    }
+    
     @Override
     public TransformableFuture<LightblueDataResponses> request(CRUDRequest... requests) {
         checkNoNullsInRequests(requests);
@@ -125,8 +130,8 @@ public class BulkLightblueRequester implements LightblueRequester {
             tryBatch = new ArrayList<>(queuedTryRequests);
             queuedTryRequests.clear();
         }
-
-        DataBulkRequest bulkRequest = new DataBulkRequest();
+        
+        DataBulkRequest bulkRequest = new DataBulkRequest(ordered);
 
         Stream.concat(batch.stream(), tryBatch.stream())
                 .flatMap(requestFuture -> Arrays.stream(requestFuture.requests))
