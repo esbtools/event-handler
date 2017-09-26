@@ -24,9 +24,14 @@
         <version>0.1.14-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
+    <name>event-handler: ${project.groupId}|${project.artifactId}</name>
     <artifactId>event-handler-lib</artifactId>
-
+    <properties>
+        <sonar.exclusions>**/*Test.java,**/*Exception.java</sonar.exclusions>
+        <sonar.projectName>event-handler-lib</sonar.projectName>
+        <!-- Override with -Dmetadata.outputDirectory= -->
+        <metadata.outputDirectory>${project.build.outputDirectory}</metadata.outputDirectory>
+    </properties>
     <dependencies>
         <!-- Camel and friends -->
         <dependency>
