@@ -53,8 +53,8 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
 
     public static PeriodicDeleteOldEntitiesRoute deletingNotificationsOlderThan(
             Duration deleteOlderThan, Duration deleteInterval, LightblueClient client,
-            String collectionDomain, LockStrategy lockStrategy, Clock clock) {
-        return new PeriodicDeleteOldEntitiesRoute(collectionDomain, NotificationEntity.ENTITY_NAME,
+            String domain, LockStrategy lockStrategy, Clock clock) {
+        return new PeriodicDeleteOldEntitiesRoute(domain, NotificationEntity.ENTITY_NAME,
                 NotificationEntity.ENTITY_VERSION, "clientRequestDate", client, lockStrategy,
                 deleteOlderThan, deleteInterval, clock);
     }
