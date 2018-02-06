@@ -85,10 +85,10 @@ public class PeriodicDeleteOldEntitiesRouteTest extends CamelTestSupport {
 
         docEventsDeleterRoute = PeriodicDeleteOldEntitiesRoute
                 .deletingDocumentEventsOlderThan(DELETE_OLDER_THAN, DELETE_INTERVAL,
-                        client, lockStrategy, fixedClock);
+                        client, "backoffice", lockStrategy, fixedClock);
         notificationsDeleterRoute = PeriodicDeleteOldEntitiesRoute
                 .deletingNotificationsOlderThan(DELETE_OLDER_THAN, DELETE_INTERVAL,
-                        client, lockStrategy, fixedClock);
+                        client, "backoffice", lockStrategy, fixedClock);
 
         // Reset locks, start with lock taken
         lockStrategy.releaseAll();
