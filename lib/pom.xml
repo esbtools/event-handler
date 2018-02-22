@@ -21,7 +21,7 @@
     <parent>
         <artifactId>event-handler-parent</artifactId>
         <groupId>org.esbtools.eventhandler</groupId>
-        <version>0.1.14-SNAPSHOT</version>
+        <version>0.1.14</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <name>event-handler: ${project.groupId}|${project.artifactId}</name>
