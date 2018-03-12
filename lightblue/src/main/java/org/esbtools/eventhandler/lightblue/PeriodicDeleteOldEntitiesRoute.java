@@ -41,6 +41,7 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
     private final Duration deleteOlderThan;
     private final Duration deleteInterval;
     private final Clock clock;
+    private final String domain;
     private final String entityName;
     private final String entityVersion;
     private final String entityDateField;
@@ -52,21 +53,21 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
 
     public static PeriodicDeleteOldEntitiesRoute deletingNotificationsOlderThan(
             Duration deleteOlderThan, Duration deleteInterval, LightblueClient client,
-            LockStrategy lockStrategy, Clock clock) {
-        return new PeriodicDeleteOldEntitiesRoute(NotificationEntity.ENTITY_NAME,
+            String domain, LockStrategy lockStrategy, Clock clock) {
+        return new PeriodicDeleteOldEntitiesRoute(domain, NotificationEntity.ENTITY_NAME,
                 NotificationEntity.ENTITY_VERSION, "clientRequestDate", client, lockStrategy,
                 deleteOlderThan, deleteInterval, clock);
     }
 
     public static PeriodicDeleteOldEntitiesRoute deletingDocumentEventsOlderThan(
             Duration deleteOlderThan, Duration deleteInterval, LightblueClient client,
-            LockStrategy lockStrategy, Clock clock) {
-        return new PeriodicDeleteOldEntitiesRoute(DocumentEventEntity.ENTITY_NAME,
+            String domain, LockStrategy lockStrategy, Clock clock) {
+        return new PeriodicDeleteOldEntitiesRoute( domain, DocumentEventEntity.ENTITY_NAME,
                 DocumentEventEntity.VERSION, "creationDate", client, lockStrategy,
                 deleteOlderThan, deleteInterval, clock);
     }
 
-    public PeriodicDeleteOldEntitiesRoute(String entityName, String entityVersion,
+    public PeriodicDeleteOldEntitiesRoute(String domain, String entityName, String entityVersion,
             String entityDateField, LightblueClient client, LockStrategy lockStrategy,
             Duration deleteOlderThan, Duration deleteInterval, Clock clock) {
         this.client = client;
@@ -74,11 +75,12 @@ public class PeriodicDeleteOldEntitiesRoute extends RouteBuilder {
         this.deleteOlderThan = deleteOlderThan;
         this.deleteInterval = deleteInterval;
         this.clock = clock;
+        this.domain = domain;
         this.entityName = entityName;
         this.entityVersion = entityVersion;
         this.entityDateField = entityDateField;
 
-        deleterLockResourceId = "old_" + entityName + "_deleter";
+        deleterLockResourceId = "old_" + domain + "_" + entityName + "_deleter";
     }
 
     @Override

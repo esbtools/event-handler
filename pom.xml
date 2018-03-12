@@ -28,7 +28,7 @@
     <groupId>org.esbtools.eventhandler</groupId>
     <artifactId>event-handler-parent</artifactId>
     <packaging>pom</packaging>
-    <version>0.1.14-SNAPSHOT</version>
+    <version>0.1.15-SNAPSHOT</version>
     <name>event-handler: ${project.groupId}|${project.artifactId}</name>
     <description>Event Handler</description>
     <url>https://github.com/esbtools/event-handler</url>
