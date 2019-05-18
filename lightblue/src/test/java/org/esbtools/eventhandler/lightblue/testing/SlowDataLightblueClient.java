@@ -21,11 +21,14 @@ package org.esbtools.eventhandler.lightblue.testing;
 import com.redhat.lightblue.client.LightblueClient;
 import com.redhat.lightblue.client.LightblueException;
 import com.redhat.lightblue.client.Locking;
+import com.redhat.lightblue.client.ResultStream;
 import com.redhat.lightblue.client.request.DataBulkRequest;
 import com.redhat.lightblue.client.request.LightblueDataRequest;
 import com.redhat.lightblue.client.request.LightblueMetadataRequest;
+import com.redhat.lightblue.client.request.data.DataFindRequest;
 import com.redhat.lightblue.client.response.LightblueBulkDataResponse;
 import com.redhat.lightblue.client.response.LightblueDataResponse;
+import com.redhat.lightblue.client.response.LightblueDiagnosticsResponse;
 import com.redhat.lightblue.client.response.LightblueMetadataResponse;
 
 import java.time.Duration;
@@ -105,6 +108,16 @@ public class SlowDataLightblueClient implements LightblueClient {
     public <T> T data(LightblueDataRequest request, Class<T> aClass)
             throws LightblueException {
         return responseOnceFlushedOrLightblueException(() -> delegate.data(request, aClass));
+    }
+
+    @Override
+    public ResultStream prepareFind(DataFindRequest req) throws LightblueException {
+        throw new UnsupportedOperationException("prepareFind");
+    }
+
+    @Override
+    public LightblueDiagnosticsResponse diagnostics() throws LightblueException {
+        throw new UnsupportedOperationException("diagnostics");
     }
 
     private <T> T responseOnceFlushedOrLightblueException(Callable<T> request)
