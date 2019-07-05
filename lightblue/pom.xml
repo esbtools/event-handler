@@ -21,13 +21,13 @@
     <parent>
         <artifactId>event-handler-parent</artifactId>
         <groupId>org.esbtools.eventhandler</groupId>
-        <version>0.1.15-SNAPSHOT</version>
+        <version>0.1.15</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>event-handler-lightblue</artifactId>
     <name>event-handler: ${project.groupId}|${project.artifactId}</name>
     <properties>
-        <version.event-handler-lib>0.1.15-SNAPSHOT</version.event-handler-lib>
+        <version.event-handler-lib>0.1.15</version.event-handler-lib>
         <version.lightblue-notification-hook-model>0.1.3</version.lightblue-notification-hook-model>
         <version.lightblue-java-generator>0.1.5-SNAPSHOT</version.lightblue-java-generator>
         <version.lightblue-client>5.16.0</version.lightblue-client>
@@ -127,7 +127,7 @@
             <dependency>
                 <groupId>com.redhat.lightblue.generator</groupId>
                 <artifactId>lightblue-java-generator-lib</artifactId>
-                <version>${version.lightblue-java-generator}</version>
+                <version>0.1.5</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
@@ -154,7 +154,7 @@
         <dependency>
             <groupId>com.redhat.lightblue.generator</groupId>
             <artifactId>lightblue-java-generator-api</artifactId>
-            <version>${version.lightblue-java-generator}</version>
+            <version>0.1.5</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
