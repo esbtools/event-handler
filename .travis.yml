@@ -1,6 +1,6 @@
 language: java
 jdk:
-- oraclejdk8
+- oraclejdk9
 sudo: false
 before_install:
   - cp ./etc/settings.xml ~/.m2/
