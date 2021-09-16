@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.org/esbtools/event-handler.svg?branch=master)](https://travis-ci.org/esbtools/event-handler.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/esbtools/event-handler/badge.svg?branch=master&service=github)](https://coveralls.io/github/esbtools/event-handler?branch=master)
 [![Stories in Ready](https://badge.waffle.io/esbtools/event-handler.png?label=ready&title=Ready)](https://waffle.io/esbtools/event-handler)
 
@@ -57,10 +56,10 @@ An implementation of an event handler which reads notifications from an cooperat
 
 ## Releasing
 
-1. Make sure you can push to org.esbtools respositories. Open a ticket up with the [Sonatype 
-Jira](https://issues.sonatype.org/secure/Dashboard.jspa) (you will need to create an 
-account), with the OSSRH community project, choose "Task" type (not "New Project"), and simply 
-ask for permissions to push to org.esbtools releases and snapshots. A currently permitted 
+1. Make sure you can push to org.esbtools respositories. Open a ticket up with the [Sonatype
+Jira](https://issues.sonatype.org/secure/Dashboard.jspa) (you will need to create an
+account), with the OSSRH community project, choose "Task" type (not "New Project"), and simply
+ask for permissions to push to org.esbtools releases and snapshots. A currently permitted
 member may be asked to comment to confirm.
 2. Make sure lightblue entity class versions are not SNAPSHOT-ed. (documentEvent and
 eventHandlerConfig)
